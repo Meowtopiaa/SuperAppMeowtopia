@@ -21,16 +21,19 @@ class IncidentService {
     String? photoUrl,
     int? catId,
   }) async {
-    await _client.post('/incidents', data: {
-      'title': title,
-      'incident_type': incidentType,
-      'urgency_level': urgencyLevel,
-      'description': description,
-      'latitude': latitude,
-      'longitude': longitude,
-      'location_note': locationNote,
-      'photo_url': photoUrl,
-      'cat_id': catId,
-    });
+    await _client.post(
+      '/incidents',
+      data: {
+        'title': title,
+        'incident_type': incidentType,
+        'urgency_level': urgencyLevel,
+        'description': description,
+        'latitude': latitude,
+        'longitude': longitude,
+        'location_note': locationNote,
+        'photo_url': photoUrl,
+        'cat_id': catId,
+      },
+    );
   }
 }

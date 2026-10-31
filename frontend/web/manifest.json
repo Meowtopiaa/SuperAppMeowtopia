@@ -1,0 +1,9 @@
+{
+  "name": "Meowtopia",
+  "short_name": "Meowtopia",
+  "description": "Kampus ramah, kucing bahagia.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FAF8FF",
+  "theme_color": "#F97316"
+}

@@ -22,12 +22,15 @@ class CatHunterService {
     required double longitude,
     required String condition,
   }) async {
-    final response = await _client.post('/cat-hunter/encounter', data: {
-      'cat_qr_token': catQrToken,
-      'latitude': latitude,
-      'longitude': longitude,
-      'condition': condition,
-    });
+    final response = await _client.post(
+      '/cat-hunter/encounter',
+      data: {
+        'cat_qr_token': catQrToken,
+        'latitude': latitude,
+        'longitude': longitude,
+        'condition': condition,
+      },
+    );
     return response.data['data'];
   }
 }

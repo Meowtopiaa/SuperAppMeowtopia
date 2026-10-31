@@ -17,10 +17,7 @@ final List<RouteBase> catIdentificationRoutes = [
         path: 'question',
         builder: (context, state) => const QuestionPage(),
       ),
-      GoRoute(
-        path: 'result',
-        builder: (context, state) => const ResultPage(),
-      ),
+      GoRoute(path: 'result', builder: (context, state) => const ResultPage()),
     ],
   ),
 ];

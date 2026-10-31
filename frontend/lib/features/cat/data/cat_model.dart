@@ -47,8 +47,12 @@ class CatModel {
       adoptionStatus: json['adoption_status'] ?? 'available',
       description: json['description'],
       primaryPhotoUrl: json['primary_photo_url'],
-      lastSeenLat: json['last_seen_lat'] != null ? double.tryParse(json['last_seen_lat'].toString()) : null,
-      lastSeenLng: json['last_seen_lng'] != null ? double.tryParse(json['last_seen_lng'].toString()) : null,
+      lastSeenLat: json['last_seen_lat'] != null
+          ? double.tryParse(json['last_seen_lat'].toString())
+          : null,
+      lastSeenLng: json['last_seen_lng'] != null
+          ? double.tryParse(json['last_seen_lng'].toString())
+          : null,
       lastSeenLocationName: json['last_seen_location_name'],
     );
   }

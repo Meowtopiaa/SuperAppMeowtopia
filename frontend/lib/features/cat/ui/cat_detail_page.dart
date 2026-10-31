@@ -28,7 +28,9 @@ class _CatDetailPageState extends State<CatDetailPage> {
     final catProvider = context.watch<CatProvider>();
 
     if (catProvider.isLoading) {
-      return const Scaffold(body: LoadingIndicator(message: 'Memuat profil kucing...'));
+      return const Scaffold(
+        body: LoadingIndicator(message: 'Memuat profil kucing...'),
+      );
     }
 
     if (catProvider.errorMessage != null) {
@@ -43,7 +45,9 @@ class _CatDetailPageState extends State<CatDetailPage> {
 
     final cat = catProvider.selectedCat;
     if (cat == null) {
-      return const Scaffold(body: Center(child: Text('Kucing tidak ditemukan')));
+      return const Scaffold(
+        body: Center(child: Text('Kucing tidak ditemukan')),
+      );
     }
 
     return Scaffold(
@@ -68,23 +72,29 @@ class _CatDetailPageState extends State<CatDetailPage> {
                       : null,
                 ),
                 child: cat.primaryPhotoUrl == null
-                    ? const Icon(Icons.pets, size: 80, color: AppConstants.primaryColor)
+                    ? const Icon(
+                        Icons.pets,
+                        size: 80,
+                        color: AppConstants.primaryColor,
+                      )
                     : null,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               cat.name,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: [
                 Chip(label: Text(cat.breed)),
-                Chip(label: Text(cat.gender == 'male' ? 'Jantan ♂' : 'Betina ♀')),
+                Chip(
+                  label: Text(cat.gender == 'male' ? 'Jantan ♂' : 'Betina ♀'),
+                ),
                 Chip(label: Text('Kondisi: ${cat.healthStatus}')),
                 if (cat.sterilizationStatus)
                   const Chip(
@@ -101,12 +111,18 @@ class _CatDetailPageState extends State<CatDetailPage> {
             const SizedBox(height: 8),
             Text(
               cat.description ?? 'Belum ada deskripsi khusus untuk kucing ini.',
-              style: const TextStyle(color: AppConstants.textSecondary, height: 1.5),
+              style: const TextStyle(
+                color: AppConstants.textSecondary,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 24),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.qr_code, color: AppConstants.primaryColor),
+                leading: const Icon(
+                  Icons.qr_code,
+                  color: AppConstants.primaryColor,
+                ),
                 title: const Text('Token QR Kalung'),
                 subtitle: Text(cat.qrCodeToken),
               ),

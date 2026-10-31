@@ -35,7 +35,9 @@ class _CatEncounterPageState extends State<CatEncounterPage> {
     if (mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Kucing berhasil dijinakkan! +20 Poin & masuk Cat Dex 🎉'),
+          content: Text(
+            'Kucing berhasil dijinakkan! +20 Poin & masuk Cat Dex 🎉',
+          ),
           backgroundColor: AppConstants.successColor,
         ),
       );
@@ -63,7 +65,11 @@ class _CatEncounterPageState extends State<CatEncounterPage> {
             const CircleAvatar(
               radius: 50,
               backgroundColor: AppConstants.primaryLight,
-              child: Icon(Icons.pets, size: 50, color: AppConstants.primaryColor),
+              child: Icon(
+                Icons.pets,
+                size: 50,
+                color: AppConstants.primaryColor,
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -86,7 +92,7 @@ class _CatEncounterPageState extends State<CatEncounterPage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _condition,
+              initialValue: _condition,
               decoration: const InputDecoration(
                 labelText: 'Kondisi Kucing Saat Ini',
                 prefixIcon: Icon(Icons.favorite_border),
@@ -95,7 +101,10 @@ class _CatEncounterPageState extends State<CatEncounterPage> {
                 DropdownMenuItem(value: 'sehat', child: Text('Sehat & Ceria')),
                 DropdownMenuItem(value: 'tidur', child: Text('Sedang Tidur')),
                 DropdownMenuItem(value: 'lapar', child: Text('Tampak Lapar')),
-                DropdownMenuItem(value: 'luka_ringan', child: Text('Luka Ringan / Lemas')),
+                DropdownMenuItem(
+                  value: 'luka_ringan',
+                  child: Text('Luka Ringan / Lemas'),
+                ),
               ],
               onChanged: (val) {
                 if (val != null) setState(() => _condition = val);

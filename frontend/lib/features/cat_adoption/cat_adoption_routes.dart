@@ -11,15 +11,13 @@ final List<RouteBase> catAdoptionRoutes = [
       GoRoute(
         path: 'apply',
         builder: (context, state) {
-          final catId = int.tryParse(state.uri.queryParameters['cat_id'] ?? '0') ?? 0;
+          final catId =
+              int.tryParse(state.uri.queryParameters['cat_id'] ?? '0') ?? 0;
           final catName = state.uri.queryParameters['name'] ?? 'Kucing Kampus';
           return AdoptionFormPage(catId: catId, catName: catName);
         },
       ),
-      GoRoute(
-        path: 'my-cats',
-        builder: (context, state) => const MyCatsPage(),
-      ),
+      GoRoute(path: 'my-cats', builder: (context, state) => const MyCatsPage()),
     ],
   ),
 ];

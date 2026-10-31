@@ -40,7 +40,9 @@ class ApiClient {
               error: ApiException(
                 message: errorMessage,
                 statusCode: e.response?.statusCode,
-                errors: e.response?.data is Map ? e.response?.data['errors'] : null,
+                errors: e.response?.data is Map
+                    ? e.response?.data['errors']
+                    : null,
               ),
               response: e.response,
               type: e.type,
@@ -72,11 +74,16 @@ class ApiClient {
     }
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
       return await dio.get(path, queryParameters: queryParameters);
     } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'Unknown error');
     }
   }
 
@@ -84,7 +91,9 @@ class ApiClient {
     try {
       return await dio.post(path, data: data);
     } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'Unknown error');
     }
   }
 
@@ -92,7 +101,9 @@ class ApiClient {
     try {
       return await dio.put(path, data: data);
     } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'Unknown error');
     }
   }
 
@@ -100,7 +111,9 @@ class ApiClient {
     try {
       return await dio.delete(path);
     } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
+      throw (e.error is ApiException)
+          ? e.error as ApiException
+          : ApiException(message: e.message ?? 'Unknown error');
     }
   }
 }
