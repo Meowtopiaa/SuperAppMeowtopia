@@ -195,8 +195,7 @@ class _ScanSpotPageState extends State<ScanSpotPage>
                                       } catch (_) {
                                         if (mounted) {
                                           setState(
-                                            () => _error =
-                                                'Flash tidak tersedia di perangkat ini.',
+                                            () => _error = 'Flash tidak tersedia di perangkat ini.',
                                           );
                                         }
                                       }

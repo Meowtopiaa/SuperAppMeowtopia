@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../logic/incident_provider.dart';
@@ -142,8 +143,7 @@ class _CreateIncidentPageState extends State<CreateIncidentPage> {
               maxLines: 4,
               decoration: const InputDecoration(
                 labelText: 'Rincian Kondisi Insiden',
-                hintText:
-                    'Jelaskan kondisi fisik kucing, ciri-ciri, dan hal darurat lainnya...',
+                hintText: 'Jelaskan kondisi fisik kucing, ciri-ciri, dan hal darurat lainnya...',
               ),
             ),
             const SizedBox(height: 24),

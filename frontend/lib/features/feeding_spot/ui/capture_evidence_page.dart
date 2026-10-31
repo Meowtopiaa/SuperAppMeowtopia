@@ -54,8 +54,7 @@ class _CaptureEvidencePageState extends State<CaptureEvidencePage>
     } catch (_) {
       if (mounted && generation == _generation) {
         setState(
-          () => _error =
-              'Kamera belum dapat dibuka. Izinkan akses kamera di pengaturan perangkat atau browser, lalu coba lagi.',
+          () => _error = 'Kamera belum dapat dibuka. Izinkan akses kamera di pengaturan perangkat atau browser, lalu coba lagi.',
         );
       }
     }

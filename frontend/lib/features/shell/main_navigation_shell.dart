@@ -82,9 +82,8 @@ class MainNavigationShell extends StatelessWidget {
                                 );
                                 final itemHeight =
                                     48 +
-                                    (MediaQuery.textScalerOf(
-                                                  context,
-                                                ).scale(10) -
+                                    (MediaQuery.textScalerOf(context)
+                                                    .scale(10) -
                                                 10)
                                             .clamp(0.0, 20.0) *
                                         1.4;

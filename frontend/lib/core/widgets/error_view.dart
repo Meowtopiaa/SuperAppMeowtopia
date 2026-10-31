@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../constants/app_constants.dart';
 import 'custom_button.dart';
 
@@ -24,9 +25,8 @@ class ErrorView extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Oops! Terjadi Masalah',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(

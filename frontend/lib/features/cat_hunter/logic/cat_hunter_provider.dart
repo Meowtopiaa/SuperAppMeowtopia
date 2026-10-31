@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../data/cat_hunter_model.dart';
 import '../data/cat_hunter_service.dart';
 
