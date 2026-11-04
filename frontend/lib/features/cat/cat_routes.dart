@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+
 import 'ui/cat_detail_page.dart';
 import 'ui/cat_qr_page.dart';
 

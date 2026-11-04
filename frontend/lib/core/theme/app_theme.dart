@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import '../constants/app_constants.dart';
 
 class AppTheme {
@@ -14,24 +14,28 @@ class AppTheme {
         error: AppConstants.dangerColor,
       ),
       scaffoldBackgroundColor: AppConstants.backgroundColor,
-      textTheme: GoogleFonts.outfitTextTheme(),
-      appBarTheme: AppBarTheme(
+      fontFamily: 'Inter',
+      textTheme: ThemeData.light().textTheme.apply(
+        fontFamily: 'Inter',
+        bodyColor: AppConstants.textPrimary,
+        displayColor: AppConstants.textPrimary,
+      ),
+      appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: AppConstants.textPrimary),
-        titleTextStyle: GoogleFonts.outfit(
+        iconTheme: IconThemeData(color: AppConstants.textPrimary),
+        titleTextStyle: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: AppConstants.textPrimary,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppConstants.cardColor,
         elevation: 1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -42,7 +46,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.outfit(
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -51,7 +56,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -62,7 +70,10 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+          borderSide: const BorderSide(
+            color: AppConstants.primaryColor,
+            width: 2,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

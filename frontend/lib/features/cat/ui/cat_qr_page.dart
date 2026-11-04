@@ -19,7 +19,10 @@ class CatQrPage extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 qrToken,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
               const SizedBox(height: 8),
               const Text(

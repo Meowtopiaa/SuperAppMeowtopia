@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../logic/auth_provider.dart';
@@ -13,8 +14,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _emailController = TextEditingController(text: 'student@telkomuniversity.ac.id');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -34,7 +35,7 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     if (mounted && success) {
-      context.go('/feeding');
+      context.go('/home');
     } else if (mounted && auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -73,14 +74,14 @@ class _LoginPageState extends State<LoginPage> {
                   Text(
                     AppConstants.appName,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppConstants.primaryColor,
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: AppConstants.primaryColor,
+                    ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  const Text(
                     AppConstants.appTagline,
-                    style: const TextStyle(color: AppConstants.textSecondary),
+                    style: TextStyle(color: AppConstants.textSecondary),
                   ),
                   const SizedBox(height: 36),
                   TextFormField(
@@ -89,7 +90,9 @@ class _LoginPageState extends State<LoginPage> {
                       labelText: 'Email Kampus / SSO',
                       prefixIcon: Icon(Icons.email_outlined),
                     ),
-                    validator: (val) => val == null || !val.contains('@') ? 'Masukkan email valid' : null,
+                    validator: (val) => val == null || !val.contains('@')
+                        ? 'Masukkan email valid'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -99,7 +102,9 @@ class _LoginPageState extends State<LoginPage> {
                       labelText: 'Kata Sandi',
                       prefixIcon: Icon(Icons.lock_outline),
                     ),
-                    validator: (val) => val == null || val.length < 6 ? 'Sandi minimal 6 karakter' : null,
+                    validator: (val) => val == null || val.length < 6
+                        ? 'Sandi minimal 6 karakter'
+                        : null,
                   ),
                   const SizedBox(height: 24),
                   CustomButton(
@@ -111,7 +116,9 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => context.push('/register'),
-                    child: const Text('Belum punya akun? Daftar Mahasiswa di sini'),
+                    child: const Text(
+                      'Belum punya akun? Daftar Mahasiswa di sini',
+                    ),
                   ),
                 ],
               ),

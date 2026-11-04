@@ -16,7 +16,8 @@ class QuestionModel {
       id: json['id'] ?? 0,
       questionText: json['question_text'] ?? '',
       traitCategory: json['trait_category'] ?? '',
-      options: (json['options'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      options:
+          (json['options'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../logic/adoption_provider.dart';
@@ -9,7 +10,11 @@ class AdoptionFormPage extends StatefulWidget {
   final int catId;
   final String catName;
 
-  const AdoptionFormPage({super.key, required this.catId, required this.catName});
+  const AdoptionFormPage({
+    super.key,
+    required this.catId,
+    required this.catName,
+  });
 
   @override
   State<AdoptionFormPage> createState() => _AdoptionFormPageState();
@@ -33,7 +38,9 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
     if (mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Formulir adopsi berhasil dikirim! Menunggu persetujuan admin.'),
+          content: Text(
+            'Formulir adopsi berhasil dikirim! Menunggu persetujuan admin.',
+          ),
           backgroundColor: AppConstants.successColor,
         ),
       );
@@ -69,15 +76,29 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
               style: TextStyle(color: AppConstants.textSecondary),
             ),
             const SizedBox(height: 24),
-            const Text('Tipe Tempat Tinggal', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Tipe Tempat Tinggal',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _housingType,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.home_outlined)),
+              initialValue: _housingType,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.home_outlined),
+              ),
               items: const [
-                DropdownMenuItem(value: 'kos', child: Text('Kos (Boleh Pelihara Hewan)')),
-                DropdownMenuItem(value: 'rumah_kontrakan', child: Text('Rumah Kontrakan')),
-                DropdownMenuItem(value: 'rumah_pribadi', child: Text('Rumah Pribadi')),
+                DropdownMenuItem(
+                  value: 'kos',
+                  child: Text('Kos (Boleh Pelihara Hewan)'),
+                ),
+                DropdownMenuItem(
+                  value: 'rumah_kontrakan',
+                  child: Text('Rumah Kontrakan'),
+                ),
+                DropdownMenuItem(
+                  value: 'rumah_pribadi',
+                  child: Text('Rumah Pribadi'),
+                ),
               ],
               onChanged: (val) {
                 if (val != null) setState(() => _housingType = val);
@@ -86,13 +107,17 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
             const SizedBox(height: 16),
             SwitchListTile(
               title: const Text('Kesiapan Finansial'),
-              subtitle: const Text('Sanggup memenuhi pakan, pasir, dan vaksin rutin kucing.'),
+              subtitle: const Text(
+                'Sanggup memenuhi pakan, pasir, dan vaksin rutin kucing.',
+              ),
               value: _financialReadiness,
               onChanged: (val) => setState(() => _financialReadiness = val),
             ),
             SwitchListTile(
               title: const Text('Izin Pemilik Tempat / Keluarga'),
-              subtitle: const Text('Telah mendapat izin dari pemilik kos atau keluarga di rumah.'),
+              subtitle: const Text(
+                'Telah mendapat izin dari pemilik kos atau keluarga di rumah.',
+              ),
               value: _familyPermission,
               onChanged: (val) => setState(() => _familyPermission = val),
             ),

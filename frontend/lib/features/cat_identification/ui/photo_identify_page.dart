@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/custom_button.dart';
 
@@ -21,15 +22,28 @@ class PhotoIdentifyPage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                border: Border.all(
+                  color: Colors.grey.shade300,
+                  style: BorderStyle.solid,
+                ),
               ),
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo_outlined, size: 54, color: AppConstants.primaryColor),
+                  Icon(
+                    Icons.add_a_photo_outlined,
+                    size: 54,
+                    color: AppConstants.primaryColor,
+                  ),
                   SizedBox(height: 12),
-                  Text('Ambil atau Unggah Foto Kucing', style: TextStyle(fontWeight: FontWeight.w600)),
-                  Text('Pastikan wajah atau corak tubuh terlihat jelas', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(
+                    'Ambil atau Unggah Foto Kucing',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    'Pastikan wajah atau corak tubuh terlihat jelas',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
                 ],
               ),
             ),

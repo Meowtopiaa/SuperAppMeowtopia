@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'app.dart';
 import 'features/auth/logic/auth_provider.dart';
 import 'features/cat/logic/cat_provider.dart';

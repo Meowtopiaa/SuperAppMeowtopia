@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../logic/incident_provider.dart';
@@ -28,7 +29,8 @@ class _CreateIncidentPageState extends State<CreateIncidentPage> {
   }
 
   void _onSubmit() async {
-    if (_titleController.text.trim().isEmpty || _descController.text.trim().isEmpty) {
+    if (_titleController.text.trim().isEmpty ||
+        _descController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Judul dan rincian insiden wajib diisi')),
       );
@@ -49,7 +51,9 @@ class _CreateIncidentPageState extends State<CreateIncidentPage> {
     if (mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Laporan insiden darurat berhasil dikirim! Tim relawan telah disiagakan.'),
+          content: Text(
+            'Laporan insiden darurat berhasil dikirim! Tim relawan telah disiagakan.',
+          ),
           backgroundColor: AppConstants.successColor,
         ),
       );
@@ -76,14 +80,29 @@ class _CreateIncidentPageState extends State<CreateIncidentPage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _incidentType,
+              initialValue: _incidentType,
               decoration: const InputDecoration(labelText: 'Tipe Insiden'),
               items: const [
-                DropdownMenuItem(value: 'injured', child: Text('Kucing Terluka / Tertabrak')),
-                DropdownMenuItem(value: 'severely_ill', child: Text('Sakit Parah / Muntah Darah')),
-                DropdownMenuItem(value: 'trapped', child: Text('Terjebak di Ketinggian / Saluran')),
-                DropdownMenuItem(value: 'abuse', child: Text('Dugaan Penganiayaan Hewan')),
-                DropdownMenuItem(value: 'missing', child: Text('Kucing Hilang / Dicari')),
+                DropdownMenuItem(
+                  value: 'injured',
+                  child: Text('Kucing Terluka / Tertabrak'),
+                ),
+                DropdownMenuItem(
+                  value: 'severely_ill',
+                  child: Text('Sakit Parah / Muntah Darah'),
+                ),
+                DropdownMenuItem(
+                  value: 'trapped',
+                  child: Text('Terjebak di Ketinggian / Saluran'),
+                ),
+                DropdownMenuItem(
+                  value: 'abuse',
+                  child: Text('Dugaan Penganiayaan Hewan'),
+                ),
+                DropdownMenuItem(
+                  value: 'missing',
+                  child: Text('Kucing Hilang / Dicari'),
+                ),
                 DropdownMenuItem(value: 'other', child: Text('Lainnya')),
               ],
               onChanged: (val) {
@@ -92,11 +111,17 @@ class _CreateIncidentPageState extends State<CreateIncidentPage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _urgencyLevel,
+              initialValue: _urgencyLevel,
               decoration: const InputDecoration(labelText: 'Tingkat Urgensi'),
               items: const [
-                DropdownMenuItem(value: 'critical', child: Text('Kritis (Butuh Penanganan < 30 Menit)')),
-                DropdownMenuItem(value: 'high', child: Text('Tinggi (Segera / Hari Ini)')),
+                DropdownMenuItem(
+                  value: 'critical',
+                  child: Text('Kritis (Butuh Penanganan < 30 Menit)'),
+                ),
+                DropdownMenuItem(
+                  value: 'high',
+                  child: Text('Tinggi (Segera / Hari Ini)'),
+                ),
                 DropdownMenuItem(value: 'medium', child: Text('Sedang')),
                 DropdownMenuItem(value: 'low', child: Text('Rendah')),
               ],
