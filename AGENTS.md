@@ -1,6 +1,6 @@
 # Meowtopia: Panduan untuk Agen Pengkodean
 
-Sumber kebenaran: `docs/PRD.md` (PRD Final v1.1). Jika kode dan PRD berbeda, laporkan ke PM. Jangan menebak.
+Acuan dan pedoman utama: `docs/PRD.md` (PRD Final v1.1). Jika kode dan PRD berbeda, laporkan ke PM. Jangan menebak.
 
 ## Stack
 - **Backend:** Laravel (REST `/api/v1`, `backend/app/Modules/*`)

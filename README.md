@@ -89,7 +89,7 @@ Meowtopia/
 
 ## 📜 Aturan Keras Pengkodean (*Hard Rules*)
 
-Sumber kebenaran tunggal: `docs/PRD.md` (PRD Final v1.1).
+Acuan dan pedoman utama: `docs/PRD.md` (PRD Final v1.1).
 1. **Satu tabel `cats`:** Hanya satu tabel master kucing. Modul dilarang membuat tabel kucing, saldo poin, atau laporan insiden sendiri.
 2. **Poin & Status Kucing:** Poin hanya melalui `PointService::award()`. Status kucing hanya melalui `CatStatusService::change()`.
 3. **RBAC & Autentikasi:** Izin diperiksa melalui permission atau policy Spatie, bukan string role. Registrasi tidak menerima role dari input pengguna.

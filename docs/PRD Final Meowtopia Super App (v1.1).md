@@ -153,7 +153,7 @@ Satu log untuk semua modul. Kolom request\_id mencegah duplikat saat retry. Scan
 - Semua modul memberi poin lewat `PointService::award()` dengan `idempotency_key`. Modul tidak menulis saldo.
 - `point_rules` menyimpan nilai, batas harian per aturan, dan batas total harian. Admin dapat mengubahnya tanpa rilis.
 - Ledger bersifat tambah-saja. Koreksi dibuat sebagai transaksi reversal yang merujuk transaksi asal.
-- Saldo adalah cache dari ledger; sumber kebenaran tetap ledger. Leaderboard dihitung dari ledger dan dapat difilter per sumber (misalnya skor game hanya dari aturan `game.*`).
+- Saldo adalah cache dari ledger; acuan data utama tetap ledger. Leaderboard dihitung dari ledger dan dapat difilter per sumber (misalnya skor game hanya dari aturan `game.*`).
 - Status aktivitas (VERIFIED) dan status poin (CREDITED) ditampilkan terpisah. Aktivitas VERIFIED tetap VERIFIED walau poin PENDING, FAILED, atau tidak memenuhi syarat.
 - Ledger berada di database yang sama dengan modul, jadi pemberian poin dipanggil dalam transaksi database yang sama dan tidak memerlukan outbox. Jika kelak dipisah, tambahkan outbox dan rekonsiliasi.
 - Tidak ada poin untuk membuka profil atau identifikasi. Laporan yang sama tidak menerima dua reward hanya karena berawal dari game lalu dikirim ke insiden.
