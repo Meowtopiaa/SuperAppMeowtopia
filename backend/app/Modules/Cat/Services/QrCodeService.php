@@ -7,20 +7,30 @@ use Illuminate\Support\Str;
 class QrCodeService
 {
     /**
-     * Generate unique collar QR code token for a cat
+     * Generate 32-character random token for a cat collar.
+     * Raw QR string in the collar tag is: MTP1.C.<token>
      */
-    public function generateCatQrToken(string $prefix = 'MEOW-CAT'): string
+    public function generateToken(): string
     {
-        return $prefix . '-' . strtoupper(Str::random(10));
+        return Str::random(32);
     }
 
     /**
-     * Verify or parse a QR code string
+     * Format full QR payload string
+     */
+    public function formatQrPayload(string $token): string
+    {
+        return 'MTP1.C.' . $token;
+    }
+
+    /**
+     * Parse raw QR content. Returns the token if valid, null otherwise.
      */
     public function parseCatQr(string $qrContent): ?string
     {
-        if (str_starts_with($qrContent, 'MEOW-CAT-')) {
-            return trim($qrContent);
+        $parts = explode('.', trim($qrContent));
+        if (count($parts) === 3 && $parts[0] === 'MTP1' && $parts[1] === 'C') {
+            return $parts[2];
         }
         return null;
     }

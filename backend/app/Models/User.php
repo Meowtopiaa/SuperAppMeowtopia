@@ -2,17 +2,27 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasUlids, SoftDeletes, HasRoles;
+
+    /**
+     * Primary key type
+     */
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     /**
      * The attributes that are mass assignable.
+     * Note: role and user_type are NEVER mass assignable from user request.
      *
      * @var array<int, string>
      */
@@ -20,11 +30,11 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',          // student, adopter, volunteer, admin
-        'student_id',    // NIM Telkom University
+        'identity_number',
         'phone',
-        'points_balance',
-        'avatar_url',
+        'avatar_media_id',
+        'is_active',
+        'last_login_at',
     ];
 
     /**
@@ -47,7 +57,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'points_balance' => 'integer',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 }

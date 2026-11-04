@@ -2,24 +2,30 @@
 
 namespace App\Modules\CatAdoption\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AdoptionFollowup extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
+
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
-        'adoption_application_id',
-        'period_number',      // 1, 2, 3 (bi-weekly reports)
-        'photo_proof_url',
-        'condition_notes',
-        'health_condition',   // excellent, good, sick
-        'status',             // submitted, reviewed
+        'adoption_id',
+        'period_no',
+        'due_at',
+        'submitted_at',
+        'condition_note',
+        'issue_note',
+        'media_id',
+        'status',             // PENDING, SUBMITTED, LATE, REVIEWED
     ];
 
-    public function application()
-    {
-        return $this->belongsTo(AdoptionApplication::class, 'adoption_application_id');
-    }
+    protected $casts = [
+        'due_at' => 'datetime',
+        'submitted_at' => 'datetime',
+    ];
 }

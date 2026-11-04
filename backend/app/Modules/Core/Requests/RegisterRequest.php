@@ -13,12 +13,26 @@ class RegisterRequest extends FormRequest
 
     public function rules(): array
     {
+        $allowedDomains = explode(',', env('ALLOWED_EMAIL_DOMAINS', 'student.telkomuniversity.ac.id,telkomuniversity.ac.id'));
+
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                'unique:users,email',
+                function ($attribute, $value, $fail) use ($allowedDomains) {
+                    $parts = explode('@', $value);
+                    $domain = end($parts);
+                    if (!empty($allowedDomains) && !in_array($domain, $allowedDomains, true)) {
+                        $fail("Domain email tidak diizinkan. Gunakan email kampus resmi.");
+                    }
+                },
+            ],
             'password' => ['required', 'string', 'min:8'],
-            'student_id' => ['nullable', 'string', 'max:30'],
-            'role' => ['nullable', 'in:student,adopter,volunteer,admin'],
+            'identity_number' => ['nullable', 'string', 'max:30'],
             'phone' => ['nullable', 'string', 'max:20'],
         ];
     }

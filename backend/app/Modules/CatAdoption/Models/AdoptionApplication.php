@@ -2,6 +2,7 @@
 
 namespace App\Modules\CatAdoption\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
@@ -9,39 +10,46 @@ use App\Modules\Cat\Models\Cat;
 
 class AdoptionApplication extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
+
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
-        'user_id',
+        'applicant_id',
         'cat_id',
-        'status',             // submitted, reviewing, approved, rejected, handed_over
-        'housing_type',       // kos, rumah_kontrakan, rumah_pribadi
-        'financial_readiness',// boolean or text
-        'family_permission',  // boolean
-        'commitment_answers', // JSON
-        'admin_notes',
-        'handed_over_at',
+        'housing_type',
+        'owner_permission',
+        'can_afford',
+        'long_term_plan',
+        'answers',
+        'commitment_version',
+        'commitment_accepted_at',
+        'precheck_passed',
+        'status',             // DRAFT, SUBMITTED, REVISION_REQUESTED, APPROVED, REJECTED
+        'submitted_at',
+        'reviewed_by',
+        'reviewed_at',
+        'review_note',
     ];
 
     protected $casts = [
-        'financial_readiness' => 'boolean',
-        'family_permission' => 'boolean',
-        'commitment_answers' => 'array',
-        'handed_over_at' => 'datetime',
+        'owner_permission' => 'boolean',
+        'can_afford' => 'boolean',
+        'precheck_passed' => 'boolean',
+        'answers' => 'array',
+        'commitment_accepted_at' => 'datetime',
+        'submitted_at' => 'datetime',
+        'reviewed_at' => 'datetime',
     ];
 
-    public function user()
+    public function applicant()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'applicant_id');
     }
 
     public function cat()
     {
         return $this->belongsTo(Cat::class);
-    }
-
-    public function followups()
-    {
-        return $this->hasMany(AdoptionFollowup::class);
     }
 }

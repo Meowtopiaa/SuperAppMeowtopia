@@ -3,19 +3,27 @@
 namespace App\Support;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 
 class ApiResponse
 {
     /**
      * Standard success JSON response.
+     * Format: { success: true, message: string, data: mixed, meta?: mixed }
      */
-    public static function success(mixed $data = null, string $message = 'Success', int $statusCode = 200): JsonResponse
+    public static function success(mixed $data = null, string $message = 'Success', int $statusCode = 200, mixed $meta = null): JsonResponse
     {
-        return response()->json([
-            'status' => 'success',
+        $payload = [
+            'success' => true,
             'message' => $message,
             'data' => $data,
-        ], $statusCode);
+        ];
+
+        if ($meta !== null) {
+            $payload['meta'] = $meta;
+        }
+
+        return response()->json($payload, $statusCode);
     }
 
     /**
@@ -28,12 +36,20 @@ class ApiResponse
 
     /**
      * Standard error JSON response.
+     * Format: { success: false, code: string, message: string, errors?: mixed, request_id: string }
      */
-    public static function error(string $message = 'An error occurred', int $statusCode = 400, mixed $errors = null): JsonResponse
-    {
+    public static function error(
+        string $message = 'An error occurred',
+        int $statusCode = 400,
+        string $code = 'ERROR',
+        mixed $errors = null,
+        ?string $requestId = null
+    ): JsonResponse {
         $payload = [
-            'status' => 'error',
+            'success' => false,
+            'code' => $code,
             'message' => $message,
+            'request_id' => $requestId ?? (string) Str::uuid(),
         ];
 
         if ($errors !== null) {
@@ -48,17 +64,14 @@ class ApiResponse
      */
     public static function paginated(mixed $paginator, string $message = 'Data retrieved successfully'): JsonResponse
     {
-        return response()->json([
-            'status' => 'success',
-            'message' => $message,
-            'data' => $paginator->items(),
-            'pagination' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-                'has_more' => $paginator->hasMorePages(),
-            ],
-        ]);
+        $meta = [
+            'current_page' => $paginator->currentPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'last_page' => $paginator->lastPage(),
+            'has_more' => $paginator->hasMorePages(),
+        ];
+
+        return self::success($paginator->items(), $message, 200, $meta);
     }
 }
