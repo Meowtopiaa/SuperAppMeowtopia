@@ -3,15 +3,27 @@
 namespace App\Modules\FeedingSpot\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Services\PointService;
+use App\Modules\FeedingSpot\Events\FeedingVerified;
+use App\Modules\FeedingSpot\Models\FeedingActivity;
+use App\Modules\FeedingSpot\Models\FeedingAggregate;
+use App\Modules\FeedingSpot\Models\FeedingEvidence;
+use App\Modules\FeedingSpot\Models\FeedingReview;
+use App\Modules\FeedingSpot\Models\FeedingRuleResult;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AdminFeedingSpotController extends Controller
 {
+    public function __construct(
+        private readonly PointService $pointService,
+    ) {}
+
     /**
      * POST /api/v1/admin/feeding/spots
      * Buat titik feeding spot baru beserta token QR resmi (AFS-01, MEOW-7).
@@ -117,5 +129,222 @@ class AdminFeedingSpotController extends Controller
             'qr_token' => $spot->qr_token,
             'qr_payload' => "MTP1.S.{$spot->qr_token}",
         ], 'Token QR feeding spot berhasil diperbarui.');
+    }
+
+    /**
+     * GET /api/v1/admin/feeding/review-queue
+     * Daftar antrean pengajuan pemberian makan berstatus UNDER_REVIEW (AFS-07, MEOW-12).
+     * Permission: feeding.review
+     */
+    public function reviewQueue(Request $request): JsonResponse
+    {
+        $status = $request->filled('status')
+            ? $request->string('status')->upper()->toString()
+            : 'UNDER_REVIEW';
+
+        $items = FeedingActivity::query()
+            ->where('status', $status)
+            ->with([
+                'user:id,name,email,user_type',
+                'spot:id,code,name,latitude,longitude,status',
+                'cat:id,unique_code,name',
+                'evidence',
+                'ruleResults',
+                'reviews.reviewer:id,name',
+            ])
+            ->orderBy('finalized_at')
+            ->get()
+            ->map(fn (FeedingActivity $a) => [
+                'id' => $a->id,
+                'feeding_record_ref' => $a->feeding_record_ref,
+                'status' => $a->status,
+                'reward_status' => $a->reward_status,
+                'points_awarded' => $a->points_awarded,
+                'food_type' => $a->food_type,
+                'food_amount' => $a->food_amount,
+                'notes' => $a->notes,
+                'flags' => $a->flags ?? [],
+                'scanned_at' => $a->scanned_at?->toIso8601String(),
+                'submitted_at' => $a->finalized_at?->toIso8601String(),
+                'verified_at' => $a->status === 'VERIFIED' ? $a->finalized_at?->toIso8601String() : null,
+                'user' => $a->user ? [
+                    'id' => $a->user->id,
+                    'name' => $a->user->name,
+                    'email' => $a->user->email,
+                    'user_type' => $a->user->user_type,
+                ] : null,
+                'spot' => $a->spot ? [
+                    'id' => $a->spot->id,
+                    'code' => $a->spot->code,
+                    'name' => $a->spot->name,
+                ] : null,
+                'cat' => $a->cat ? [
+                    'id' => $a->cat->id,
+                    'unique_code' => $a->cat->unique_code,
+                    'name' => $a->cat->name,
+                ] : null,
+                'evidence' => $a->evidence->map(fn (FeedingEvidence $e) => [
+                    'id' => $e->id,
+                    'media_id' => $e->media_id,
+                    'sort_order' => $e->sort_order,
+                ])->values(),
+                'rule_results' => $a->ruleResults->map(fn (FeedingRuleResult $r) => [
+                    'rule' => $r->rule,
+                    'result' => $r->result,
+                    'detail' => $r->detail,
+                ])->values(),
+            ])
+            ->values();
+
+        return ApiResponse::success($items, 'Antrean review pemberian pakan berhasil diambil.');
+    }
+
+    /**
+     * POST /api/v1/admin/feeding/activities/{id}/review
+     * Simpan keputusan reviewer (VERIFIED atau REJECTED) dengan larangan self-review (AFS-07, AFS-10, MEOW-12).
+     * Permission: feeding.review
+     */
+    public function reviewActivity(Request $request, string $id): JsonResponse
+    {
+        $activity = FeedingActivity::with(['user', 'spot'])->find($id);
+        if (!$activity) {
+            return ApiResponse::error('Aktivitas pemberian pakan tidak ditemukan.', 404, 'ACTIVITY_NOT_FOUND');
+        }
+
+        $reviewer = $request->user();
+
+        // AFS-07: Reviewer tidak boleh me-review pengajuannya sendiri
+        if ($activity->user_id === $reviewer->id) {
+            return ApiResponse::error(
+                'Reviewer tidak diperbolehkan memeriksa pengajuan pemberian pakan miliknya sendiri.',
+                403,
+                'SELF_REVIEW_FORBIDDEN'
+            );
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', 'string', Rule::in(['VERIFIED', 'REJECTED'])],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if (!in_array($activity->status, ['UNDER_REVIEW', 'SUBMITTED'], true)) {
+            return ApiResponse::error(
+                "Aktivitas berstatus {$activity->status} tidak dapat direview.",
+                422,
+                'INVALID_ACTIVITY_STATUS'
+            );
+        }
+
+        $decision = $validated['decision'];
+        $reason = $validated['notes'] ?? $validated['reason'] ?? null;
+
+        $payload = DB::transaction(function () use ($activity, $reviewer, $decision, $reason) {
+            FeedingReview::create([
+                'activity_id' => $activity->id,
+                'reviewer_id' => $reviewer->id,
+                'decision' => $decision,
+                'reason' => $reason,
+            ]);
+
+            if ($decision === 'VERIFIED') {
+                $award = $this->pointService->award(
+                    user: $activity->user,
+                    ruleKey: 'feeding.verified',
+                    sourceModule: 'FeedingSpot',
+                    sourceType: 'feeding_activity',
+                    sourceRefId: $activity->id,
+                    idempotencyKey: "feeding.verified:{$activity->id}"
+                );
+
+                $pointsAwarded = (int) ($award['points'] ?? 0);
+                $rewardCapped = (bool) ($award['reward_capped'] ?? false);
+                $snapshot = $activity->reward_snapshot ?? [];
+
+                $activity->update([
+                    'status' => 'VERIFIED',
+                    'reward_status' => 'CREDITED',
+                    'potential_points' => $pointsAwarded,
+                    'reward_snapshot' => array_merge($snapshot, [
+                        'points_awarded' => $pointsAwarded,
+                        'reward_capped' => $rewardCapped,
+                        'transaction_id' => $award['transaction_id'] ?? null,
+                        'review_reason' => $reason,
+                    ]),
+                ]);
+
+                $this->refreshSpotAggregate($activity->spot_id);
+                event(new FeedingVerified($activity->fresh()));
+
+                return [
+                    'activity_id' => $activity->id,
+                    'decision' => 'VERIFIED',
+                    'status' => 'VERIFIED',
+                    'reward_status' => 'CREDITED',
+                    'points_awarded' => $pointsAwarded,
+                    'reward_capped' => $rewardCapped,
+                    'reviewed_by' => $reviewer->id,
+                    'reviewed_at' => now()->toIso8601String(),
+                ];
+            }
+
+            // REJECTED
+            $snapshot = $activity->reward_snapshot ?? [];
+            $activity->update([
+                'status' => 'REJECTED',
+                'reward_status' => 'NOT_ELIGIBLE',
+                'reward_snapshot' => array_merge($snapshot, [
+                    'points_awarded' => 0,
+                    'review_reason' => $reason,
+                ]),
+            ]);
+
+            $this->refreshSpotAggregate($activity->spot_id);
+
+            return [
+                'activity_id' => $activity->id,
+                'decision' => 'REJECTED',
+                'status' => 'REJECTED',
+                'reward_status' => 'NOT_ELIGIBLE',
+                'points_awarded' => 0,
+                'reward_capped' => false,
+                'reviewed_by' => $reviewer->id,
+                'reviewed_at' => now()->toIso8601String(),
+            ];
+        });
+
+        return ApiResponse::success($payload, 'Keputusan review berhasil disimpan.');
+    }
+
+    /**
+     * Perbarui agregat 14 hari terakhir untuk spot (feeding_aggregates).
+     */
+    private function refreshSpotAggregate(string $spotId): FeedingAggregate
+    {
+        $windowStart = now()->subDays(14)->startOfDay();
+        $windowEnd = now();
+
+        $verifiedCount = FeedingActivity::query()
+            ->where('spot_id', $spotId)
+            ->where('status', 'VERIFIED')
+            ->where('finalized_at', '>=', $windowStart)
+            ->count();
+
+        $pendingCount = FeedingActivity::query()
+            ->where('spot_id', $spotId)
+            ->where('status', 'UNDER_REVIEW')
+            ->where('finalized_at', '>=', $windowStart)
+            ->count();
+
+        return FeedingAggregate::updateOrCreate(
+            ['spot_id' => $spotId],
+            [
+                'window_start' => $windowStart,
+                'window_end' => $windowEnd,
+                'verified_count' => $verifiedCount,
+                'pending_count' => $pendingCount,
+                'computed_at' => now(),
+            ]
+        );
     }
 }

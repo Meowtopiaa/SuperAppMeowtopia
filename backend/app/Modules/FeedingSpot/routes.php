@@ -35,6 +35,12 @@ Route::prefix('admin/feeding')->middleware('auth:sanctum')->group(function () {
         Route::patch('/spots/{id}', [AdminFeedingSpotController::class, 'updateSpot']);
         Route::post('/spots/{id}/qr', [AdminFeedingSpotController::class, 'regenerateQr']);
     });
+
+    // Antrean Review & Keputusan Reviewer (Permission: feeding.review) (MEOW-12)
+    Route::middleware('can:feeding.review')->group(function () {
+        Route::get('/review-queue', [AdminFeedingSpotController::class, 'reviewQueue']);
+        Route::post('/activities/{id}/review', [AdminFeedingSpotController::class, 'reviewActivity']);
+    });
 });
 
 // Backward-compatible legacy alias (/api/v1/feeding-spots)

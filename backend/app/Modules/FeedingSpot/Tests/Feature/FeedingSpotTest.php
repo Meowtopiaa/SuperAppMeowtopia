@@ -534,4 +534,86 @@ class FeedingSpotTest extends TestCase
             ->count();
         $this->assertEquals(1, $sightingCount);
     }
+
+    public function test_meow_12_review_queue_and_reviewer_decision_prevent_self_review_and_award_points(): void
+    {
+        DB::table('point_rules')->insert([
+            'id' => (string) Str::ulid(),
+            'rule_key' => 'feeding.verified',
+            'module' => 'FeedingSpot',
+            'points' => 10,
+            'daily_cap_count' => 3,
+            'daily_cap_points' => 60,
+            'description' => 'Aktivitas pemberian pakan terverifikasi',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('point_balances')->insert([
+            'user_id' => $this->student->id,
+            'total_points' => 0,
+            'updated_at' => now(),
+        ]);
+
+        $adminOwnSubmission = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->spotAdmin->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'UNDER_REVIEW',
+            'reward_status' => 'PENDING',
+            'potential_points' => 10,
+            'scanned_at' => now()->subMinutes(10),
+            'finalized_at' => now()->subMinutes(5),
+        ]);
+
+        $studentSubmission = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'UNDER_REVIEW',
+            'reward_status' => 'PENDING',
+            'potential_points' => 10,
+            'scanned_at' => now()->subMinutes(8),
+            'finalized_at' => now()->subMinutes(3),
+        ]);
+
+        // 1. Mahasiswa biasa tanpa permission feeding.review ditolak (403)
+        $forbiddenQueue = $this->actingAs($this->student, 'sanctum')
+            ->getJson('/api/v1/admin/feeding/review-queue');
+        $forbiddenQueue->assertStatus(403);
+
+        // 2. Spot Admin bisa melihat antrean review (200)
+        $queueResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->getJson('/api/v1/admin/feeding/review-queue');
+        $queueResp->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+
+        // 3. AFS-07: Reviewer tidak boleh me-review pengajuannya sendiri (403 SELF_REVIEW_FORBIDDEN)
+        $selfReviewResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/activities/{$adminOwnSubmission->id}/review", [
+                'decision' => 'VERIFIED',
+                'notes' => 'Approve punya sendiri',
+            ]);
+        $selfReviewResp->assertStatus(403)
+            ->assertJsonPath('code', 'SELF_REVIEW_FORBIDDEN');
+
+        // 4. Validasi gagal ketika decision tidak valid (422)
+        $invalidResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/activities/{$studentSubmission->id}/review", [
+                'decision' => 'INVALID_DECISION',
+            ]);
+        $invalidResp->assertStatus(422);
+
+        // 5. Sukses menyetujui pengajuan mahasiswa: status VERIFIED & poin CREDITED
+        $approveResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/activities/{$studentSubmission->id}/review", [
+                'decision' => 'VERIFIED',
+                'notes' => 'Bukti foto mangkuk jelas dan sesuai spot',
+            ]);
+        $approveResp->assertStatus(200)
+            ->assertJsonPath('data.status', 'VERIFIED')
+            ->assertJsonPath('data.reward_status', 'CREDITED')
+            ->assertJsonPath('data.points_awarded', 10);
+    }
 }
