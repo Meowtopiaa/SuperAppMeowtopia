@@ -1,11 +1,12 @@
 <?php
 
+use App\Modules\FeedingSpot\Controllers\AdminFeedingSpotController;
 use App\Modules\FeedingSpot\Controllers\FeedingSpotController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Adopt Feeding Spot (AFS) Routes — /api/v1/feeding/*
+| Adopt Feeding Spot (AFS) Routes — /api/v1/feeding/* & /api/v1/admin/feeding/*
 |--------------------------------------------------------------------------
 */
 
@@ -13,6 +14,16 @@ Route::prefix('feeding')->group(function () {
     // Public / Read Endpoints (MEOW-6)
     Route::get('/spots', [FeedingSpotController::class, 'listSpots']);
     Route::get('/spots/{id}', [FeedingSpotController::class, 'showSpot']);
+});
+
+// Admin Endpoints — /api/v1/admin/feeding/*
+Route::prefix('admin/feeding')->middleware('auth:sanctum')->group(function () {
+    // Kelola Spot & QR (Permission: spot.manage) (MEOW-7)
+    Route::middleware('can:spot.manage')->group(function () {
+        Route::post('/spots', [AdminFeedingSpotController::class, 'storeSpot']);
+        Route::patch('/spots/{id}', [AdminFeedingSpotController::class, 'updateSpot']);
+        Route::post('/spots/{id}/qr', [AdminFeedingSpotController::class, 'regenerateQr']);
+    });
 });
 
 // Backward-compatible legacy alias (/api/v1/feeding-spots)

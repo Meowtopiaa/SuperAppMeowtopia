@@ -10,6 +10,8 @@ use App\Modules\FeedingSpot\Models\FeedingSpot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class FeedingSpotTest extends TestCase
@@ -17,6 +19,7 @@ class FeedingSpotTest extends TestCase
     use RefreshDatabase;
 
     private User $student;
+    private User $spotAdmin;
     private FeedingSpot $activeSpot;
     private FeedingSpot $inactiveSpot;
 
@@ -34,6 +37,19 @@ class FeedingSpotTest extends TestCase
     {
         parent::setUp();
 
+        foreach (['spot.manage', 'feeding.review'] as $perm) {
+            Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'sanctum']);
+            Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
+        }
+
+        $userRole = Role::firstOrCreate(['name' => 'user', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'user', 'guard_name' => 'sanctum']);
+
+        $adminRoleWeb = Role::firstOrCreate(['name' => 'spot_admin', 'guard_name' => 'web']);
+        $adminRoleSanctum = Role::firstOrCreate(['name' => 'spot_admin', 'guard_name' => 'sanctum']);
+        $adminRoleWeb->syncPermissions(['spot.manage', 'feeding.review']);
+        $adminRoleSanctum->syncPermissions(['spot.manage', 'feeding.review']);
+
         $this->seed(FeedingSettingSeeder::class);
 
         $this->student = User::create([
@@ -44,6 +60,17 @@ class FeedingSpotTest extends TestCase
             'user_type' => 'MAHASISWA',
             'is_active' => true,
         ]);
+        $this->student->assignRole($userRole);
+
+        $this->spotAdmin = User::create([
+            'id' => (string) Str::ulid(),
+            'name' => 'Spot Admin Acumalaka',
+            'email' => 'spotadmin@telkomuniversity.ac.id',
+            'password' => Hash::make('password'),
+            'user_type' => 'STAF',
+            'is_active' => true,
+        ]);
+        $this->spotAdmin->assignRole($adminRoleWeb);
 
         $this->activeSpot = FeedingSpot::create([
             'id' => (string) Str::ulid(),
@@ -118,5 +145,52 @@ class FeedingSpotTest extends TestCase
         $inactiveResp = $this->getJson("/api/v1/feeding/spots/{$this->inactiveSpot->id}");
         $inactiveResp->assertStatus(404)
             ->assertJsonPath('code', 'SPOT_NOT_FOUND');
+    }
+
+    public function test_meow_7_admin_spot_crud_and_qr_regeneration_permissions_and_validation(): void
+    {
+        // 1. Akses ditolak untuk mahasiswa biasa tanpa permission spot.manage (403)
+        $forbiddenResp = $this->actingAs($this->student, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'code' => 'SPOT-GKU-02',
+                'name' => 'Spot GKU Baru',
+                'latitude' => -6.973,
+                'longitude' => 107.631,
+            ]);
+        $forbiddenResp->assertStatus(403);
+
+        // 2. Validasi gagal ketika field wajib kosong (422)
+        $invalidResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'code' => '',
+            ]);
+        $invalidResp->assertStatus(422);
+
+        // 3. Sukses membuat spot baru (201)
+        $createResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'code' => 'spot-gku-02',
+                'name' => 'Spot GKU Baru',
+                'latitude' => -6.973,
+                'longitude' => 107.631,
+            ]);
+        $createResp->assertStatus(201)
+            ->assertJsonPath('data.code', 'SPOT-GKU-02');
+
+        $spotId = $createResp->json('data.id');
+        $oldToken = $createResp->json('data.qr_token');
+
+        // 4. Sukses update status spot & regenerate QR
+        $patchResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$spotId}", [
+                'status' => 'MAINTENANCE',
+            ]);
+        $patchResp->assertStatus(200)
+            ->assertJsonPath('data.status', 'MAINTENANCE');
+
+        $qrResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/spots/{$spotId}/qr");
+        $qrResp->assertStatus(200);
+        $this->assertNotEquals($oldToken, $qrResp->json('data.qr_token'));
     }
 }
