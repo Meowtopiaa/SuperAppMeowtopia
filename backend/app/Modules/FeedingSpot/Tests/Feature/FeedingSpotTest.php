@@ -666,4 +666,59 @@ class FeedingSpotTest extends TestCase
             ->assertJsonPath('data.0.verified_count', 1)
             ->assertJsonPath('data.0.pending_count', 1);
     }
+
+    public function test_meow_14_dynamic_reward_formula_appendix_a1_and_point_reversal_without_negative_balance(): void
+    {
+        $rewardService = app(\App\Modules\FeedingSpot\Services\FeedingRewardService::class);
+
+        // 1. Uji formula Lampiran A.1 untuk spot jarang diberi makan (Sp=1.0, St=1.0, Sq=1.0, D(1)=1.0)
+        // P0=10 * (1 + 0.60*1 + 0.25*1 + 0.15*1) * 1.0 = 10 * 2.0 = 20 poin
+        $activity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'VERIFIED',
+            'reward_status' => 'CREDITED',
+            'potential_points' => 10,
+            'reward_snapshot' => ['points_awarded' => 10],
+            'flags' => [],
+            'scanned_at' => now()->subMinutes(10),
+            'finalized_at' => now(),
+        ]);
+
+        $m1 = $this->createMediaRecord($this->student, hash('sha256', 'm14-1'));
+        $m2 = $this->createMediaRecord($this->student, hash('sha256', 'm14-2'));
+        FeedingEvidence::create(['activity_id' => $activity->id, 'media_id' => $m1, 'captured_at' => now(), 'sort_order' => 0]);
+        FeedingEvidence::create(['activity_id' => $activity->id, 'media_id' => $m2, 'captured_at' => now(), 'sort_order' => 1]);
+
+        $snapshot = $rewardService->calculateRewardSnapshot($activity, now());
+        $this->assertEquals(20, $snapshot['dynamic_points']);
+        $this->assertFalse($snapshot['reward_capped']);
+        $this->assertEquals(1.0, $snapshot['sp']);
+        $this->assertEquals(1.0, $snapshot['st']);
+        $this->assertEquals(1.0, $snapshot['sq']);
+        $this->assertEquals(1.0, $snapshot['dn']);
+
+        // 2. Uji reversal poin (AFS-12): saldo mahasiswa hanya 4 poin (lebih kecil dari 10 poin yang di-reverse),
+        // saldo diklem ke 0 (tidak boleh negatif) dan reward_status menjadi REVERSED
+        DB::table('point_balances')->insert([
+            'user_id' => $this->student->id,
+            'total_points' => 4,
+            'updated_at' => now(),
+        ]);
+
+        $revResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/activities/{$activity->id}/review", [
+                'decision' => 'REJECTED',
+                'reason' => 'Foto terbukti hasil rekayasa saat audit',
+            ]);
+
+        $revResp->assertStatus(200)
+            ->assertJsonPath('data.status', 'REJECTED')
+            ->assertJsonPath('data.reward_status', 'REVERSED')
+            ->assertJsonPath('data.new_balance', 0);
+
+        $balanceAfter = (int) DB::table('point_balances')->where('user_id', $this->student->id)->value('total_points');
+        $this->assertEquals(0, $balanceAfter);
+    }
 }

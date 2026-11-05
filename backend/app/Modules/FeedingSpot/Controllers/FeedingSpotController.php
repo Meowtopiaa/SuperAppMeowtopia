@@ -12,6 +12,7 @@ use App\Modules\FeedingSpot\Models\FeedingAggregate;
 use App\Modules\FeedingSpot\Models\FeedingEvidence;
 use App\Modules\FeedingSpot\Models\FeedingSetting;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
+use App\Modules\FeedingSpot\Services\FeedingRewardService;
 use App\Modules\FeedingSpot\Services\FeedingRuleEngine;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ class FeedingSpotController extends Controller
     public function __construct(
         private readonly ScanResolver $scanResolver,
         private readonly FeedingRuleEngine $ruleEngine,
+        private readonly FeedingRewardService $rewardService,
         private readonly PointService $pointService,
     ) {}
 
@@ -413,6 +415,7 @@ class FeedingSpotController extends Controller
             }
 
             $notes = $validated['notes'] ?? null;
+            $formulaSnapshot = $this->rewardService->calculateRewardSnapshot($activity, $activity->finalized_at);
 
             if ($evaluation['status'] === 'VERIFIED') {
                 $award = $this->pointService->award(
@@ -431,12 +434,12 @@ class FeedingSpotController extends Controller
                     'status' => 'VERIFIED',
                     'reward_status' => 'CREDITED',
                     'potential_points' => $pointsAwarded,
-                    'reward_snapshot' => [
+                    'reward_snapshot' => array_merge($formulaSnapshot, [
                         'points_awarded' => $pointsAwarded,
                         'reward_capped' => $rewardCapped,
                         'transaction_id' => $award['transaction_id'] ?? null,
                         'notes' => $notes,
-                    ],
+                    ]),
                 ]);
 
                 $this->refreshSpotAggregate($activity->spot_id);

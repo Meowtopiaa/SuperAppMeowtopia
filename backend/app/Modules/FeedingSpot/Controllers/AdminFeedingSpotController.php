@@ -11,6 +11,7 @@ use App\Modules\FeedingSpot\Models\FeedingEvidence;
 use App\Modules\FeedingSpot\Models\FeedingReview;
 use App\Modules\FeedingSpot\Models\FeedingRuleResult;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
+use App\Modules\FeedingSpot\Services\FeedingRewardService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class AdminFeedingSpotController extends Controller
 {
     public function __construct(
         private readonly PointService $pointService,
+        private readonly FeedingRewardService $rewardService,
     ) {}
 
     /**
@@ -228,7 +230,7 @@ class AdminFeedingSpotController extends Controller
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        if (!in_array($activity->status, ['UNDER_REVIEW', 'SUBMITTED'], true)) {
+        if (!in_array($activity->status, ['UNDER_REVIEW', 'SUBMITTED', 'VERIFIED'], true)) {
             return ApiResponse::error(
                 "Aktivitas berstatus {$activity->status} tidak dapat direview.",
                 422,
@@ -248,6 +250,7 @@ class AdminFeedingSpotController extends Controller
             ]);
 
             if ($decision === 'VERIFIED') {
+                $formulaSnapshot = $this->rewardService->calculateRewardSnapshot($activity, now());
                 $award = $this->pointService->award(
                     user: $activity->user,
                     ruleKey: 'feeding.verified',
@@ -265,7 +268,7 @@ class AdminFeedingSpotController extends Controller
                     'status' => 'VERIFIED',
                     'reward_status' => 'CREDITED',
                     'potential_points' => $pointsAwarded,
-                    'reward_snapshot' => array_merge($snapshot, [
+                    'reward_snapshot' => array_merge($snapshot, $formulaSnapshot, [
                         'points_awarded' => $pointsAwarded,
                         'reward_capped' => $rewardCapped,
                         'transaction_id' => $award['transaction_id'] ?? null,
@@ -288,7 +291,30 @@ class AdminFeedingSpotController extends Controller
                 ];
             }
 
-            // REJECTED
+            // REJECTED: jika sebelumnya sudah CREDITED, jalankan reversal poin (AFS-12)
+            if ($activity->reward_status === 'CREDITED') {
+                $reversal = $this->rewardService->reverseReward(
+                    $activity,
+                    $reason ?? 'Dibatalkan oleh reviewer saat audit.',
+                    $reviewer->id
+                );
+                $activity->update(['status' => 'REJECTED']);
+                $this->refreshSpotAggregate($activity->spot_id);
+
+                return [
+                    'activity_id' => $activity->id,
+                    'decision' => 'REJECTED',
+                    'status' => 'REJECTED',
+                    'reward_status' => 'REVERSED',
+                    'points_awarded' => 0,
+                    'reversed_points' => $reversal['reversed_points'],
+                    'new_balance' => $reversal['new_balance'],
+                    'reward_capped' => false,
+                    'reviewed_by' => $reviewer->id,
+                    'reviewed_at' => now()->toIso8601String(),
+                ];
+            }
+
             $snapshot = $activity->reward_snapshot ?? [];
             $activity->update([
                 'status' => 'REJECTED',
