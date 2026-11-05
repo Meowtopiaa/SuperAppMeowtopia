@@ -243,4 +243,65 @@ class FeedingSpotTest extends TestCase
         $cooldownResp->assertStatus(422)
             ->assertJsonPath('code', 'COOLDOWN_ACTIVE');
     }
+
+    public function test_meow_9_confirm_intent_checks_ownership_and_15_minute_window(): void
+    {
+        $otherStudent = User::create([
+            'id' => (string) Str::ulid(),
+            'name' => 'Mahasiswa Lain',
+            'email' => 'other@student.telkomuniversity.ac.id',
+            'password' => Hash::make('password'),
+            'user_type' => 'MAHASISWA',
+            'is_active' => true,
+        ]);
+
+        // 1. Sesi yang sudah lewat > 15 menit sejak scan ditolak dengan 422 SESSION_EXPIRED
+        $expiredActivity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'DRAFT',
+            'reward_status' => 'PENDING',
+            'potential_points' => 10,
+            'scanned_at' => now()->subMinutes(16),
+            'intent_deadline_at' => now()->subMinute(),
+            'finalize_deadline_at' => now()->addMinutes(44),
+        ]);
+
+        $expiredResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-intent-expired-01')
+            ->postJson("/api/v1/feeding/activities/{$expiredActivity->id}/intent");
+        $expiredResp->assertStatus(422)
+            ->assertJsonPath('code', 'SESSION_EXPIRED');
+
+        $this->assertEquals('EXPIRED', $expiredActivity->fresh()->status);
+
+        // 2. Sesi aktif: pengguna lain ditolak (403 FORBIDDEN), pemilik sesi berhasil (200 OK)
+        $activeSession = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'DRAFT',
+            'reward_status' => 'PENDING',
+            'potential_points' => 10,
+            'scanned_at' => now(),
+            'intent_deadline_at' => now()->addMinutes(15),
+            'finalize_deadline_at' => now()->addMinutes(60),
+        ]);
+
+        $forbiddenResp = $this->actingAs($otherStudent, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-intent-forbidden-01')
+            ->postJson("/api/v1/feeding/activities/{$activeSession->id}/intent");
+        $forbiddenResp->assertStatus(403)
+            ->assertJsonPath('code', 'FORBIDDEN');
+
+        $okResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-intent-ok-01')
+            ->postJson("/api/v1/feeding/activities/{$activeSession->id}/intent");
+        $okResp->assertStatus(200)
+            ->assertJsonPath('data.activity_id', $activeSession->id)
+            ->assertJsonStructure(['data' => ['activity_id', 'status', 'intent_confirmed_at', 'finalize_deadline_at']]);
+
+        $this->assertNotNull($activeSession->fresh()->intent_at);
+    }
 }

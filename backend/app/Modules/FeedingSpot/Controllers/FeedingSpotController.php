@@ -235,6 +235,59 @@ class FeedingSpotController extends Controller
     }
 
     /**
+     * POST /api/v1/feeding/activities/{id}/intent †
+     * Konfirmasi niat memberi makan dalam batas waktu 15 menit sejak scan QR (AFS-04, MEOW-9).
+     */
+    public function confirmIntent(Request $request, string $id): JsonResponse
+    {
+        $activity = FeedingActivity::find($id);
+        if (!$activity) {
+            return ApiResponse::error('Sesi pemberian pakan tidak ditemukan.', 404, 'ACTIVITY_NOT_FOUND');
+        }
+
+        if ($activity->user_id !== $request->user()->id) {
+            return ApiResponse::error('Anda tidak memiliki akses ke sesi ini.', 403, 'FORBIDDEN');
+        }
+
+        if ($activity->status !== 'DRAFT') {
+            return ApiResponse::error(
+                "Sesi tidak dapat dikonfirmasi karena sudah berstatus {$activity->status}.",
+                422,
+                'INVALID_SESSION_STATUS'
+            );
+        }
+
+        $intentMinutes = (int) FeedingSetting::getFloat('intent_window_minutes', 15.0);
+        $isExpired = ($activity->intent_deadline_at && now()->greaterThan($activity->intent_deadline_at))
+            || ($activity->scanned_at && $activity->scanned_at->diffInMinutes(now()) > $intentMinutes);
+
+        if ($isExpired) {
+            $activity->update(['status' => 'EXPIRED']);
+
+            return ApiResponse::error(
+                "Batas waktu konfirmasi intent ({$intentMinutes} menit) telah berakhir. Silakan scan ulang QR spot.",
+                422,
+                'SESSION_EXPIRED'
+            );
+        }
+
+        if (!$activity->intent_at) {
+            $activity->update(['intent_at' => now()]);
+        }
+
+        $finalizeMinutes = (int) FeedingSetting::getFloat('finalize_window_minutes', 60.0);
+        $finalizeDeadline = $activity->finalize_deadline_at
+            ?? ($activity->scanned_at ? $activity->scanned_at->copy()->addMinutes($finalizeMinutes) : now()->addMinutes($finalizeMinutes));
+
+        return ApiResponse::success([
+            'activity_id' => $activity->id,
+            'status' => $activity->status,
+            'intent_confirmed_at' => $activity->intent_at->toIso8601String(),
+            'finalize_deadline_at' => $finalizeDeadline->toIso8601String(),
+        ], 'Niat pemberian pakan berhasil dikonfirmasi.');
+    }
+
+    /**
      * Format representasi spot untuk daftar, peta, dan detail sesuai AFS-02.
      */
     private function formatSpotSummary(FeedingSpot $spot, ?string $fallbackLastFedAt = null, ?array $territory = null): array
