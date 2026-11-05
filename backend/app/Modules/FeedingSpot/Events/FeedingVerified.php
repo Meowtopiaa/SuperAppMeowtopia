@@ -14,3 +14,4 @@ class FeedingVerified
         public readonly FeedingActivity $activity,
     ) {}
 }
+
