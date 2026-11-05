@@ -130,7 +130,7 @@ class CampusSpotMap extends StatelessWidget {
     required this.isDemo,
   });
   final List<FeedingSpotModel> spots;
-  final int? selectedId;
+  final String? selectedId;
   final bool isDemo;
   @override
   Widget build(BuildContext context) => ClipRRect(

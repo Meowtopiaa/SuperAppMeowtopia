@@ -11,7 +11,7 @@ import 'feeding_widgets.dart';
 
 class FeedingSpotDetailPage extends StatefulWidget {
   const FeedingSpotDetailPage({super.key, required this.spotId});
-  final int spotId;
+  final String spotId;
   @override
   State<FeedingSpotDetailPage> createState() => _FeedingSpotDetailPageState();
 }

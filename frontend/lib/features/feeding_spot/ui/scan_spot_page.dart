@@ -9,7 +9,7 @@ import '../logic/feeding_spot_provider.dart';
 
 class ScanSpotPage extends StatefulWidget {
   const ScanSpotPage({super.key, this.expectedSpotId});
-  final int? expectedSpotId;
+  final String? expectedSpotId;
   @override
   State<ScanSpotPage> createState() => _ScanSpotPageState();
 }

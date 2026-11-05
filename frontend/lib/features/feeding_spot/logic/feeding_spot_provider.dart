@@ -22,8 +22,8 @@ class FeedingSpotProvider extends ChangeNotifier {
   final FeedingSpotService _service;
   List<FeedingSpotModel> _spots = [];
   final List<FeedingSubmission> _history = [];
-  final Set<int> _favorites = {};
-  final Map<int, DateTime> _lastSubmitted = {};
+  final Set<String> _favorites = {};
+  final Map<String, DateTime> _lastSubmitted = {};
   FeedingSession? session;
   bool _isLoading = false;
   bool _loaded = false;
@@ -38,15 +38,15 @@ class FeedingSpotProvider extends ChangeNotifier {
       _history.where((s) => s.status == FeedingStatus.underReview).length;
   int get creditedPoints =>
       _history.fold(0, (sum, s) => sum + s.creditedPoints);
-  bool isFavorite(int id) => _favorites.contains(id);
-  void toggleFavorite(int id) {
+  bool isFavorite(String id) => _favorites.contains(id);
+  void toggleFavorite(String id) {
     if (!_favorites.add(id)) _favorites.remove(id);
     notifyListeners();
   }
 
-  FeedingSpotModel? spotById(int id) {
+  FeedingSpotModel? spotById(String id) {
     for (final spot in spots) {
-      if (spot.id == id) return spot;
+      if (spot.id == id || spot.code == id) return spot;
     }
     return null;
   }
@@ -76,21 +76,29 @@ class FeedingSpotProvider extends ChangeNotifier {
 
   Future<FeedingSession> openSession(
     String rawToken, {
-    int? expectedSpotId,
+    String? expectedSpotId,
   }) async {
     final token = rawToken.trim();
     if (token.isEmpty) throw StateError('Masukkan token QR spot yang valid.');
     await fetchSpots();
     FeedingSpotModel? match;
     for (final spot in spots) {
-      if (spot.qrToken == token) match = spot;
+      if (spot.qrToken == token ||
+          'SPOT:${spot.code}' == token ||
+          'MTP1.S.${spot.code}' == token ||
+          spot.code == token) {
+        match = spot;
+      }
     }
     if (match == null) {
       throw StateError(
         'QR tidak dikenali sebagai QR spot. Gunakan QR resmi di lokasi.',
       );
     }
-    if (expectedSpotId != null && match.id != expectedSpotId) {
+    if (expectedSpotId != null &&
+        expectedSpotId.isNotEmpty &&
+        match.id != expectedSpotId &&
+        match.code != expectedSpotId) {
       throw StateError(
         'QR ini milik spot lain. Pindai QR di spot yang dipilih.',
       );
@@ -107,7 +115,6 @@ class FeedingSpotProvider extends ChangeNotifier {
         'Kegiatan di spot ini sudah diajukan. Tunggu 6 jam untuk kegiatan berikutnya.',
       );
     }
-    // The legacy endpoint auto-credits points; never use it for this evidence flow.
     if (!isDemo) {
       throw StateError(
         'Layanan sesi dan verifikasi bukti belum tersedia. Coba lagi setelah integrasi backend siap.',
