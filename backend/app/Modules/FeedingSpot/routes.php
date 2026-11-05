@@ -18,10 +18,11 @@ Route::prefix('feeding')->group(function () {
 
     // Authenticated User Endpoints
     Route::middleware('auth:sanctum')->group(function () {
-        // Idempotent Write Endpoints (†) (MEOW-8, MEOW-9)
+        // Idempotent Write Endpoints (†) (MEOW-8, MEOW-9, MEOW-11)
         Route::middleware(RequireIdempotencyKey::class)->group(function () {
             Route::post('/activities', [FeedingSpotController::class, 'startSession']);
             Route::post('/activities/{id}/intent', [FeedingSpotController::class, 'confirmIntent']);
+            Route::post('/activities/{id}/finalize', [FeedingSpotController::class, 'finalizeSession']);
         });
     });
 });

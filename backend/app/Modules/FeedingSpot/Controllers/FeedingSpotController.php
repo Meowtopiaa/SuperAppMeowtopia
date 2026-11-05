@@ -3,20 +3,29 @@
 namespace App\Modules\FeedingSpot\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Cat\Models\Cat;
+use App\Modules\Core\Services\PointService;
 use App\Modules\Core\Services\ScanResolver;
+use App\Modules\FeedingSpot\Events\FeedingVerified;
 use App\Modules\FeedingSpot\Models\FeedingActivity;
+use App\Modules\FeedingSpot\Models\FeedingAggregate;
+use App\Modules\FeedingSpot\Models\FeedingEvidence;
 use App\Modules\FeedingSpot\Models\FeedingSetting;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
+use App\Modules\FeedingSpot\Services\FeedingRuleEngine;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class FeedingSpotController extends Controller
 {
     public function __construct(
         private readonly ScanResolver $scanResolver,
+        private readonly FeedingRuleEngine $ruleEngine,
+        private readonly PointService $pointService,
     ) {}
 
     /**
@@ -285,6 +294,231 @@ class FeedingSpotController extends Controller
             'intent_confirmed_at' => $activity->intent_at->toIso8601String(),
             'finalize_deadline_at' => $finalizeDeadline->toIso8601String(),
         ], 'Niat pemberian pakan berhasil dikonfirmasi.');
+    }
+
+    /**
+     * POST /api/v1/feeding/activities/{id}/finalize †
+     * Finalisasi sesi pemberian makan, simpan 1-3 bukti foto, jalankan FeedingRuleEngine,
+     * kreditkan poin via PointService::award jika VERIFIED, dan catat sighting opsional (AFS-05, AFS-06, AFS-10, AFS-13, MEOW-11).
+     */
+    public function finalizeSession(Request $request, string $id): JsonResponse
+    {
+        $activity = FeedingActivity::with(['spot', 'user'])->find($id);
+        if (!$activity) {
+            return ApiResponse::error('Sesi pemberian pakan tidak ditemukan.', 404, 'ACTIVITY_NOT_FOUND');
+        }
+
+        if ($activity->user_id !== $request->user()->id) {
+            return ApiResponse::error('Anda tidak memiliki akses ke sesi ini.', 403, 'FORBIDDEN');
+        }
+
+        // Idempotent replay jika sesi sudah difinalisasi
+        if (in_array($activity->status, ['VERIFIED', 'UNDER_REVIEW', 'REJECTED'], true)) {
+            return ApiResponse::success([
+                'activity_id' => $activity->id,
+                'status' => $activity->status,
+                'reward_status' => $activity->reward_status,
+                'points_awarded' => $activity->points_awarded,
+                'is_replay' => true,
+            ], 'Sesi pemberian pakan telah difinalisasi sebelumnya.');
+        }
+
+        $finalizeMinutes = (int) FeedingSetting::getFloat('finalize_window_minutes', 60.0);
+        $isExpired = ($activity->finalize_deadline_at && now()->greaterThan($activity->finalize_deadline_at))
+            || ($activity->scanned_at && $activity->scanned_at->diffInMinutes(now()) > $finalizeMinutes);
+
+        if ($isExpired) {
+            $activity->update(['status' => 'EXPIRED']);
+
+            return ApiResponse::error(
+                "Batas waktu finalisasi sesi ({$finalizeMinutes} menit) telah berakhir. Silakan scan ulang QR spot.",
+                422,
+                'SESSION_EXPIRED'
+            );
+        }
+
+        $validated = $request->validate([
+            'media_ids' => ['required', 'array', 'min:1', 'max:3'],
+            'media_ids.*' => ['required', 'string', 'size:26', 'exists:media_files,id'],
+            'food_type' => ['nullable', 'string', 'max:64'],
+            'food_amount' => ['nullable', 'string', 'max:64'],
+            'cat_id' => ['nullable', 'string', 'size:26', 'exists:cats,id'],
+            'cat_code' => ['nullable', 'string', 'max:64'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        // Pastikan seluruh foto milik user ini dan bertipe feeding_proof
+        $mediaRows = DB::table('media_files')
+            ->whereIn('id', $validated['media_ids'])
+            ->get();
+
+        if ($mediaRows->count() !== count($validated['media_ids'])) {
+            return ApiResponse::error('Salah satu bukti foto tidak ditemukan.', 422, 'INVALID_EVIDENCE');
+        }
+
+        // Resolusi opsional kucing (AFS-13)
+        $catId = $validated['cat_id'] ?? null;
+        if (!$catId && !empty($validated['cat_code'])) {
+            $cat = Cat::where('unique_code', trim($validated['cat_code']))->first();
+            $catId = $cat?->id;
+        }
+
+        $resultPayload = DB::transaction(function () use ($activity, $validated, $catId) {
+            if (!$activity->intent_at) {
+                $activity->intent_at = now();
+            }
+
+            $activity->food_type = $validated['food_type'] ?? 'dry_food';
+            $activity->food_amount = $validated['food_amount'] ?? '1 mangkuk';
+            $activity->cat_id = $catId;
+            $activity->finalized_at = now();
+            $activity->save();
+
+            // Simpan 1-3 bukti foto
+            FeedingEvidence::where('activity_id', $activity->id)->delete();
+            foreach (array_values($validated['media_ids']) as $index => $mediaId) {
+                FeedingEvidence::create([
+                    'activity_id' => $activity->id,
+                    'media_id' => $mediaId,
+                    'captured_at' => now(),
+                    'sort_order' => $index,
+                ]);
+            }
+
+            // Jalankan FeedingRuleEngine (Aturan R1, R2, R4, R5, R6, R8 tanpa GPS)
+            $evaluation = $this->ruleEngine->evaluateAndRecord($activity, $validated['media_ids']);
+
+            // Catat sighting opsional kucing di spot (AFS-13)
+            if ($catId) {
+                DB::table('cat_sightings')->insert([
+                    'id' => (string) Str::ulid(),
+                    'cat_id' => $catId,
+                    'user_id' => $activity->user_id,
+                    'source' => 'feeding',
+                    'location_lat' => $activity->location_lat,
+                    'location_lng' => $activity->location_lng,
+                    'occurred_at' => now(),
+                    'metadata' => json_encode([
+                        'spot_id' => $activity->spot_id,
+                        'activity_id' => $activity->id,
+                    ]),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                DB::table('cats')->where('id', $catId)->update([
+                    'last_seen_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $notes = $validated['notes'] ?? null;
+
+            if ($evaluation['status'] === 'VERIFIED') {
+                $award = $this->pointService->award(
+                    user: $activity->user,
+                    ruleKey: 'feeding.verified',
+                    sourceModule: 'FeedingSpot',
+                    sourceType: 'feeding_activity',
+                    sourceRefId: $activity->id,
+                    idempotencyKey: "feeding.verified:{$activity->id}"
+                );
+
+                $pointsAwarded = (int) ($award['points'] ?? 0);
+                $rewardCapped = (bool) ($award['reward_capped'] ?? false);
+
+                $activity->update([
+                    'status' => 'VERIFIED',
+                    'reward_status' => 'CREDITED',
+                    'potential_points' => $pointsAwarded,
+                    'reward_snapshot' => [
+                        'points_awarded' => $pointsAwarded,
+                        'reward_capped' => $rewardCapped,
+                        'transaction_id' => $award['transaction_id'] ?? null,
+                        'notes' => $notes,
+                    ],
+                ]);
+
+                $this->refreshSpotAggregate($activity->spot_id);
+                event(new FeedingVerified($activity->fresh()));
+
+                return [
+                    'activity_id' => $activity->id,
+                    'status' => 'VERIFIED',
+                    'reward_status' => 'CREDITED',
+                    'points_awarded' => $pointsAwarded,
+                    'reward_capped' => $rewardCapped,
+                    'flags' => $evaluation['flags'],
+                    'rules' => $evaluation['results'],
+                    'submitted_at' => $activity->finalized_at->toIso8601String(),
+                    'verified_at' => $activity->finalized_at->toIso8601String(),
+                ];
+            }
+
+            // UNDER_REVIEW atau REJECTED
+            $rewardStatus = $evaluation['status'] === 'UNDER_REVIEW' ? 'PENDING' : 'NOT_ELIGIBLE';
+            $activity->update([
+                'status' => $evaluation['status'],
+                'reward_status' => $rewardStatus,
+                'reward_snapshot' => [
+                    'points_awarded' => 0,
+                    'reward_capped' => false,
+                    'notes' => $notes,
+                ],
+            ]);
+
+            $this->refreshSpotAggregate($activity->spot_id);
+
+            return [
+                'activity_id' => $activity->id,
+                'status' => $activity->status,
+                'reward_status' => $activity->reward_status,
+                'points_awarded' => 0,
+                'reward_capped' => false,
+                'flags' => $evaluation['flags'],
+                'rules' => $evaluation['results'],
+                'submitted_at' => $activity->finalized_at->toIso8601String(),
+                'verified_at' => null,
+            ];
+        });
+
+        $msg = $resultPayload['status'] === 'VERIFIED'
+            ? 'Aktivitas pemberian pakan berhasil diverifikasi dan poin telah dikreditkan.'
+            : 'Bukti pemberian pakan berhasil dikirim dan sedang menunggu pemeriksaan reviewer.';
+
+        return ApiResponse::success($resultPayload, $msg);
+    }
+
+    /**
+     * Perbarui agregat 14 hari terakhir untuk spot (feeding_aggregates).
+     */
+    private function refreshSpotAggregate(string $spotId): FeedingAggregate
+    {
+        $windowStart = now()->subDays(14)->startOfDay();
+        $windowEnd = now();
+
+        $verifiedCount = FeedingActivity::query()
+            ->where('spot_id', $spotId)
+            ->where('status', 'VERIFIED')
+            ->where('finalized_at', '>=', $windowStart)
+            ->count();
+
+        $pendingCount = FeedingActivity::query()
+            ->where('spot_id', $spotId)
+            ->where('status', 'UNDER_REVIEW')
+            ->where('finalized_at', '>=', $windowStart)
+            ->count();
+
+        return FeedingAggregate::updateOrCreate(
+            ['spot_id' => $spotId],
+            [
+                'window_start' => $windowStart,
+                'window_end' => $windowEnd,
+                'verified_count' => $verifiedCount,
+                'pending_count' => $pendingCount,
+                'computed_at' => now(),
+            ]
+        );
     }
 
     /**

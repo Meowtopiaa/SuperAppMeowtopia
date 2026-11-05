@@ -402,4 +402,136 @@ class FeedingSpotTest extends TestCase
         $this->assertEquals('UNDER_REVIEW', $eval3['status']);
         $this->assertContains('PHOTO_REUSED', $eval3['flags']);
     }
+
+    public function test_meow_11_finalize_session_point_service_integration_and_optional_sighting(): void
+    {
+        DB::table('point_rules')->insert([
+            'id' => (string) Str::ulid(),
+            'rule_key' => 'feeding.verified',
+            'module' => 'FeedingSpot',
+            'points' => 10,
+            'daily_cap_count' => 3,
+            'daily_cap_points' => 60,
+            'description' => 'Aktivitas pemberian pakan terverifikasi',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('point_balances')->insert([
+            'user_id' => $this->student->id,
+            'total_points' => 0,
+            'updated_at' => now(),
+        ]);
+
+        $catId = (string) Str::ulid();
+        DB::table('cats')->insert([
+            'id' => $catId,
+            'unique_code' => 'CAT001',
+            'name' => 'Oyen TULT',
+            'gender' => 'MALE',
+            'presence_status' => 'ON_CAMPUS',
+            'health_status' => 'HEALTHY',
+            'adoption_status' => 'UNREVIEWED',
+            'verification_status' => 'VERIFIED',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $otherStudent = User::create([
+            'id' => (string) Str::ulid(),
+            'name' => 'Mahasiswa Lain',
+            'email' => 'other11@student.telkomuniversity.ac.id',
+            'password' => Hash::make('password'),
+            'user_type' => 'MAHASISWA',
+            'is_active' => true,
+        ]);
+
+        // Buat 2 riwayat VERIFIED agar mahasiswa lolos aturan R6 (NEW_USER_SAMPLE)
+        for ($i = 1; $i <= 2; $i++) {
+            FeedingActivity::create([
+                'id' => (string) Str::ulid(),
+                'user_id' => $this->student->id,
+                'spot_id' => $this->inactiveSpot->id,
+                'status' => 'VERIFIED',
+                'reward_status' => 'CREDITED',
+                'potential_points' => 10,
+                'scanned_at' => now()->subDays($i + 1),
+                'finalized_at' => now()->subDays($i + 1),
+            ]);
+        }
+
+        $activity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'DRAFT',
+            'reward_status' => 'PENDING',
+            'potential_points' => 10,
+            'scanned_at' => now()->subMinutes(4),
+            'intent_at' => now()->subMinutes(3),
+            'intent_deadline_at' => now()->addMinutes(11),
+            'finalize_deadline_at' => now()->addMinutes(56),
+        ]);
+
+        $mediaId = $this->createMediaRecord($this->student, hash('sha256', 'finalize-photo-11'));
+
+        // 1. Akses ditolak untuk pengguna lain (403 FORBIDDEN)
+        $forbiddenResp = $this->actingAs($otherStudent, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-fin-forbidden-11')
+            ->postJson("/api/v1/feeding/activities/{$activity->id}/finalize", [
+                'media_ids' => [$mediaId],
+            ]);
+        $forbiddenResp->assertStatus(403);
+
+        // 2. Validasi gagal ketika media_ids kosong (422)
+        $invalidResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-fin-invalid-11')
+            ->postJson("/api/v1/feeding/activities/{$activity->id}/finalize", [
+                'media_ids' => [],
+            ]);
+        $invalidResp->assertStatus(422);
+
+        // 3. Sukses finalisasi: otomatis VERIFIED, poin CREDITED via PointService, dan cat_sightings tercatat (AFS-13)
+        $okResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-fin-ok-11')
+            ->postJson("/api/v1/feeding/activities/{$activity->id}/finalize", [
+                'media_ids' => [$mediaId],
+                'food_type' => 'wet_food',
+                'food_amount' => '1 mangkuk',
+                'cat_code' => 'CAT001',
+                'notes' => 'Oyen makan dengan lahap',
+            ]);
+
+        $okResp->assertStatus(200)
+            ->assertJsonPath('data.status', 'VERIFIED')
+            ->assertJsonPath('data.reward_status', 'CREDITED')
+            ->assertJsonPath('data.points_awarded', 10);
+
+        // 4. IT-05: Idempotent replay dengan Idempotency-Key yang sama tidak menduplikasi poin
+        $replayResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-fin-ok-11')
+            ->postJson("/api/v1/feeding/activities/{$activity->id}/finalize", [
+                'media_ids' => [$mediaId],
+                'food_type' => 'wet_food',
+                'food_amount' => '1 mangkuk',
+                'cat_code' => 'CAT001',
+                'notes' => 'Oyen makan dengan lahap',
+            ]);
+        $replayResp->assertStatus(200)
+            ->assertJsonPath('data.activity_id', $activity->id);
+
+        $txCount = DB::table('point_transactions')
+            ->where('user_id', $this->student->id)
+            ->where('source_ref_id', $activity->id)
+            ->count();
+        $this->assertEquals(1, $txCount);
+
+        $sightingCount = DB::table('cat_sightings')
+            ->where('cat_id', $catId)
+            ->where('user_id', $this->student->id)
+            ->where('source', 'feeding')
+            ->count();
+        $this->assertEquals(1, $sightingCount);
+    }
 }
