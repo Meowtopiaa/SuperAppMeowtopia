@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_exception.dart';
@@ -17,6 +18,7 @@ class FeedingSpotProvider extends ChangeNotifier {
       _spots = demoFeedingSpots(DateTime.now());
       _history.addAll(demoFeedingHistory(_spots, DateTime.now()));
       _loaded = true;
+      _sortSpotsClientSide();
     }
   }
 
@@ -73,6 +75,7 @@ class FeedingSpotProvider extends ChangeNotifier {
         _spots = await _service.getSpots();
         await fetchMyActivities();
       }
+      await _sortSpotsClientSide();
       _loaded = true;
     } catch (e) {
       _errorMessage = _extractErrorMessage(e);
@@ -94,6 +97,58 @@ class FeedingSpotProvider extends ChangeNotifier {
     } catch (_) {
       // Abaikan jika pengguna belum login saat melihat daftar spot publik
     }
+  }
+
+  /// Mengurutkan spot terdekat di sisi klien (HP) tanpa mengirim atau menyimpan
+  /// koordinat GPS pengguna ke server (sesuai Aturan Keras #8 & AFS-02).
+  /// Jika izin lokasi tidak diberikan, otomatis fallback ke urutan alfabetis.
+  Future<void> _sortSpotsClientSide() async {
+    if (_spots.isEmpty) return;
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _sortAlphabetically();
+        return;
+      }
+
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        _sortAlphabetically();
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 4),
+        ),
+      );
+
+      _spots = _spots.map((spot) {
+        final distance = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          spot.lat,
+          spot.lng,
+        );
+        return spot.copyWith(distanceMeters: distance);
+      }).toList()
+        ..sort(
+          (a, b) => (a.distanceMeters ?? double.infinity).compareTo(
+            b.distanceMeters ?? double.infinity,
+          ),
+        );
+      notifyListeners();
+    } catch (_) {
+      _sortAlphabetically();
+    }
+  }
+
+  void _sortAlphabetically() {
+    _spots = [..._spots]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    notifyListeners();
   }
 
   Future<FeedingSession> openSession(

@@ -90,9 +90,7 @@ class FeedingSpotPreviewCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  spot.verifiedCount14Days == null
-                      ? 'Aktivitas belum tersedia'
-                      : '${spot.verifiedCount14Days} aktivitas / 14 hari',
+                  spot.lastFedSentence,
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFFCFD3DD),
@@ -100,7 +98,9 @@ class FeedingSpotPreviewCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  spot.activityLabel,
+                  spot.distanceLabel != null
+                      ? '${spot.activityLabel} · ${spot.distanceLabel}'
+                      : spot.activityLabel,
                   style: const TextStyle(
                     fontSize: 11,
                     color: MeowStyle.peach,

@@ -243,7 +243,9 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${spot.locationName} · Shelter kampus',
+                  spot.distanceLabel != null
+                      ? '${spot.locationName} · ${spot.distanceLabel} · Shelter kampus'
+                      : '${spot.locationName} · Shelter kampus',
                   style: const TextStyle(
                     fontSize: 14,
                     color: MeowStyle.brown,
@@ -319,9 +321,12 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Terakhir tercatat',
-                        style: TextStyle(fontSize: 12, color: MeowStyle.brown),
+                      Text(
+                        spot.lastFedSentence,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: MeowStyle.brown,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Text(

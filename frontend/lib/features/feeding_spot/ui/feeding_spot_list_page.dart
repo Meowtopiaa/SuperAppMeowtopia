@@ -282,10 +282,21 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      spot.locationName,
+                      spot.distanceLabel != null
+                          ? '${spot.locationName} · ${spot.distanceLabel}'
+                          : spot.locationName,
                       style: const TextStyle(
                         fontSize: 12,
                         color: MeowStyle.brown,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      spot.lastFedSentence,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: MeowStyle.orangeDark,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 14),
