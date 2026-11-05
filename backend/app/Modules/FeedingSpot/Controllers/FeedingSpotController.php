@@ -235,7 +235,9 @@ class FeedingSpotController extends Controller
         ]);
 
         return ApiResponse::created([
+            'id' => $activity->id,
             'activity_id' => $activity->id,
+            'spot_id' => $spot->id,
             'feeding_record_ref' => $activity->feeding_record_ref,
             'status' => $activity->status,
             'spot' => $this->formatSpotSummary($spot),
@@ -446,11 +448,19 @@ class FeedingSpotController extends Controller
                 event(new FeedingVerified($activity->fresh()));
 
                 return [
+                    'id' => $activity->id,
                     'activity_id' => $activity->id,
+                    'feeding_record_ref' => $activity->feeding_record_ref,
+                    'spot_id' => $activity->spot_id,
                     'status' => 'VERIFIED',
                     'reward_status' => 'CREDITED',
                     'points_awarded' => $pointsAwarded,
+                    'potential_points' => $pointsAwarded,
                     'reward_capped' => $rewardCapped,
+                    'food_type' => $activity->food_type,
+                    'food_amount' => $activity->food_amount,
+                    'notes' => $notes,
+                    'cat_id' => $activity->cat_id,
                     'flags' => $evaluation['flags'],
                     'rules' => $evaluation['results'],
                     'submitted_at' => $activity->finalized_at->toIso8601String(),
@@ -463,21 +473,29 @@ class FeedingSpotController extends Controller
             $activity->update([
                 'status' => $evaluation['status'],
                 'reward_status' => $rewardStatus,
-                'reward_snapshot' => [
+                'reward_snapshot' => array_merge($formulaSnapshot, [
                     'points_awarded' => 0,
                     'reward_capped' => false,
                     'notes' => $notes,
-                ],
+                ]),
             ]);
 
             $this->refreshSpotAggregate($activity->spot_id);
 
             return [
+                'id' => $activity->id,
                 'activity_id' => $activity->id,
+                'feeding_record_ref' => $activity->feeding_record_ref,
+                'spot_id' => $activity->spot_id,
                 'status' => $activity->status,
                 'reward_status' => $activity->reward_status,
                 'points_awarded' => 0,
+                'potential_points' => (int) ($formulaSnapshot['dynamic_points'] ?? 10),
                 'reward_capped' => false,
+                'food_type' => $activity->food_type,
+                'food_amount' => $activity->food_amount,
+                'notes' => $notes,
+                'cat_id' => $activity->cat_id,
                 'flags' => $evaluation['flags'],
                 'rules' => $evaluation['results'],
                 'submitted_at' => $activity->finalized_at->toIso8601String(),

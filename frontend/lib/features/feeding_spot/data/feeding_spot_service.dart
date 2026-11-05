@@ -76,6 +76,7 @@ class FeedingSpotService {
     required String foodAmount,
     String? notes,
     String? catId,
+    String? catCode,
     String? idempotencyKey,
   }) async {
     final response = await _client.post(
@@ -86,6 +87,8 @@ class FeedingSpotService {
         'food_amount': foodAmount,
         if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
         if (catId != null && catId.trim().isNotEmpty) 'cat_id': catId.trim(),
+        if (catCode != null && catCode.trim().isNotEmpty)
+          'cat_code': catCode.trim(),
       },
       headers: {'Idempotency-Key': idempotencyKey ?? _uuid.v4()},
     );
@@ -110,12 +113,13 @@ class FeedingSpotService {
                   code: spotJson?['code']?.toString() ?? spotId,
                   qrToken: '',
                   name: spotJson?['name']?.toString() ?? 'Feeding Spot',
-                  zone: spotJson?['zone']?.toString() ?? 'Kampus',
-                  building: spotJson?['building']?.toString() ?? '-',
-                  landmark: spotJson?['landmark']?.toString() ?? '-',
-                  description: spotJson?['description']?.toString() ?? '-',
-                  lat: 0,
-                  lng: 0,
+                  locationName:
+                      spotJson?['description']?.toString() ??
+                      'Kampus Telkom University',
+                  latitude: -6.9740,
+                  longitude: 107.6300,
+                  status: 'active',
+                  bowlCondition: 'unknown',
                 ));
       return FeedingSubmission.fromJson(json, fallbackSpot: fallbackSpot);
     }).toList();

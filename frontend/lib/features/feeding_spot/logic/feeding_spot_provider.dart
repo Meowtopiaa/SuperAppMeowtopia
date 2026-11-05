@@ -129,8 +129,8 @@ class FeedingSpotProvider extends ChangeNotifier {
         final distance = Geolocator.distanceBetween(
           position.latitude,
           position.longitude,
-          spot.lat,
-          spot.lng,
+          spot.latitude,
+          spot.longitude,
         );
         return spot.copyWith(distanceMeters: distance);
       }).toList()
@@ -162,11 +162,15 @@ class FeedingSpotProvider extends ChangeNotifier {
     if (!isDemo) {
       try {
         final data = await _service.openSession(qrToken: token);
-        final activityId = data['id']?.toString() ?? '';
-        final spotId = data['spot_id']?.toString() ?? '';
+        final spotJson = data['spot'] as Map<String, dynamic>?;
+        final activityId =
+            (data['id'] ?? data['activity_id'])?.toString() ?? '';
+        final spotId =
+            (data['spot_id'] ?? spotJson?['id'])?.toString() ?? '';
         if (expectedSpotId != null &&
             expectedSpotId.isNotEmpty &&
-            spotId != expectedSpotId) {
+            spotId != expectedSpotId &&
+            spotJson?['code']?.toString() != expectedSpotId) {
           throw StateError(
             'QR ini milik spot lain. Pindai QR di spot yang dipilih.',
           );
@@ -174,7 +178,6 @@ class FeedingSpotProvider extends ChangeNotifier {
 
         await _service.confirmIntent(activityId);
 
-        final spotJson = data['spot'] as Map<String, dynamic>?;
         final matchedSpot =
             spotById(spotId) ??
             (spotJson != null
@@ -320,10 +323,11 @@ class FeedingSpotProvider extends ChangeNotifier {
         final data = await _service.finalizeSession(
           activityId: current.id,
           mediaIds: mediaIds,
-          foodType: current.foodType.apiValue,
+          foodType: current.foodType,
           foodAmount: current.quantity,
           notes: current.notes.trim(),
           catId: current.catId,
+          catCode: current.catCode,
         );
 
         final submission = FeedingSubmission.fromJson(
@@ -347,7 +351,7 @@ class FeedingSpotProvider extends ChangeNotifier {
       spot: current.spot,
       createdAt: now,
       status: FeedingStatus.underReview,
-      rewardStatus: FeedingRewardStatus.pending,
+      rewardStatus: 'PENDING',
       foodType: current.foodType,
       quantity: current.quantity,
       evidence: List.unmodifiable(current.evidence),

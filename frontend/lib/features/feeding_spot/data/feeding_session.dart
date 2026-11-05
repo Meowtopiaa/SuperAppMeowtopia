@@ -23,9 +23,11 @@ class FeedingSession {
     required this.spot,
     required this.startedAt,
     required this.expiresAt,
+    this.feedingRecordRef,
     this.intentDeadlineAt,
   });
   final String id;
+  final String? feedingRecordRef;
   final FeedingSpotModel spot;
   final DateTime startedAt;
   final DateTime expiresAt;
@@ -34,6 +36,7 @@ class FeedingSession {
   String foodType = 'dry_food';
   String quantity = '2 genggam (perkiraan 120 g)';
   String notes = '';
+  String? catId;
   String? catCode;
   bool get isExpired => !DateTime.now().isBefore(expiresAt);
   bool get canSubmit =>
@@ -48,15 +51,18 @@ class FeedingSubmission {
     required this.status,
     required this.foodType,
     required this.quantity,
+    this.feedingRecordRef,
     this.rewardStatus = 'PENDING',
     this.rewardCapped = false,
     this.evidence = const [],
     this.notes = '',
+    this.catId,
     this.potentialPoints,
     this.creditedPoints = 0,
     this.reason,
   });
   final String id;
+  final String? feedingRecordRef;
   final FeedingSpotModel spot;
   final DateTime createdAt;
   final FeedingStatus status;
@@ -67,6 +73,7 @@ class FeedingSubmission {
   final List<FeedingEvidence> evidence;
   FeedingEvidence? get photo => evidence.isEmpty ? null : evidence.first;
   final String notes;
+  final String? catId;
   final int? potentialPoints;
   final int creditedPoints;
   final String? reason;
@@ -74,6 +81,7 @@ class FeedingSubmission {
   factory FeedingSubmission.fromJson(
     Map<String, dynamic> json, {
     FeedingSpotModel? fallbackSpot,
+    List<FeedingEvidence>? localEvidence,
   }) {
     final rawStatus = (json['status'] ?? 'UNDER_REVIEW').toString().toUpperCase();
     final parsedStatus = switch (rawStatus) {
@@ -102,22 +110,27 @@ class FeedingSubmission {
             ));
 
     final points = (json['points_awarded'] as num?)?.toInt() ?? 0;
+    final potential = (json['potential_points'] as num?)?.toInt();
 
     return FeedingSubmission(
       id: (json['id'] ?? json['activity_id'] ?? '').toString(),
+      feedingRecordRef: json['feeding_record_ref']?.toString(),
       spot: spot,
       createdAt: DateTime.tryParse(
             (json['submitted_at'] ?? json['scanned_at'] ?? '').toString(),
           ) ??
           DateTime.now(),
       status: parsedStatus,
-      rewardStatus: (json['reward_status'] ?? 'NONE').toString(),
+      rewardStatus: (json['reward_status'] ?? 'PENDING').toString(),
       rewardCapped: json['reward_capped'] == true,
       foodType: (json['food_type'] ?? 'dry_food').toString(),
       quantity: (json['food_amount'] ?? '1 mangkuk').toString(),
+      evidence: localEvidence ?? const [],
       notes: (json['notes'] ?? '').toString(),
-      potentialPoints: points > 0 ? points : 10,
+      catId: json['cat_id']?.toString(),
+      potentialPoints: potential ?? (points > 0 ? points : 10),
       creditedPoints: points,
+      reason: json['rejection_reason']?.toString(),
     );
   }
 
@@ -130,7 +143,7 @@ class FeedingSubmission {
   /// AFS-08: Status kegiatan dan status reward ditampilkan terpisah.
   String get rewardStatusLabel {
     if (rewardStatus.toUpperCase() == 'CREDITED' && creditedPoints > 0) {
-      return '+$creditedPoints poin dikreditkan';
+      return 'Poin dikreditkan';
     }
     if (rewardCapped || (rewardStatus.toUpperCase() == 'CREDITED' && creditedPoints == 0)) {
       return 'Tanpa poin (batas harian tercapai)';
