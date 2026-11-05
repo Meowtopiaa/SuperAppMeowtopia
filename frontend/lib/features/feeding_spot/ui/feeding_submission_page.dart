@@ -166,7 +166,7 @@ class FeedingSubmissionPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'ID ${item.id}',
+                  'Ref ${item.feedingRecordRef ?? item.id} · ID ${item.id}',
                   style: const TextStyle(fontSize: 10, color: MeowStyle.brown),
                 ),
                 const Divider(height: 28, color: MeowStyle.lilac),
@@ -276,8 +276,8 @@ class FeedingSubmissionPage extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         item.creditedPoints > 0
-                            ? '+${item.creditedPoints} poin ${provider.isDemo ? 'contoh' : 'dikreditkan'}'
-                            : 'Belum ada poin dikreditkan',
+                            ? '${item.rewardStatusLabel} · +${item.creditedPoints} poin ${provider.isDemo ? 'contoh' : 'dikreditkan'}'
+                            : item.rewardStatusLabel,
                         style: const TextStyle(
                           fontSize: 13,
                           color: MeowStyle.green,

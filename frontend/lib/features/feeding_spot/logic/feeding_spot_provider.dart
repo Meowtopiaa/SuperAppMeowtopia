@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/demo_feeding_data.dart';
 import '../data/feeding_session.dart';
 import '../data/feeding_spot_model.dart';
@@ -18,6 +19,7 @@ class FeedingSpotProvider extends ChangeNotifier {
       _loaded = true;
     }
   }
+
   final bool isDemo;
   final FeedingSpotService _service;
   List<FeedingSpotModel> _spots = [];
@@ -28,6 +30,7 @@ class FeedingSpotProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _loaded = false;
   String? _errorMessage;
+
   List<FeedingSpotModel> get spots => List.unmodifiable(
     _spots.where((s) => s.status.toLowerCase() != 'inactive'),
   );
@@ -38,7 +41,9 @@ class FeedingSpotProvider extends ChangeNotifier {
       _history.where((s) => s.status == FeedingStatus.underReview).length;
   int get creditedPoints =>
       _history.fold(0, (sum, s) => sum + s.creditedPoints);
+
   bool isFavorite(String id) => _favorites.contains(id);
+
   void toggleFavorite(String id) {
     if (!_favorites.add(id)) _favorites.remove(id);
     notifyListeners();
@@ -64,13 +69,30 @@ class FeedingSpotProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      if (!isDemo) _spots = await _service.getSpots();
+      if (!isDemo) {
+        _spots = await _service.getSpots();
+        await fetchMyActivities();
+      }
       _loaded = true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _extractErrorMessage(e);
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> fetchMyActivities() async {
+    if (isDemo) return;
+    try {
+      final spotsMap = {for (final s in _spots) s.id: s};
+      final items = await _service.getMyActivities(spotsMap);
+      _history
+        ..clear()
+        ..addAll(items);
+      notifyListeners();
+    } catch (_) {
+      // Abaikan jika pengguna belum login saat melihat daftar spot publik
     }
   }
 
@@ -81,6 +103,52 @@ class FeedingSpotProvider extends ChangeNotifier {
     final token = rawToken.trim();
     if (token.isEmpty) throw StateError('Masukkan token QR spot yang valid.');
     await fetchSpots();
+
+    if (!isDemo) {
+      try {
+        final data = await _service.openSession(qrToken: token);
+        final activityId = data['id']?.toString() ?? '';
+        final spotId = data['spot_id']?.toString() ?? '';
+        if (expectedSpotId != null &&
+            expectedSpotId.isNotEmpty &&
+            spotId != expectedSpotId) {
+          throw StateError(
+            'QR ini milik spot lain. Pindai QR di spot yang dipilih.',
+          );
+        }
+
+        await _service.confirmIntent(activityId);
+
+        final spotJson = data['spot'] as Map<String, dynamic>?;
+        final matchedSpot =
+            spotById(spotId) ??
+            (spotJson != null
+                ? FeedingSpotModel.fromJson(spotJson)
+                : await _service.getSpotDetail(spotId));
+
+        final now = DateTime.now();
+        final startedAt = data['scanned_at'] != null
+            ? DateTime.tryParse(data['scanned_at'].toString()) ?? now
+            : now;
+        final expiresAt = data['finalize_deadline_at'] != null
+            ? DateTime.tryParse(data['finalize_deadline_at'].toString()) ??
+                  now.add(const Duration(minutes: 15))
+            : now.add(const Duration(minutes: 15));
+
+        session = FeedingSession(
+          id: activityId,
+          feedingRecordRef: data['feeding_record_ref']?.toString(),
+          spot: matchedSpot,
+          startedAt: startedAt,
+          expiresAt: expiresAt,
+        );
+        notifyListeners();
+        return session!;
+      } catch (e) {
+        throw StateError(_extractErrorMessage(e));
+      }
+    }
+
     FeedingSpotModel? match;
     for (final spot in spots) {
       if (spot.qrToken == token ||
@@ -115,14 +183,10 @@ class FeedingSpotProvider extends ChangeNotifier {
         'Kegiatan di spot ini sudah diajukan. Tunggu 6 jam untuk kegiatan berikutnya.',
       );
     }
-    if (!isDemo) {
-      throw StateError(
-        'Layanan sesi dan verifikasi bukti belum tersedia. Coba lagi setelah integrasi backend siap.',
-      );
-    }
     final now = DateTime.now();
     session = FeedingSession(
-      id: 'LOKAL-${now.microsecondsSinceEpoch}',
+      id: '01JAFS00000000000000999999',
+      feedingRecordRef: 'FD-${now.millisecondsSinceEpoch}',
       spot: match,
       startedAt: now,
       expiresAt: now.add(const Duration(minutes: 15)),
@@ -183,21 +247,70 @@ class FeedingSpotProvider extends ChangeNotifier {
         'Sesi harus aktif dan minimal satu foto wajib tersedia.',
       );
     }
-    if (!isDemo) throw StateError('Layanan pengiriman bukti belum tersedia.');
+
+    if (!isDemo) {
+      try {
+        final mediaIds = <String>[];
+        for (var i = 0; i < current.evidence.length; i++) {
+          final evidence = current.evidence[i];
+          final mediaId =
+              evidence.mediaId ??
+              await _service.uploadEvidence(
+                evidence.bytes,
+                filename: 'feeding-${current.id}-${i + 1}.jpg',
+              );
+          mediaIds.add(mediaId);
+        }
+
+        final data = await _service.finalizeSession(
+          activityId: current.id,
+          mediaIds: mediaIds,
+          foodType: current.foodType.apiValue,
+          foodAmount: current.quantity,
+          notes: current.notes.trim(),
+          catId: current.catId,
+        );
+
+        final submission = FeedingSubmission.fromJson(
+          data,
+          fallbackSpot: current.spot,
+          localEvidence: List.unmodifiable(current.evidence),
+        );
+        _history.insert(0, submission);
+        _lastSubmitted[current.spot.id] = DateTime.now();
+        notifyListeners();
+        return submission;
+      } catch (e) {
+        throw StateError(_extractErrorMessage(e));
+      }
+    }
+
     final now = DateTime.now();
     final item = FeedingSubmission(
       id: current.id,
+      feedingRecordRef: current.feedingRecordRef,
       spot: current.spot,
       createdAt: now,
       status: FeedingStatus.underReview,
+      rewardStatus: FeedingRewardStatus.pending,
       foodType: current.foodType,
       quantity: current.quantity,
       evidence: List.unmodifiable(current.evidence),
       notes: current.notes.trim(),
+      catId: current.catId,
+      potentialPoints: 10,
     );
     _history.insert(0, item);
     _lastSubmitted[current.spot.id] = now;
     notifyListeners();
     return item;
+  }
+
+  String _extractErrorMessage(Object error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+    final raw = error.toString();
+    return raw.replaceFirst('Bad state: ', '').replaceFirst('Exception: ', '');
   }
 }
