@@ -5,9 +5,13 @@ namespace App\Modules\FeedingSpot\Tests\Feature;
 use App\Models\User;
 use App\Modules\FeedingSpot\Database\Seeders\FeedingSettingSeeder;
 use App\Modules\FeedingSpot\Models\FeedingActivity;
+use App\Modules\FeedingSpot\Models\FeedingEvidence;
+use App\Modules\FeedingSpot\Models\FeedingRuleResult;
 use App\Modules\FeedingSpot\Models\FeedingSetting;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
+use App\Modules\FeedingSpot\Services\FeedingRuleEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
@@ -303,5 +307,99 @@ class FeedingSpotTest extends TestCase
             ->assertJsonStructure(['data' => ['activity_id', 'status', 'intent_confirmed_at', 'finalize_deadline_at']]);
 
         $this->assertNotNull($activeSession->fresh()->intent_at);
+    }
+
+    private function createMediaRecord(User $owner, string $sha256): string
+    {
+        $mediaId = (string) Str::ulid();
+        DB::table('media_files')->insert([
+            'id' => $mediaId,
+            'owner_id' => $owner->id,
+            'purpose' => 'feeding_proof',
+            'disk' => 'local',
+            'path' => "media/feeding_proof/{$mediaId}.jpg",
+            'mime' => 'image/jpeg',
+            'size_bytes' => 120000,
+            'sha256' => $sha256,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $mediaId;
+    }
+
+    public function test_meow_10_feeding_rule_engine_evaluates_r1_r2_r4_r5_r6_r8_without_gps(): void
+    {
+        $engine = app(FeedingRuleEngine::class);
+
+        // 1. Pengguna baru (< 2 riwayat VERIFIED) terkena flag NEW_USER_SAMPLE (R6) -> UNDER_REVIEW
+        $newUserActivity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'DRAFT',
+            'scanned_at' => now()->subMinutes(5),
+        ]);
+        $media1 = $this->createMediaRecord($this->student, hash('sha256', 'photo-unique-1'));
+
+        $eval1 = $engine->evaluateAndRecord($newUserActivity, [$media1]);
+        $this->assertEquals('UNDER_REVIEW', $eval1['status']);
+        $this->assertContains('NEW_USER_SAMPLE', $eval1['flags']);
+
+        // Pastikan hanya 6 aturan non-GPS (R1, R2, R4, R5, R6, R8) yang dievaluasi (tanpa R3/R9)
+        $rulesRecorded = FeedingRuleResult::where('activity_id', $newUserActivity->id)->pluck('rule')->toArray();
+        $this->assertEquals([
+            'R1_QR_VALID',
+            'R2_SESSION_TIMELY',
+            'R4_PHOTO_UNIQUE',
+            'R5_COOLDOWN_PASSED',
+            'R6_NEW_USER_SAMPLE',
+            'R8_RATE_LIMIT_OK',
+        ], $rulesRecorded);
+
+        // 2. Pengguna terpercaya (>= 2 riwayat VERIFIED) dengan foto unik langsung VERIFIED
+        for ($i = 1; $i <= 2; $i++) {
+            FeedingActivity::create([
+                'id' => (string) Str::ulid(),
+                'user_id' => $this->student->id,
+                'spot_id' => $this->inactiveSpot->id,
+                'status' => 'VERIFIED',
+                'scanned_at' => now()->subDays($i + 1),
+                'finalized_at' => now()->subDays($i + 1),
+            ]);
+        }
+
+        $trustedActivity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'DRAFT',
+            'scanned_at' => now()->subMinutes(3),
+        ]);
+        $media2 = $this->createMediaRecord($this->student, hash('sha256', 'photo-unique-2'));
+        FeedingEvidence::create([
+            'activity_id' => $trustedActivity->id,
+            'media_id' => $media2,
+            'captured_at' => now(),
+            'sort_order' => 0,
+        ]);
+
+        $eval2 = $engine->evaluateAndRecord($trustedActivity, [$media2]);
+        $this->assertEquals('VERIFIED', $eval2['status']);
+        $this->assertEmpty($eval2['flags']);
+
+        // 3. Foto duplikat (SHA-256 sama dengan foto yang sudah dipakai) terkena flag PHOTO_REUSED (R4) -> UNDER_REVIEW
+        $duplicatePhotoActivity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'DRAFT',
+            'scanned_at' => now()->subMinutes(2),
+        ]);
+        $reusedMedia = $this->createMediaRecord($this->student, hash('sha256', 'photo-unique-2'));
+
+        $eval3 = $engine->evaluateAndRecord($duplicatePhotoActivity, [$reusedMedia]);
+        $this->assertEquals('UNDER_REVIEW', $eval3['status']);
+        $this->assertContains('PHOTO_REUSED', $eval3['flags']);
     }
 }
