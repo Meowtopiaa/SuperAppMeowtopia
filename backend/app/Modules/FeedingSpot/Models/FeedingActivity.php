@@ -3,63 +3,71 @@
 namespace App\Modules\FeedingSpot\Models;
 
 use App\Models\User;
-use App\Modules\Cat\Models\Cat;
+use App\Modules\Core\Models\Cat;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FeedingActivity extends Model
 {
-    use HasFactory, HasUlids;
+    use HasUlids;
 
-    protected $keyType = 'string';
+    protected $table = 'feeding_activities';
     public $incrementing = false;
+    protected $keyType = 'string';
 
     protected $fillable = [
-        'feeding_record_ref',
         'user_id',
         'spot_id',
-        'location_lat',
-        'location_lng',
-        'status',           // DRAFT, SUBMITTED, UNDER_REVIEW, VERIFIED, REJECTED, EXPIRED
-        'scanned_at',
-        'intent_at',
-        'intent_deadline_at',
-        'finalize_deadline_at',
-        'finalized_at',
+        'cat_id',
+        'status',
+        'reward_status',
+        'points_awarded',
         'food_type',
         'food_amount',
-        'cat_id',
-        'reward_status',    // NOT_ELIGIBLE, PENDING, CREDITED, FAILED, REVERSED
-        'potential_points',
-        'reward_snapshot',
-        'flags',
+        'notes',
+        'scanned_at',
+        'intent_confirmed_at',
+        'submitted_at',
+        'verified_at',
     ];
 
     protected $casts = [
+        'points_awarded' => 'integer',
         'scanned_at' => 'datetime',
-        'intent_at' => 'datetime',
-        'intent_deadline_at' => 'datetime',
-        'finalize_deadline_at' => 'datetime',
-        'finalized_at' => 'datetime',
-        'reward_snapshot' => 'array',
-        'flags' => 'array',
-        'location_lat' => 'double',
-        'location_lng' => 'double',
+        'intent_confirmed_at' => 'datetime',
+        'submitted_at' => 'datetime',
+        'verified_at' => 'datetime',
     ];
 
-    public function user()
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function spot()
+    public function spot(): BelongsTo
     {
         return $this->belongsTo(FeedingSpot::class, 'spot_id');
     }
 
-    public function cat()
+    public function cat(): BelongsTo
     {
-        return $this->belongsTo(Cat::class);
+        return $this->belongsTo(Cat::class, 'cat_id');
+    }
+
+    public function evidence(): HasMany
+    {
+        return $this->hasMany(FeedingEvidence::class, 'activity_id');
+    }
+
+    public function ruleResults(): HasMany
+    {
+        return $this->hasMany(FeedingRuleResult::class, 'activity_id');
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(FeedingReview::class, 'activity_id');
     }
 }
