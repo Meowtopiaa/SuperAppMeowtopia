@@ -1,0 +1,384 @@
+openapi: 3.0.3
+info:
+  title: Meowtopia Super App API - Adopt Feeding Spot (AFS)
+  version: 1.1.0
+  description: >
+    Spesifikasi kontrak REST API untuk modul **Adopt Feeding Spot (AFS)** sesuai PRD Final v1.1 (Bagian 5.3 & 6).
+    Seluruh identifier menggunakan ULID (`char(26)`). Endpoint mutasi yang bertanda † wajib menyertakan header `Idempotency-Key`.
+    Sesuai Aturan Keras #8 & OQ-01, tidak ada pengiriman atau verifikasi GPS pengguna di backend; GPS hanya dipakai di sisi klien (HP)
+    untuk mengurutkan spot terdekat.
+servers:
+  - url: /api/v1
+    description: API v1 Base Path
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  parameters:
+    IdempotencyKeyHeader:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        format: uuid
+        example: "8f14e45f-ceea-467a-a838-1b63e73f9f1b"
+      description: Kunci unik idempotensi untuk mencegah duplikasi sesi, finalisasi, atau poin.
+
+  schemas:
+    FeedingSpotSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "01JAFS00000000000000000101"
+        code:
+          type: string
+          example: "FS-TULT-01"
+        name:
+          type: string
+          example: "Taman TULT Utara"
+        description:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: double
+          example: -6.9732
+        longitude:
+          type: number
+          format: double
+          example: 107.6304
+        territory_id:
+          type: string
+          nullable: true
+          example: "01JAFS00000000000000000010"
+        status:
+          type: string
+          enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
+          example: "ACTIVE"
+        last_fed_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-04-19T06:30:00Z"
+        aggregate:
+          type: object
+          properties:
+            window_days:
+              type: integer
+              example: 14
+            total_feedings:
+              type: integer
+              example: 12
+            verified_count:
+              type: integer
+              example: 12
+            pending_count:
+              type: integer
+              example: 2
+            need_score:
+              type: number
+              format: float
+              example: 57.1
+            last_fed_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    ApiErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        code:
+          type: string
+          example: "QR_WRONG_TYPE"
+        message:
+          type: string
+          example: "QR yang dipindai adalah QR kalung kucing, bukan QR feeding spot."
+        errors:
+          type: object
+          nullable: true
+        request_id:
+          type: string
+          example: "req_01JAFS99999999999999999999"
+
+paths:
+  /feeding/spots:
+    get:
+      summary: Daftar spot pemberian pakan aktif beserta waktu terakhir diberi makan (AFS-01, AFS-02)
+      tags: [FeedingSpot - Public]
+      parameters:
+        - in: query
+          name: territory_id
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE]
+      responses:
+        "200":
+          description: Daftar spot berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FeedingSpotSummary"
+
+  /feeding/spots/{id}:
+    get:
+      summary: Detail spot pemberian pakan, agregat 14 hari, dan aktivitas terverifikasi terbaru (AFS-02)
+      tags: [FeedingSpot - Public]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Detail spot berhasil diambil
+        "404":
+          description: Spot tidak ditemukan atau tidak aktif
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /feeding/heatmap:
+    get:
+      summary: Agregat heatmap pemberian pakan 14 hari terakhir per spot (AFS-09)
+      tags: [FeedingSpot - Public]
+      responses:
+        "200":
+          description: Data heatmap 14 hari berhasil diambil (memisahkan verified_count dan pending_count)
+
+  /feeding/activities:
+    post:
+      summary: Buka sesi pemberian pakan dengan scan QR spot resmi † (AFS-03, IT-03)
+      tags: [FeedingSpot - User]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qr_token]
+              properties:
+                qr_token:
+                  type: string
+                  example: "MTP1.S.SPOTTOKEN123456"
+      responses:
+        "201":
+          description: Sesi pemberian pakan berhasil dibuka
+        "422":
+          description: QR tidak valid, salah tipe (QR_WRONG_TYPE), spot tidak aktif, atau masih dalam cooldown 6 jam (COOLDOWN_ACTIVE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /feeding/activities/{id}/intent:
+    post:
+      summary: Konfirmasi niat memberi makan dalam batas waktu 15 menit sejak scan † (AFS-04)
+      tags: [FeedingSpot - User]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Niat pemberian pakan berhasil dikonfirmasi
+        "422":
+          description: Sesi kedaluwarsa (> 15 menit) atau status tidak valid
+
+  /feeding/activities/{id}/finalize:
+    post:
+      summary: Finalisasi sesi pemberian makan, simpan 1-3 foto bukti, jalankan Rule Engine, dan kreditkan poin † (AFS-05, AFS-06, AFS-10, AFS-13)
+      tags: [FeedingSpot - User]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [media_ids]
+              properties:
+                media_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 3
+                  items:
+                    type: string
+                food_type:
+                  type: string
+                  example: "dry_food"
+                food_amount:
+                  type: string
+                  example: "1 mangkuk"
+                cat_id:
+                  type: string
+                  nullable: true
+                cat_code:
+                  type: string
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Sesi difinalisasi (VERIFIED dengan poin CREDITED, atau UNDER_REVIEW dengan poin PENDING)
+
+  /feeding/activities/mine:
+    get:
+      summary: Riwayat pemberian makan milik pengguna beserta status verifikasi dan status poin terpisah (AFS-08)
+      tags: [FeedingSpot - User]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Riwayat aktivitas berhasil diambil
+
+  /admin/feeding/spots:
+    post:
+      summary: Buat titik feeding spot baru (Permission spot.manage) (AFS-01)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name, latitude, longitude]
+              properties:
+                code:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                territory_id:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
+      responses:
+        "201":
+          description: Spot baru berhasil dibuat beserta qr_token
+
+  /admin/feeding/spots/{id}:
+    patch:
+      summary: Perbarui titik feeding spot atau ubah statusnya (Permission spot.manage) (AFS-01)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Spot berhasil diperbarui
+
+  /admin/feeding/spots/{id}/qr:
+    post:
+      summary: Regenerate token QR spot dan cabut token lama (Permission spot.manage) (AFS-01)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Token QR baru berhasil dibuat
+
+  /admin/feeding/review-queue:
+    get:
+      summary: Daftar antrean pengajuan pemberian makan berstatus UNDER_REVIEW (Permission feeding.review) (AFS-07)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Antrean review berhasil diambil
+
+  /admin/feeding/activities/{id}/review:
+    post:
+      summary: Simpan keputusan reviewer VERIFIED/REJECTED dengan larangan self-review (Permission feeding.review) (AFS-07, AFS-10, AFS-12)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [VERIFIED, REJECTED]
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Keputusan review disimpan (dan poin dikreditkan via PointService::award jika VERIFIED, atau di-reverse jika sebelumnya CREDITED)
+        "403":
+          description: Pelanggaran SELF_REVIEW_FORBIDDEN atau tidak memiliki permission feeding.review
