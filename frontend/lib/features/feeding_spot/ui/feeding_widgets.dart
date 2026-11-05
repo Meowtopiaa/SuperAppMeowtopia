@@ -98,6 +98,14 @@ class FeedingSpotPreviewCard extends StatelessWidget {
                     color: Color(0xFFCFD3DD),
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  spot.lastFedSentence,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFFE5EAEF),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   spot.activityLabel,
@@ -130,76 +138,93 @@ class CampusSpotMap extends StatelessWidget {
     required this.isDemo,
   });
   final List<FeedingSpotModel> spots;
-  final int? selectedId;
+  final String? selectedId;
   final bool isDemo;
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(18),
-    child: Container(
-      height: 208,
-      decoration: BoxDecoration(
-        color: MeowStyle.lavender,
-        border: Border.all(color: MeowStyle.lilac),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Opacity(
-              opacity: .8,
-              child: SvgPicture.asset(
-                'assets/icons/figma/campus-map.svg',
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          Positioned(
-            top: 10,
-            left: 10,
-            child: MeowPill(
-              isDemo
-                  ? 'Peta ilustrasi · data contoh'
-                  : 'Skema lokasi · bukan GPS',
-              color: Colors.white,
-            ),
-          ),
-          for (var i = 0; i < spots.length && i < 4; i++)
-            Positioned(
-              left:
-                  [0.46, .15, .74, .68][i] *
-                  (MediaQuery.sizeOf(context).width.clamp(280, 720) - 80),
-              top: [84.0, 65.0, 111.0, 48.0][i],
-              child: Semantics(
-                label: spots[i].name,
-                button: true,
-                child: IconButton(
-                  tooltip: spots[i].name,
-                  onPressed: () => context.push('/feeding/spot/${spots[i].id}'),
-                  style: IconButton.styleFrom(
-                    backgroundColor: selectedId == spots[i].id
-                        ? MeowStyle.orange
-                        : spots[i].isActive
-                        ? MeowStyle.green
-                        : MeowStyle.slate,
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white, width: 2),
-                  ),
-                  icon: const Icon(Icons.pets_rounded, size: 19),
+  Widget build(BuildContext context) {
+    FeedingSpotModel? selectedSpot;
+    if (selectedId != null) {
+      for (final s in spots) {
+        if (s.id == selectedId) {
+          selectedSpot = s;
+          break;
+        }
+      }
+    } else if (spots.isNotEmpty) {
+      selectedSpot = spots.first;
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        height: 208,
+        decoration: BoxDecoration(
+          color: MeowStyle.lavender,
+          border: Border.all(color: MeowStyle.lilac),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Opacity(
+                opacity: .8,
+                child: SvgPicture.asset(
+                  'assets/icons/figma/campus-map.svg',
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
-          const Positioned(
-            bottom: 10,
-            left: 10,
-            child: MeowPill(
-              'Aktivitas terverifikasi · 14 hari',
-              color: Colors.white,
-              icon: Icons.layers_outlined,
+            Positioned(
+              top: 10,
+              left: 10,
+              child: MeowPill(
+                isDemo
+                    ? 'Peta ilustrasi · data contoh'
+                    : 'Skema lokasi · bukan GPS',
+                color: Colors.white,
+              ),
             ),
-          ),
-        ],
+            for (var i = 0; i < spots.length && i < 4; i++)
+              Positioned(
+                left:
+                    [0.46, .15, .74, .68][i] *
+                    (MediaQuery.sizeOf(context).width.clamp(280, 720) - 80),
+                top: [84.0, 65.0, 111.0, 48.0][i],
+                child: Semantics(
+                  label: '${spots[i].name} · ${spots[i].lastFedSentence}',
+                  button: true,
+                  child: IconButton(
+                    tooltip: '${spots[i].name}\n${spots[i].lastFedSentence}',
+                    onPressed: () =>
+                        context.push('/feeding/spot/${spots[i].id}'),
+                    style: IconButton.styleFrom(
+                      backgroundColor: selectedId == spots[i].id
+                          ? MeowStyle.orange
+                          : spots[i].isActive
+                          ? MeowStyle.green
+                          : MeowStyle.slate,
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white, width: 2),
+                    ),
+                    icon: const Icon(Icons.pets_rounded, size: 19),
+                  ),
+                ),
+              ),
+            Positioned(
+              bottom: 10,
+              left: 10,
+              child: MeowPill(
+                selectedSpot != null
+                    ? selectedSpot.lastFedSentence
+                    : 'Aktivitas terverifikasi · 14 hari',
+                color: Colors.white,
+                icon: Icons.schedule_rounded,
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class FeedingMessage extends StatelessWidget {

@@ -12,6 +12,7 @@ class FeedingActivity extends Model
 {
     use HasFactory, HasUlids;
 
+    protected $table = 'feeding_activities';
     protected $keyType = 'string';
     public $incrementing = false;
 
@@ -46,11 +47,12 @@ class FeedingActivity extends Model
         'flags' => 'array',
         'location_lat' => 'double',
         'location_lng' => 'double',
+        'potential_points' => 'integer',
     ];
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function spot()
@@ -60,6 +62,21 @@ class FeedingActivity extends Model
 
     public function cat()
     {
-        return $this->belongsTo(Cat::class);
+        return $this->belongsTo(Cat::class, 'cat_id');
+    }
+
+    public function evidence()
+    {
+        return $this->hasMany(FeedingEvidence::class, 'activity_id')->orderBy('sort_order');
+    }
+
+    public function ruleResults()
+    {
+        return $this->hasMany(FeedingRuleResult::class, 'activity_id');
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(FeedingReview::class, 'activity_id')->latest();
     }
 }

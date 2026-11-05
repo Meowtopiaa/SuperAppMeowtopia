@@ -273,12 +273,25 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    Text(
-                      spot.name,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            spot.name,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (spot.distanceLabel != null)
+                          MeowPill(
+                            spot.distanceLabel!,
+                            color: MeowStyle.lavender,
+                            foreground: MeowStyle.brown,
+                            icon: Icons.near_me_outlined,
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 5),
                     Text(
@@ -287,6 +300,27 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
                         fontSize: 12,
                         color: MeowStyle.brown,
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.schedule_rounded,
+                          size: 13,
+                          color: MeowStyle.orangeDark,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            spot.lastFedSentence,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: MeowStyle.orangeDark,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     Row(

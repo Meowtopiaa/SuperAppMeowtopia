@@ -17,6 +17,19 @@ class FeedingHistoryPage extends StatefulWidget {
 
 class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
   FeedingStatus? _filter;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<FeedingSpotProvider>();
+      if (!provider.isDemo) {
+        provider.fetchMyActivities();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FeedingSpotProvider>();
@@ -38,7 +51,7 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Pantau bukti, pemeriksaan, dan poinmu.',
+            'Pantau bukti, pemeriksaan, dan poinmu secara terpisah.',
             style: TextStyle(fontSize: 12, color: MeowStyle.brown),
           ),
           const SizedBox(height: 20),
@@ -120,11 +133,7 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
             ),
           ),
           const SizedBox(height: 20),
-          if (!provider.isDemo)
-            const FeedingMessage(
-              'Riwayat kegiatan akan tersedia setelah layanan sesi, verifikasi, dan reward terhubung.',
-            ),
-          if (provider.isDemo && items.isEmpty)
+          if (items.isEmpty)
             const FeedingMessage(
               'Belum ada kegiatan dalam kategori ini. Kegiatan baru akan muncul setelah bukti dikirim.',
             ),
@@ -205,12 +214,13 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
                             ),
                             const SizedBox(height: 5),
                             Text(
-                              item.creditedPoints > 0
+                              provider.isDemo && item.creditedPoints > 0
                                   ? '+${item.creditedPoints} poin contoh'
-                                  : 'Poin belum dikreditkan',
+                                  : item.rewardStatusLabel,
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: MeowStyle.orangeDark,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
