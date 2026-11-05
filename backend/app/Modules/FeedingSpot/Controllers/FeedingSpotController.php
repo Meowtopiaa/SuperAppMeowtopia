@@ -490,6 +490,152 @@ class FeedingSpotController extends Controller
     }
 
     /**
+     * GET /api/v1/feeding/activities/mine
+     * Riwayat pemberian makan milik pengguna yang sedang login dengan pemisahan
+     * status kegiatan (status) dan status poin (reward_status) (AFS-08, MEOW-13).
+     */
+    public function myActivities(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $query = FeedingActivity::query()
+            ->where('user_id', $user->id)
+            ->with([
+                'spot:id,code,name,latitude,longitude,status',
+                'cat:id,unique_code,name',
+                'evidences',
+                'latestReview',
+            ])
+            ->orderByDesc('created_at');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status')->upper()->toString());
+        }
+
+        $activities = $query->limit(50)->get();
+
+        $mediaIds = $activities->pluck('evidences')->flatten()->pluck('media_id')->filter()->unique()->values();
+        $mediaMap = $mediaIds->isNotEmpty()
+            ? DB::table('media_files')->whereIn('id', $mediaIds)->get()->keyBy('id')
+            : collect();
+
+        $data = $activities->map(function (FeedingActivity $a) use ($mediaMap) {
+            return [
+                'id' => $a->id,
+                'feeding_record_ref' => $a->feeding_record_ref,
+                'spot_id' => $a->spot_id,
+                'spot' => $a->spot ? [
+                    'id' => $a->spot->id,
+                    'code' => $a->spot->code,
+                    'name' => $a->spot->name,
+                    'latitude' => (float) $a->spot->latitude,
+                    'longitude' => (float) $a->spot->longitude,
+                    'status' => $a->spot->status,
+                ] : null,
+                'status' => $a->status,
+                'reward_status' => $a->reward_status,
+                'points_awarded' => $a->points_awarded,
+                'potential_points' => (int) $a->potential_points,
+                'reward_capped' => $a->reward_capped,
+                'food_type' => $a->food_type,
+                'food_amount' => $a->food_amount,
+                'notes' => $a->notes,
+                'cat' => $a->cat ? [
+                    'id' => $a->cat->id,
+                    'unique_code' => $a->cat->unique_code,
+                    'name' => $a->cat->name,
+                ] : null,
+                'evidences' => $a->evidences->map(function (FeedingEvidence $ev) use ($mediaMap) {
+                    $m = $mediaMap[$ev->media_id] ?? null;
+
+                    return [
+                        'id' => $ev->id,
+                        'media_id' => $ev->media_id,
+                        'path' => $m->path ?? null,
+                        'sort_order' => $ev->sort_order,
+                    ];
+                })->values(),
+                'flags' => $a->flags ?? [],
+                'rejection_reason' => $a->rejection_reason,
+                'scanned_at' => $a->scanned_at?->toIso8601String(),
+                'intent_confirmed_at' => $a->intent_at?->toIso8601String(),
+                'submitted_at' => $a->finalized_at?->toIso8601String(),
+                'verified_at' => $a->status === 'VERIFIED' ? $a->finalized_at?->toIso8601String() : null,
+                'reviewed_at' => $a->latestReview?->created_at?->toIso8601String(),
+            ];
+        })->values();
+
+        return ApiResponse::success($data, 'Riwayat aktivitas pemberian pakan berhasil diambil.');
+    }
+
+    /**
+     * GET /api/v1/feeding/heatmap
+     * Agregat distribusi pemberian makan 14 hari terakhir per spot (AFS-09, MEOW-13).
+     * Memisahkan secara jelas jumlah aktivitas terverifikasi (verified_count) dan yang masih direview (pending_count).
+     */
+    public function heatmap(): JsonResponse
+    {
+        $spots = FeedingSpot::query()
+            ->active()
+            ->with(['latestAggregate'])
+            ->orderBy('name')
+            ->get();
+
+        $windowStart = now()->subDays(14)->startOfDay();
+
+        $verifiedCounts = FeedingActivity::query()
+            ->whereIn('spot_id', $spots->pluck('id'))
+            ->where('status', 'VERIFIED')
+            ->where('finalized_at', '>=', $windowStart)
+            ->selectRaw('spot_id, COUNT(*) as total, MAX(finalized_at) as last_fed_at')
+            ->groupBy('spot_id')
+            ->get()
+            ->keyBy('spot_id');
+
+        $pendingCounts = FeedingActivity::query()
+            ->whereIn('spot_id', $spots->pluck('id'))
+            ->where('status', 'UNDER_REVIEW')
+            ->where('finalized_at', '>=', $windowStart)
+            ->selectRaw('spot_id, COUNT(*) as total')
+            ->groupBy('spot_id')
+            ->pluck('total', 'spot_id');
+
+        $data = $spots->map(function (FeedingSpot $spot) use ($verifiedCounts, $pendingCounts) {
+            $agg = $spot->latestAggregate;
+            $vRow = $verifiedCounts[$spot->id] ?? null;
+
+            $verified14d = $vRow ? (int) $vRow->total : (int) ($agg?->verified_count ?? 0);
+            $pending14d = isset($pendingCounts[$spot->id])
+                ? (int) $pendingCounts[$spot->id]
+                : (int) ($agg?->pending_count ?? 0);
+
+            $lastFedAt = $vRow?->last_fed_at
+                ? Carbon::parse($vRow->last_fed_at)->toIso8601String()
+                : null;
+
+            // Skor prioritas sederhana: semakin jarang diberi makan dalam 14 hari, semakin tinggi need_score (0..100)
+            $needScore = round(max(0.0, min(100.0, (1.0 - min(1.0, $verified14d / 28.0)) * 100.0)), 1);
+
+            return [
+                'spot_id' => $spot->id,
+                'code' => $spot->code,
+                'name' => $spot->name,
+                'latitude' => (float) $spot->latitude,
+                'longitude' => (float) $spot->longitude,
+                'territory_id' => $spot->territory_id,
+                'window_days' => 14,
+                'total_feedings' => $verified14d,
+                'verified_count' => $verified14d,
+                'pending_count' => $pending14d,
+                'need_score' => $needScore,
+                'last_fed_at' => $lastFedAt,
+            ];
+        })->values();
+
+        return ApiResponse::success($data, 'Data heatmap aktivitas pemberian pakan 14 hari terakhir berhasil diambil.');
+    }
+
+    /**
      * Perbarui agregat 14 hari terakhir untuk spot (feeding_aggregates).
      */
     private function refreshSpotAggregate(string $spotId): FeedingAggregate

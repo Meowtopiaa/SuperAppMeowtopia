@@ -12,12 +12,15 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('feeding')->group(function () {
-    // Public / Read Endpoints (MEOW-6)
+    // Public / Read Endpoints (MEOW-6, MEOW-13)
     Route::get('/spots', [FeedingSpotController::class, 'listSpots']);
     Route::get('/spots/{id}', [FeedingSpotController::class, 'showSpot']);
+    Route::get('/heatmap', [FeedingSpotController::class, 'heatmap']);
 
     // Authenticated User Endpoints
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/activities/mine', [FeedingSpotController::class, 'myActivities']);
+
         // Idempotent Write Endpoints (†) (MEOW-8, MEOW-9, MEOW-11)
         Route::middleware(RequireIdempotencyKey::class)->group(function () {
             Route::post('/activities', [FeedingSpotController::class, 'startSession']);

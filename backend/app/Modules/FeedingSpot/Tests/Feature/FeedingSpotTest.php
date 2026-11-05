@@ -616,4 +616,54 @@ class FeedingSpotTest extends TestCase
             ->assertJsonPath('data.reward_status', 'CREDITED')
             ->assertJsonPath('data.points_awarded', 10);
     }
+
+    public function test_meow_13_user_activity_history_and_public_heatmap_14_days(): void
+    {
+        // 1. Tanpa autentikasi ke /api/v1/feeding/activities/mine ditolak (401)
+        $unauthResp = $this->getJson('/api/v1/feeding/activities/mine');
+        $unauthResp->assertStatus(401);
+
+        // Buat 1 aktivitas VERIFIED dan 1 aktivitas UNDER_REVIEW dalam 14 hari terakhir
+        FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'VERIFIED',
+            'reward_status' => 'CREDITED',
+            'potential_points' => 10,
+            'reward_snapshot' => ['points_awarded' => 10, 'reward_capped' => false],
+            'scanned_at' => now()->subDays(2),
+            'finalized_at' => now()->subDays(2),
+        ]);
+
+        FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'UNDER_REVIEW',
+            'reward_status' => 'PENDING',
+            'potential_points' => 10,
+            'scanned_at' => now()->subHours(4),
+            'finalized_at' => now()->subHours(4),
+        ]);
+
+        // 2. Mahasiswa melihat riwayat miliknya dengan pemisahan status & reward_status (AFS-08)
+        $mineResp = $this->actingAs($this->student, 'sanctum')
+            ->getJson('/api/v1/feeding/activities/mine');
+        $mineResp->assertStatus(200)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonStructure([
+                'data' => [
+                    '*' => ['id', 'feeding_record_ref', 'spot_id', 'status', 'reward_status', 'points_awarded'],
+                ],
+            ]);
+
+        // 3. Publik melihat heatmap 14 hari terakhir dengan verified_count & pending_count terpisah (AFS-09)
+        $heatmapResp = $this->getJson('/api/v1/feeding/heatmap');
+        $heatmapResp->assertStatus(200)
+            ->assertJsonPath('data.0.spot_id', $this->activeSpot->id)
+            ->assertJsonPath('data.0.window_days', 14)
+            ->assertJsonPath('data.0.verified_count', 1)
+            ->assertJsonPath('data.0.pending_count', 1);
+    }
 }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class FeedingActivity extends Model
@@ -76,6 +77,16 @@ class FeedingActivity extends Model
         return (int) ($this->reward_snapshot['points_awarded'] ?? ($this->reward_status === 'CREDITED' ? $this->potential_points : 0));
     }
 
+    public function getRewardCappedAttribute(): bool
+    {
+        return (bool) ($this->reward_snapshot['reward_capped'] ?? false);
+    }
+
+    public function getRejectionReasonAttribute(): ?string
+    {
+        return $this->reward_snapshot['rejection_reason'] ?? $this->latestReview?->reason;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
@@ -96,6 +107,11 @@ class FeedingActivity extends Model
         return $this->hasMany(FeedingEvidence::class, 'activity_id')->orderBy('sort_order');
     }
 
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(FeedingEvidence::class, 'activity_id')->orderBy('sort_order');
+    }
+
     public function ruleResults(): HasMany
     {
         return $this->hasMany(FeedingRuleResult::class, 'activity_id');
@@ -104,5 +120,10 @@ class FeedingActivity extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(FeedingReview::class, 'activity_id');
+    }
+
+    public function latestReview(): HasOne
+    {
+        return $this->hasOne(FeedingReview::class, 'activity_id')->latestOfMany('created_at');
     }
 }
