@@ -13,19 +13,12 @@ class FeedingRuleResult extends Model
     protected $table = 'feeding_rule_results';
     public $incrementing = false;
     protected $keyType = 'string';
-    public $timestamps = false;
 
     protected $fillable = [
         'activity_id',
-        'rule_code',
-        'passed',
+        'rule',
+        'result',
         'detail',
-        'evaluated_at',
-    ];
-
-    protected $casts = [
-        'passed' => 'boolean',
-        'evaluated_at' => 'datetime',
     ];
 
     public function activity(): BelongsTo

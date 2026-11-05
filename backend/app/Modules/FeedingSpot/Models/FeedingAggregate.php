@@ -13,26 +13,21 @@ class FeedingAggregate extends Model
     protected $table = 'feeding_aggregates';
     public $incrementing = false;
     protected $keyType = 'string';
-    public $timestamps = false;
 
     protected $fillable = [
         'spot_id',
         'window_start',
         'window_end',
-        'total_feedings',
-        'unique_feeders',
-        'last_fed_at',
-        'need_score',
+        'verified_count',
+        'pending_count',
         'computed_at',
     ];
 
     protected $casts = [
-        'window_start' => 'date',
-        'window_end' => 'date',
-        'total_feedings' => 'integer',
-        'unique_feeders' => 'integer',
-        'last_fed_at' => 'datetime',
-        'need_score' => 'float',
+        'window_start' => 'datetime',
+        'window_end' => 'datetime',
+        'verified_count' => 'integer',
+        'pending_count' => 'integer',
         'computed_at' => 'datetime',
     ];
 

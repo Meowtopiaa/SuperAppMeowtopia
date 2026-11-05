@@ -2,10 +2,10 @@
 
 namespace App\Modules\FeedingSpot\Models;
 
-use App\Modules\Core\Models\MediaFile;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 class FeedingEvidence extends Model
 {
@@ -14,16 +14,17 @@ class FeedingEvidence extends Model
     protected $table = 'feeding_evidence';
     public $incrementing = false;
     protected $keyType = 'string';
-    public $timestamps = false;
 
     protected $fillable = [
         'activity_id',
         'media_id',
-        'created_at',
+        'captured_at',
+        'sort_order',
     ];
 
     protected $casts = [
-        'created_at' => 'datetime',
+        'captured_at' => 'datetime',
+        'sort_order' => 'integer',
     ];
 
     public function activity(): BelongsTo
@@ -31,8 +32,12 @@ class FeedingEvidence extends Model
         return $this->belongsTo(FeedingActivity::class, 'activity_id');
     }
 
-    public function media(): BelongsTo
+    public function getMediaDataAttribute(): ?array
     {
-        return $this->belongsTo(MediaFile::class, 'media_id');
+        $row = DB::table('media_files')
+            ->where('id', $this->media_id)
+            ->first();
+
+        return $row ? (array) $row : null;
     }
 }

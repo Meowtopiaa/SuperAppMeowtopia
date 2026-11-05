@@ -2,13 +2,14 @@
 
 namespace App\Modules\FeedingSpot\Models;
 
-use App\Modules\Core\Models\Territory;
+use App\Modules\Cat\Models\Cat;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 
 class FeedingSpot extends Model
 {
@@ -34,9 +35,24 @@ class FeedingSpot extends Model
         'longitude' => 'float',
     ];
 
-    public function territory(): BelongsTo
+    public function getTerritoryDataAttribute(): ?array
     {
-        return $this->belongsTo(Territory::class, 'territory_id');
+        if (!$this->territory_id) {
+            return null;
+        }
+
+        $row = DB::table('territories')
+            ->select(['id', 'code', 'name'])
+            ->where('id', $this->territory_id)
+            ->first();
+
+        return $row ? (array) $row : null;
+    }
+
+    public function cats(): BelongsToMany
+    {
+        return $this->belongsToMany(Cat::class, 'feeding_spot_cats', 'spot_id', 'cat_id')
+            ->withTimestamps();
     }
 
     public function activities(): HasMany
@@ -56,6 +72,6 @@ class FeedingSpot extends Model
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->whereIn('status', ['ACTIVE', 'MAINTENANCE']);
+        return $query->whereIn('status', ['ACTIVE', 'MAINTENANCE', 'TEMPORARILY_UNAVAILABLE']);
     }
 }

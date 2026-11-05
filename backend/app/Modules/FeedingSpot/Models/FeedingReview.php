@@ -14,18 +14,12 @@ class FeedingReview extends Model
     protected $table = 'feeding_reviews';
     public $incrementing = false;
     protected $keyType = 'string';
-    public $timestamps = false;
 
     protected $fillable = [
         'activity_id',
         'reviewer_id',
         'decision',
-        'notes',
-        'reviewed_at',
-    ];
-
-    protected $casts = [
-        'reviewed_at' => 'datetime',
+        'reason',
     ];
 
     public function activity(): BelongsTo

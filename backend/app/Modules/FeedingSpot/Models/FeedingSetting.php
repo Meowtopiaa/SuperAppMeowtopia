@@ -10,17 +10,14 @@ class FeedingSetting extends Model
     protected $primaryKey = 'key';
     public $incrementing = false;
     protected $keyType = 'string';
-    public $timestamps = false;
 
     protected $fillable = [
         'key',
         'value',
-        'description',
-        'updated_at',
     ];
 
     protected $casts = [
-        'updated_at' => 'datetime',
+        'value' => 'array',
     ];
 
     /**
@@ -46,11 +43,7 @@ class FeedingSetting extends Model
         foreach (self::DEFAULTS as $key => $meta) {
             self::firstOrCreate(
                 ['key' => $key],
-                [
-                    'value' => $meta['value'],
-                    'description' => $meta['description'],
-                    'updated_at' => now(),
-                ]
+                ['value' => $meta]
             );
         }
     }
@@ -58,7 +51,10 @@ class FeedingSetting extends Model
     public static function getValue(string $key, mixed $default = null): mixed
     {
         $row = self::find($key);
-        if ($row) {
+        if ($row && is_array($row->value) && array_key_exists('value', $row->value)) {
+            return $row->value['value'];
+        }
+        if ($row && !is_array($row->value)) {
             return $row->value;
         }
 
