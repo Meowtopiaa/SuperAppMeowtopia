@@ -291,7 +291,7 @@ Identifikasi tidak memberi poin.
 | ID | Prioritas | Kebutuhan dan kriteria penerimaan |
 | --- | --- | --- |
 | AFS-01 | P0 | Spot\_admin membuat, mengubah, menonaktifkan spot dan QR. ACTIVE dapat membuka sesi; TEMPORARILY\_UNAVAILABLE tampil dengan alasan tetapi tidak dapat membuka sesi; INACTIVE tidak tampil ke pengguna umum. |
-| AFS-02 | P0 | Peta dan daftar spot dengan legenda status. Data agregat yang usang diberi label, tidak dianggap nol. Daftar diurutkan dari yang terdekat bila pengguna mengizinkan lokasi; bila izin ditolak, daftar tetap tampil dan diurutkan berdasarkan nama. |
+| AFS-02 | P0 | Peta, daftar spot, dan detail spot dengan legenda status serta waktu terakhir tercatat diberi makan (last_fed_at, misalnya "Terakhir tercatat diberi makan 1 jam lalu"). Data agregat yang usang diberi label, tidak dianggap nol. Daftar diurutkan dari yang terdekat bila pengguna mengizinkan lokasi; bila izin ditolak, daftar tetap tampil dan diurutkan berdasarkan nama. |
 | AFS-03 | P0 | Scan QR spot yang valid dan aktif membuat aktivitas berstatus DRAFT dengan lokasi dari spot. QR kucing atau token dicabut ditolak tanpa membuat data. |
 | AFS-04 | P0 | Intent dicatat server paling lambat 15 menit sejak sesi dibuat; finalisasi paling lambat 60 menit, memakai jam server. 1 sampai 3 foto dari kamera aplikasi, tanpa galeri. Unggah ulang sebelum batas waktu tidak mensyaratkan foto baru. |
 | AFS-05 | P0 | Idempotency key dan satu aktivitas per sesi. Key sama dengan payload sama mengembalikan hasil awal; key sama dengan payload berbeda menghasilkan 409. |
@@ -472,7 +472,7 @@ Admin (`cat.edit`, `cat.curate`, `cat.qr.regenerate`): `POST/PATCH /admin/cats`,
 
 | Endpoint | Akses | Fungsi |
 | --- | --- | --- |
-| GET /feeding/spots, GET /feeding/spots/{id} | login | Spot dan agregat yang boleh ditampilkan |
+| GET /feeding/spots, GET /feeding/spots/{id} | login | Spot, waktu terakhir tercatat diberi makan (last_fed_at), dan agregat yang boleh ditampilkan |
 | POST /feeding/activities † | login | Body: qr\_token spot. Membuat aktivitas DRAFT dengan lokasi dari spot; mengembalikan activity\_id dan batas waktu |
 | POST /feeding/activities/{id}/intent † | pemilik | Konfirmasi memberi makan; server mencatat waktu |
 | POST /feeding/activities/{id}/finalize † | pemilik | Body: media\_ids (1-3), food\_type, food\_amount (opsional), cat\_code (opsional dari QR kalung). Menjalankan aturan; hasil SUBMITTED, UNDER\_REVIEW, atau VERIFIED, dengan reward\_status terpisah |
