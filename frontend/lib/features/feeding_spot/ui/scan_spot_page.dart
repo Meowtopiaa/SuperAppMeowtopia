@@ -9,7 +9,7 @@ import '../logic/feeding_spot_provider.dart';
 
 class ScanSpotPage extends StatefulWidget {
   const ScanSpotPage({super.key, this.expectedSpotId});
-  final String? expectedSpotId;
+  final int? expectedSpotId;
   @override
   State<ScanSpotPage> createState() => _ScanSpotPageState();
 }
@@ -86,7 +86,7 @@ class _ScanSpotPageState extends State<ScanSpotPage>
               autofocus: true,
               decoration: const InputDecoration(
                 labelText: 'Token QR spot',
-                hintText: 'MTP1.S.… atau SPOT-…',
+                hintText: 'SPOT:…',
               ),
               onSubmitted: (value) => Navigator.pop(dialog, value),
             ),
@@ -388,7 +388,7 @@ class _ScanSpotPageState extends State<ScanSpotPage>
               secondary: true,
               busy: _busy,
               onPressed: () =>
-                  _openToken(selected?.qrToken ?? 'MTP1.S.FS-TULT-01'),
+                  _openToken(selected?.qrToken ?? 'SPOT:FS-TULT-01'),
             ),
             const SizedBox(height: 10),
             const Text(

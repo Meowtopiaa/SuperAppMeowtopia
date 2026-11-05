@@ -17,19 +17,6 @@ class FeedingHistoryPage extends StatefulWidget {
 
 class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
   FeedingStatus? _filter;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final provider = context.read<FeedingSpotProvider>();
-      if (!provider.isDemo) {
-        provider.fetchMyActivities();
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FeedingSpotProvider>();
@@ -51,7 +38,7 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Pantau bukti, pemeriksaan, dan poinmu secara terpisah.',
+            'Pantau bukti, pemeriksaan, dan poinmu.',
             style: TextStyle(fontSize: 12, color: MeowStyle.brown),
           ),
           const SizedBox(height: 20),
@@ -133,7 +120,11 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
             ),
           ),
           const SizedBox(height: 20),
-          if (items.isEmpty)
+          if (!provider.isDemo)
+            const FeedingMessage(
+              'Riwayat kegiatan akan tersedia setelah layanan sesi, verifikasi, dan reward terhubung.',
+            ),
+          if (provider.isDemo && items.isEmpty)
             const FeedingMessage(
               'Belum ada kegiatan dalam kategori ini. Kegiatan baru akan muncul setelah bukti dikirim.',
             ),
@@ -214,13 +205,12 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
                             ),
                             const SizedBox(height: 5),
                             Text(
-                              provider.isDemo && item.creditedPoints > 0
+                              item.creditedPoints > 0
                                   ? '+${item.creditedPoints} poin contoh'
-                                  : item.rewardStatusLabel,
+                                  : 'Poin belum dikreditkan',
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: MeowStyle.orangeDark,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],

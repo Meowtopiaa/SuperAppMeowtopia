@@ -11,7 +11,7 @@ import 'feeding_widgets.dart';
 
 class FeedingSpotDetailPage extends StatefulWidget {
   const FeedingSpotDetailPage({super.key, required this.spotId});
-  final String spotId;
+  final int spotId;
   @override
   State<FeedingSpotDetailPage> createState() => _FeedingSpotDetailPageState();
 }
@@ -250,27 +250,6 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.schedule_rounded,
-                      size: 14,
-                      color: MeowStyle.orangeDark,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        spot.lastFedSentence,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: MeowStyle.orangeDark,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
                 if (!spot.isActive) ...[
                   const SizedBox(height: 12),
                   const MeowPill(
@@ -341,7 +320,7 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Terakhir tercatat diberi makan',
+                        'Terakhir tercatat',
                         style: TextStyle(fontSize: 12, color: MeowStyle.brown),
                       ),
                       const SizedBox(height: 6),

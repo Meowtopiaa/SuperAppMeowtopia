@@ -275,9 +275,9 @@ class FeedingSubmissionPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        provider.isDemo && item.creditedPoints > 0
-                            ? '+${item.creditedPoints} poin contoh'
-                            : item.rewardStatusLabel,
+                        item.creditedPoints > 0
+                            ? '+${item.creditedPoints} poin ${provider.isDemo ? 'contoh' : 'dikreditkan'}'
+                            : 'Belum ada poin dikreditkan',
                         style: const TextStyle(
                           fontSize: 13,
                           color: MeowStyle.green,
@@ -288,7 +288,7 @@ class FeedingSubmissionPage extends StatelessWidget {
                       Text(
                         item.potentialPoints != null && !verified
                             ? 'Potensi ${item.potentialPoints} poin · mengikuti hasil pemeriksaan.'
-                            : 'Status kegiatan (${item.statusLabel}) dan status reward (${item.rewardStatus}) dicatat terpisah.',
+                            : 'Status kegiatan dan status poin dicatat terpisah.',
                         style: const TextStyle(
                           fontSize: 11,
                           color: MeowStyle.brown,

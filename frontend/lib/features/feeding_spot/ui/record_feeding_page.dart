@@ -9,6 +9,7 @@ import '../../../core/widgets/meow_widgets.dart';
 import '../data/feeding_session.dart';
 import '../logic/feeding_spot_provider.dart';
 import 'feeding_widgets.dart';
+import 'scan_spot_page.dart';
 
 class RecordFeedingPage extends StatefulWidget {
   const RecordFeedingPage({super.key});
@@ -133,7 +134,7 @@ class _RecordFeedingPageState extends State<RecordFeedingPage> {
       );
     }
     final left = session.expiresAt.difference(DateTime.now());
-    final seconds = left.inSeconds.clamp(0, 3600);
+    final seconds = left.inSeconds.clamp(0, 900);
     final countdown =
         '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
     return MeowPage(

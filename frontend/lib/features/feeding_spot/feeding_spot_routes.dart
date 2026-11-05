@@ -23,19 +23,13 @@ final List<RouteBase> feedingFlowRoutes = [
   GoRoute(
     path: '/feeding/spot/:id',
     builder: (context, state) => FeedingSpotDetailPage(
-      spotId: state.pathParameters['id'] ?? '',
-    ),
-  ),
-  GoRoute(
-    path: '/feeding/spots/:id',
-    builder: (context, state) => FeedingSpotDetailPage(
-      spotId: state.pathParameters['id'] ?? '',
+      spotId: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
     ),
   ),
   GoRoute(
     path: '/feeding/scan',
     builder: (context, state) => ScanSpotPage(
-      expectedSpotId: state.uri.queryParameters['spot_id'],
+      expectedSpotId: int.tryParse(state.uri.queryParameters['spot_id'] ?? ''),
     ),
   ),
   GoRoute(
