@@ -193,4 +193,54 @@ class FeedingSpotTest extends TestCase
         $qrResp->assertStatus(200);
         $this->assertNotEquals($oldToken, $qrResp->json('data.qr_token'));
     }
+
+    public function test_meow_8_start_session_validates_idempotency_qr_type_and_cooldown(): void
+    {
+        // 1. Akses tanpa autentikasi ditolak (401)
+        $unauthResp = $this->postJson('/api/v1/feeding/activities', [
+            'qr_token' => "MTP1.S.{$this->activeSpot->qr_token}",
+        ]);
+        $unauthResp->assertStatus(401);
+
+        // 2. Tanpa Idempotency-Key ditolak (400 VALIDATION_ERROR)
+        $noIdemResp = $this->actingAs($this->student, 'sanctum')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => "MTP1.S.{$this->activeSpot->qr_token}",
+            ]);
+        $noIdemResp->assertStatus(400);
+
+        // 3. IT-03: Scan QR kalung kucing di modul Feeding Spot ditolak dengan 422 QR_WRONG_TYPE
+        $catQrResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-qr-cat-01')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => 'MTP1.C.RANDOM_CAT_TOKEN_123',
+            ]);
+        $catQrResp->assertStatus(422)
+            ->assertJsonPath('code', 'QR_WRONG_TYPE');
+
+        // 4. Sukses membuka sesi DRAFT dengan QR Spot resmi (201)
+        $openResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-open-01')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => "MTP1.S.{$this->activeSpot->qr_token}",
+            ]);
+        $openResp->assertStatus(201)
+            ->assertJsonPath('data.status', 'DRAFT')
+            ->assertJsonPath('data.spot.id', $this->activeSpot->id)
+            ->assertJsonStructure([
+                'data' => ['activity_id', 'feeding_record_ref', 'status', 'spot', 'scanned_at', 'intent_deadline_at', 'finalize_deadline_at'],
+            ]);
+
+        // 5. Cooldown 6 jam: jika sudah ada sesi SUBMITTED/UNDER_REVIEW/VERIFIED dalam < 6 jam, tolak dengan 422 COOLDOWN_ACTIVE
+        FeedingActivity::where('id', $openResp->json('data.activity_id'))
+            ->update(['status' => 'VERIFIED', 'finalized_at' => now()]);
+
+        $cooldownResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-open-cooldown-02')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => "MTP1.S.{$this->activeSpot->qr_token}",
+            ]);
+        $cooldownResp->assertStatus(422)
+            ->assertJsonPath('code', 'COOLDOWN_ACTIVE');
+    }
 }

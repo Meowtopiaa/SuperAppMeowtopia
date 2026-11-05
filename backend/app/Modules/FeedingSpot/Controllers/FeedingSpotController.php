@@ -3,7 +3,9 @@
 namespace App\Modules\FeedingSpot\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Services\ScanResolver;
 use App\Modules\FeedingSpot\Models\FeedingActivity;
+use App\Modules\FeedingSpot\Models\FeedingSetting;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class FeedingSpotController extends Controller
 {
+    public function __construct(
+        private readonly ScanResolver $scanResolver,
+    ) {}
+
     /**
      * GET /api/v1/feeding/spots
      * Daftar spot pemberian pakan aktif beserta waktu terakhir diberi makan (last_fed_at)
@@ -115,6 +121,117 @@ class FeedingSpotController extends Controller
         ])->values();
 
         return ApiResponse::success($summary, 'Detail spot pemberian pakan berhasil diambil.');
+    }
+
+    /**
+     * POST /api/v1/feeding/activities †
+     * Buka sesi pemberian makan dengan memindai QR spot resmi (AFS-03, IT-03, MEOW-8).
+     */
+    public function startSession(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'qr_token' => ['required', 'string', 'max:255'],
+        ]);
+
+        $rawToken = trim($validated['qr_token']);
+
+        // IT-03 & AFS-03: Jika QR berprefiks MTP1.C. (QR kalung kucing), tolak dengan QR_WRONG_TYPE
+        if (str_starts_with($rawToken, 'MTP1.C.')) {
+            return ApiResponse::error(
+                'QR yang dipindai adalah QR kalung kucing, bukan QR feeding spot.',
+                422,
+                'QR_WRONG_TYPE'
+            );
+        }
+
+        $spot = null;
+
+        try {
+            $resolved = $this->scanResolver->resolve($rawToken);
+            if (($resolved['type'] ?? null) === 'cat') {
+                return ApiResponse::error(
+                    'QR yang dipindai adalah QR kalung kucing, bukan QR feeding spot.',
+                    422,
+                    'QR_WRONG_TYPE'
+                );
+            }
+            if (($resolved['type'] ?? null) === 'spot' && !empty($resolved['id'])) {
+                $spot = FeedingSpot::find($resolved['id']);
+            }
+        } catch (\Throwable) {
+            // Fallback untuk raw qr_token atau format SPOT:<CODE>
+            $cleanToken = str_starts_with($rawToken, 'SPOT:')
+                ? substr($rawToken, 5)
+                : (str_starts_with($rawToken, 'MTP1.S.') ? substr($rawToken, 7) : $rawToken);
+
+            $spot = FeedingSpot::where('qr_token', $cleanToken)
+                ->orWhere('code', $cleanToken)
+                ->first();
+        }
+
+        if (!$spot) {
+            return ApiResponse::error('Token QR spot tidak valid atau sudah diganti.', 422, 'QR_INVALID');
+        }
+
+        if ($spot->status !== 'ACTIVE') {
+            return ApiResponse::error(
+                'Spot sedang dalam perawatan atau tidak aktif.',
+                422,
+                'SPOT_UNAVAILABLE'
+            );
+        }
+
+        $user = $request->user();
+        $cooldownHours = (int) FeedingSetting::getFloat('cooldown_hours', 6.0);
+
+        $recentActivity = FeedingActivity::query()
+            ->where('user_id', $user->id)
+            ->where('spot_id', $spot->id)
+            ->whereIn('status', ['SUBMITTED', 'UNDER_REVIEW', 'VERIFIED'])
+            ->where(function ($q) use ($cooldownHours) {
+                $cutoff = now()->subHours($cooldownHours);
+                $q->where('finalized_at', '>=', $cutoff)
+                    ->orWhere('scanned_at', '>=', $cutoff);
+            })
+            ->latest('scanned_at')
+            ->first();
+
+        if ($recentActivity) {
+            return ApiResponse::error(
+                "Anda baru saja memberi makan di spot ini. Silakan tunggu {$cooldownHours} jam sebelum membuat sesi baru di spot yang sama.",
+                422,
+                'COOLDOWN_ACTIVE'
+            );
+        }
+
+        $now = now();
+        $intentMinutes = (int) FeedingSetting::getFloat('intent_window_minutes', 15.0);
+        $finalizeMinutes = (int) FeedingSetting::getFloat('finalize_window_minutes', 60.0);
+        $intentDeadline = $now->copy()->addMinutes($intentMinutes);
+        $finalizeDeadline = $now->copy()->addMinutes($finalizeMinutes);
+
+        $activity = FeedingActivity::create([
+            'user_id' => $user->id,
+            'spot_id' => $spot->id,
+            'location_lat' => $spot->latitude,
+            'location_lng' => $spot->longitude,
+            'status' => 'DRAFT',
+            'reward_status' => 'PENDING',
+            'potential_points' => 10,
+            'scanned_at' => $now,
+            'intent_deadline_at' => $intentDeadline,
+            'finalize_deadline_at' => $finalizeDeadline,
+        ]);
+
+        return ApiResponse::created([
+            'activity_id' => $activity->id,
+            'feeding_record_ref' => $activity->feeding_record_ref,
+            'status' => $activity->status,
+            'spot' => $this->formatSpotSummary($spot),
+            'scanned_at' => $activity->scanned_at->toIso8601String(),
+            'intent_deadline_at' => $intentDeadline->toIso8601String(),
+            'finalize_deadline_at' => $finalizeDeadline->toIso8601String(),
+        ], 'Sesi pemberian pakan berhasil dibuka.');
     }
 
     /**

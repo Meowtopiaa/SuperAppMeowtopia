@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Middleware\RequireIdempotencyKey;
 use App\Modules\FeedingSpot\Controllers\AdminFeedingSpotController;
 use App\Modules\FeedingSpot\Controllers\FeedingSpotController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,14 @@ Route::prefix('feeding')->group(function () {
     // Public / Read Endpoints (MEOW-6)
     Route::get('/spots', [FeedingSpotController::class, 'listSpots']);
     Route::get('/spots/{id}', [FeedingSpotController::class, 'showSpot']);
+
+    // Authenticated User Endpoints
+    Route::middleware('auth:sanctum')->group(function () {
+        // Idempotent Write Endpoints (†) (MEOW-8)
+        Route::middleware(RequireIdempotencyKey::class)->group(function () {
+            Route::post('/activities', [FeedingSpotController::class, 'startSession']);
+        });
+    });
 });
 
 // Admin Endpoints — /api/v1/admin/feeding/*
