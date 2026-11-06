@@ -61,6 +61,11 @@ components:
           type: string
           enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
           example: "ACTIVE"
+        status_reason:
+          type: string
+          nullable: true
+          example: "Sedang dilakukan perbaikan wadah pakan"
+          description: Keterangan alasan jika spot sementara tidak aktif atau dalam pemeliharaan (TEMPORARILY_UNAVAILABLE/MAINTENANCE).
         last_fed_at:
           type: string
           format: date-time
@@ -111,6 +116,20 @@ components:
           example: false
         code:
           type: string
+          enum:
+            - VALIDATION_ERROR
+            - FORBIDDEN
+            - CONFLICT
+            - IDEMPOTENCY_CONFLICT
+            - QR_INVALID
+            - QR_REVOKED
+            - QR_WRONG_TYPE
+            - SPOT_UNAVAILABLE
+            - SESSION_EXPIRED
+            - COOLDOWN_ACTIVE
+            - DAILY_CAP_REACHED
+            - INVALID_EVIDENCE
+            - SELF_REVIEW_FORBIDDEN
           example: "QR_WRONG_TYPE"
         message:
           type: string
@@ -205,8 +224,14 @@ paths:
       responses:
         "201":
           description: Sesi pemberian pakan berhasil dibuka
+        "409":
+          description: Konflik idempotensi (IDEMPOTENCY_CONFLICT) saat key yang sama dikirim dengan payload berbeda
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "422":
-          description: QR tidak valid, salah tipe (QR_WRONG_TYPE), spot tidak aktif, atau masih dalam cooldown 6 jam (COOLDOWN_ACTIVE)
+          description: QR tidak valid (QR_INVALID), salah tipe (QR_WRONG_TYPE), spot sementara tidak tersedia (SPOT_UNAVAILABLE), atau masih dalam cooldown 6 jam (COOLDOWN_ACTIVE)
           content:
             application/json:
               schema:
