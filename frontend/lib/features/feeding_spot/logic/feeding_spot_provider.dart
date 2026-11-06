@@ -193,12 +193,21 @@ class FeedingSpotProvider extends ChangeNotifier {
                   now.add(const Duration(minutes: 15))
             : now.add(const Duration(minutes: 15));
 
+        final intentDeadlineAt = data['intent_deadline_at'] != null
+            ? DateTime.tryParse(data['intent_deadline_at'].toString())
+            : startedAt.add(const Duration(minutes: 15));
+        final finalizeDeadlineAt = data['finalize_deadline_at'] != null
+            ? DateTime.tryParse(data['finalize_deadline_at'].toString())
+            : null;
+
         session = FeedingSession(
           id: activityId,
           feedingRecordRef: data['feeding_record_ref']?.toString(),
           spot: matchedSpot,
           startedAt: startedAt,
-          expiresAt: expiresAt,
+          expiresAt: finalizeDeadlineAt ?? intentDeadlineAt ?? now.add(const Duration(minutes: 15)),
+          intentDeadlineAt: intentDeadlineAt,
+          finalizeDeadlineAt: finalizeDeadlineAt,
         );
         notifyListeners();
         return session!;
@@ -367,7 +376,23 @@ class FeedingSpotProvider extends ChangeNotifier {
 
   String _extractErrorMessage(Object error) {
     if (error is ApiException) {
-      return error.message;
+      switch (error.code) {
+        case 'COOLDOWN_ACTIVE':
+          return 'Spot ini baru saja diberi makan dalam 6 jam terakhir. Silakan pilih spot lain yang membutuhkan pakan.';
+        case 'SESSION_EXPIRED':
+          return 'Sesi pemberian makan telah kedaluwarsa. Silakan pindai ulang QR di spot.';
+        case 'QR_WRONG_TYPE':
+          return 'Kode QR tidak sesuai. Pastikan Anda memindai kode QR resmi titik pakan (MTP1.S.*).';
+        case 'SPOT_UNAVAILABLE':
+        case 'SPOT_NOT_FOUND':
+          return 'Spot pakan ini sedang dalam perawatan atau sementara tidak tersedia.';
+        case 'DAILY_CAP_REACHED':
+          return 'Batas reward harian Anda telah tercapai. Anda tetap dapat memberi makan, namun poin tidak bertambah hari ini.';
+        case 'IDEMPOTENCY_CONFLICT':
+          return 'Permintaan sedang diproses atau sudah tercatat sebelumnya. Muat ulang halaman.';
+        default:
+          return error.message;
+      }
     }
     final raw = error.toString();
     return raw.replaceFirst('Bad state: ', '').replaceFirst('Exception: ', '');

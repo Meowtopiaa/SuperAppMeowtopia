@@ -25,6 +25,7 @@ class FeedingSession {
     required this.expiresAt,
     this.feedingRecordRef,
     this.intentDeadlineAt,
+    this.finalizeDeadlineAt,
   });
   final String id;
   final String? feedingRecordRef;
@@ -32,12 +33,26 @@ class FeedingSession {
   final DateTime startedAt;
   final DateTime expiresAt;
   final DateTime? intentDeadlineAt;
+  final DateTime? finalizeDeadlineAt;
   final List<FeedingEvidence> evidence = [];
   String foodType = 'dry_food';
   String quantity = '2 genggam (perkiraan 120 g)';
   String notes = '';
   String? catId;
   String? catCode;
+
+  Duration get remainingIntentTime {
+    final deadline = intentDeadlineAt ?? startedAt.add(const Duration(minutes: 15));
+    final diff = deadline.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
+  }
+
+  Duration get remainingFinalizeTime {
+    final deadline = finalizeDeadlineAt ?? expiresAt;
+    final diff = deadline.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
+  }
+
   bool get isExpired => !DateTime.now().isBefore(expiresAt);
   bool get canSubmit =>
       !isExpired && evidence.isNotEmpty && evidence.length <= 3;
