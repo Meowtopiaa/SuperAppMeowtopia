@@ -59,3 +59,4 @@ class RefreshFeedingAggregatesCommand extends Command
         return Command::SUCCESS;
     }
 }
+

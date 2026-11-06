@@ -17,6 +17,7 @@ class FeedingSpotModel {
   final String? imageUrl;
   final String imageAsset;
   final DateTime? aggregateUpdatedAt;
+  final bool hasPendingReview;
 
   /// Client-side only distance in meters (computed locally on device via Geolocator, never sent to server).
   final double? distanceMeters;
@@ -40,6 +41,7 @@ class FeedingSpotModel {
     this.imageUrl,
     this.imageAsset = 'assets/images/figma/feeding-shelter.png',
     this.aggregateUpdatedAt,
+    this.hasPendingReview = false,
     this.distanceMeters,
   });
 
@@ -57,6 +59,9 @@ class FeedingSpotModel {
     final rawVerified14d = json['verified_count_14_days'] ??
         aggregate?['total_feedings'] ??
         aggregate?['verified_count'];
+
+    final pendingCount = (aggregate?['pending_count'] as num?)?.toInt() ?? 0;
+    final hasPending = json['has_pending_review'] == true || pendingCount > 0;
 
     return FeedingSpotModel(
       id: (json['id'] ?? '').toString(),
@@ -88,6 +93,7 @@ class FeedingSpotModel {
       aggregateUpdatedAt: DateTime.tryParse(
         json['aggregate_updated_at']?.toString() ?? '',
       ),
+      hasPendingReview: hasPending,
     );
   }
 
@@ -96,6 +102,7 @@ class FeedingSpotModel {
     DateTime? lastFedAt,
     int? verifiedCount14Days,
     String? status,
+    bool? hasPendingReview,
   }) {
     return FeedingSpotModel(
       id: id,
@@ -116,6 +123,7 @@ class FeedingSpotModel {
       imageUrl: imageUrl,
       imageAsset: imageAsset,
       aggregateUpdatedAt: aggregateUpdatedAt,
+      hasPendingReview: hasPendingReview ?? this.hasPendingReview,
       distanceMeters: distanceMeters ?? this.distanceMeters,
     );
   }
@@ -129,10 +137,10 @@ class FeedingSpotModel {
       ? 'Jarang tercatat'
       : 'Rutin tercatat';
 
-  /// AFS-02 requirement: "Terakhir tercatat diberi makan X lalu"
+  /// AFS-02 & MEOW-25 requirement: Fallback "Belum ada catatan"
   String get lastFedSentence {
     if (lastFedAt == null) {
-      return 'Belum tercatat diberi makan dalam 14 hari terakhir';
+      return 'Belum ada catatan';
     }
     final diff = DateTime.now().difference(lastFedAt!);
     if (diff.inMinutes < 1) {

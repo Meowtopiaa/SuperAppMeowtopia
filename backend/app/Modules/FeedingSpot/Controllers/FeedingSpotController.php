@@ -69,13 +69,23 @@ class FeedingSpotController extends Controller
             ->groupBy('spot_id')
             ->pluck('last_fed_at', 'spot_id');
 
-        $data = $spots->map(function (FeedingSpot $spot) use ($latestVerifiedMap, $territoryMap) {
+        // Deteksi apakah ada pengajuan pakan yang sedang menunggu verifikasi (MEOW-25)
+        $pendingSpotIds = FeedingActivity::query()
+            ->whereIn('spot_id', $spots->pluck('id'))
+            ->where('status', 'UNDER_REVIEW')
+            ->pluck('spot_id')
+            ->unique()
+            ->flip();
+
+        $data = $spots->map(function (FeedingSpot $spot) use ($latestVerifiedMap, $territoryMap, $pendingSpotIds) {
             $territoryRow = $spot->territory_id ? ($territoryMap[$spot->territory_id] ?? null) : null;
+            $hasPending = isset($pendingSpotIds[$spot->id]) || (($spot->latestAggregate?->pending_count ?? 0) > 0);
 
             return $this->formatSpotSummary(
                 $spot,
                 $latestVerifiedMap[$spot->id] ?? null,
-                $territoryRow ? (array) $territoryRow : null
+                $territoryRow ? (array) $territoryRow : null,
+                $hasPending
             );
         })->values();
 
@@ -111,10 +121,16 @@ class FeedingSpotController extends Controller
         $lastFedAt = $recentActivities->first()?->finalized_at
             ?? $recentActivities->first()?->updated_at;
 
+        $hasPending = FeedingActivity::query()
+            ->where('spot_id', $spot->id)
+            ->where('status', 'UNDER_REVIEW')
+            ->exists() || (($spot->latestAggregate?->pending_count ?? 0) > 0);
+
         $summary = $this->formatSpotSummary(
             $spot,
             $lastFedAt ? (is_string($lastFedAt) ? $lastFedAt : $lastFedAt->toIso8601String()) : null,
-            $spot->territory_data
+            $spot->territory_data,
+            $hasPending
         );
 
         $summary['cats'] = $spot->cats()->select(['cats.id', 'cats.unique_code', 'cats.name'])->get()->map(fn ($c) => [
@@ -697,7 +713,7 @@ class FeedingSpotController extends Controller
     /**
      * Format representasi spot untuk daftar, peta, dan detail sesuai AFS-02.
      */
-    private function formatSpotSummary(FeedingSpot $spot, ?string $fallbackLastFedAt = null, ?array $territory = null): array
+    private function formatSpotSummary(FeedingSpot $spot, ?string $fallbackLastFedAt = null, ?array $territory = null, bool $hasPendingReview = false): array
     {
         $agg = $spot->latestAggregate;
         $lastFedIso = $fallbackLastFedAt ? Carbon::parse($fallbackLastFedAt)->toIso8601String() : null;
@@ -715,6 +731,7 @@ class FeedingSpotController extends Controller
             'territory' => $territory,
             'status' => $spot->status,
             'last_fed_at' => $lastFedIso,
+            'has_pending_review' => $hasPendingReview,
             'aggregate' => [
                 'window_days' => 14,
                 'total_feedings' => $verifiedCount,

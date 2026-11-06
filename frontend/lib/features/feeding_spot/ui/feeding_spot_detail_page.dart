@@ -328,6 +328,15 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                           color: MeowStyle.brown,
                         ),
                       ),
+                      if (spot.hasPendingReview) ...[
+                        const SizedBox(height: 6),
+                        MeowPill(
+                          'Ada pengajuan menunggu verifikasi',
+                          color: const Color(0xFFFFF4E5),
+                          foreground: const Color(0xFFD97706),
+                          icon: Icons.hourglass_top_rounded,
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Text(
                         spot.aggregateUpdatedAt == null

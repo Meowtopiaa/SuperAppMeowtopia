@@ -912,4 +912,56 @@ class FeedingSpotTest extends TestCase
         $this->assertDatabaseMissing('feeding_evidence', ['media_id' => $mOldRejected]);
         $this->assertDatabaseHas('feeding_evidence', ['media_id' => $mRecent]);
     }
+
+    public function test_meow_25_pending_review_indicator(): void
+    {
+        $newSpot = FeedingSpot::create([
+            'id' => (string) Str::ulid(),
+            'code' => 'SPOT-M25',
+            'name' => 'Spot MEOW-25',
+            'description' => 'Spot untuk uji pending review',
+            'latitude' => -6.9745,
+            'longitude' => 107.6305,
+            'qr_token' => 'TOKEN_SPOT_M25',
+            'status' => 'ACTIVE',
+        ]);
+
+        // 1. Awalnya belum ada catatan dan has_pending_review false
+        $initialResp = $this->getJson("/api/v1/feeding/spots/{$newSpot->id}");
+        $initialResp->assertStatus(200)
+            ->assertJsonPath('data.last_fed_at', null)
+            ->assertJsonPath('data.has_pending_review', false);
+
+        // 2. Ada pengajuan berstatus UNDER_REVIEW
+        $pendingAct = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-M25-01',
+            'user_id' => $this->student->id,
+            'spot_id' => $newSpot->id,
+            'location_lat' => (float) $newSpot->latitude,
+            'location_lng' => (float) $newSpot->longitude,
+            'status' => 'UNDER_REVIEW',
+            'scanned_at' => now(),
+            'finalized_at' => now(),
+            'reward_status' => 'PENDING',
+        ]);
+
+        $pendingDetailResp = $this->getJson("/api/v1/feeding/spots/{$newSpot->id}");
+        $pendingDetailResp->assertStatus(200)
+            ->assertJsonPath('data.has_pending_review', true);
+
+        $pendingListResp = $this->getJson("/api/v1/feeding/spots");
+        $pendingListResp->assertStatus(200);
+        $spotItem = collect($pendingListResp->json('data'))->firstWhere('id', $newSpot->id);
+        $this->assertNotNull($spotItem);
+        $this->assertTrue($spotItem['has_pending_review']);
+
+        // 3. Setelah disetujui (VERIFIED), has_pending_review kembali false dan last_fed_at terisi
+        $pendingAct->update(['status' => 'VERIFIED']);
+
+        $verifiedResp = $this->getJson("/api/v1/feeding/spots/{$newSpot->id}");
+        $verifiedResp->assertStatus(200)
+            ->assertJsonPath('data.has_pending_review', false);
+        $this->assertNotNull($verifiedResp->json('data.last_fed_at'));
+    }
 }

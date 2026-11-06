@@ -299,6 +299,15 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    if (spot.hasPendingReview) ...[
+                      const SizedBox(height: 6),
+                      MeowPill(
+                        'Ada pengajuan menunggu verifikasi',
+                        color: const Color(0xFFFFF4E5),
+                        foreground: const Color(0xFFD97706),
+                        icon: Icons.hourglass_top_rounded,
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     Row(
                       children: [
