@@ -721,4 +721,62 @@ class FeedingSpotTest extends TestCase
         $balanceAfter = (int) DB::table('point_balances')->where('user_id', $this->student->id)->value('total_points');
         $this->assertEquals(0, $balanceAfter);
     }
+
+    public function test_meow_23_spot_cats_and_hub_action_provider(): void
+    {
+        $cat = \App\Modules\Cat\Models\Cat::create([
+            'id' => (string) Str::ulid(),
+            'unique_code' => 'CAT-M23',
+            'name' => 'Oyen MEOW-23',
+            'presence_status' => 'ON_CAMPUS',
+            'health_status' => 'HEALTHY',
+            'adoption_status' => 'UNREVIEWED',
+            'verification_status' => 'VERIFIED',
+        ]);
+
+        $actionProvider = new \App\Modules\FeedingSpot\Services\FeedingActionProvider();
+
+        // 1. Cat not yet linked to spot -> feeding.start is disabled
+        $actionsBefore = $actionProvider->actionsFor($cat, $this->student);
+        $this->assertCount(1, $actionsBefore);
+        $this->assertFalse($actionsBefore[0]['enabled']);
+        $this->assertStringContainsString('belum diasosiasikan', $actionsBefore[0]['reason']);
+
+        // 2. Admin attaches cat to active spot
+        $attachResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}/cats", [
+                'cat_ids' => [$cat->id],
+            ]);
+        $attachResp->assertStatus(200)
+            ->assertJsonPath('data.attached_count', 1);
+
+        // 3. Admin lists spot cats
+        $listResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->getJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}/cats");
+        $listResp->assertStatus(200)
+            ->assertJsonCount(1, 'data.cats');
+
+        // 4. Cat is now linked -> feeding.start is enabled
+        $actionsAfter = $actionProvider->actionsFor($cat, $this->student);
+        $this->assertTrue($actionsAfter[0]['enabled']);
+        $this->assertNull($actionsAfter[0]['reason']);
+        $this->assertCount(1, $actionsAfter[0]['spots']);
+
+        // 5. Hub cat actions endpoint /api/v1/cats/{id}/actions includes enabled feeding.start
+        $catActionsResp = $this->actingAs($this->student, 'sanctum')
+            ->getJson("/api/v1/cats/{$cat->id}/actions");
+        $catActionsResp->assertStatus(200);
+        $feedingItem = collect($catActionsResp->json('data'))->firstWhere('id', 'feeding.start');
+        $this->assertNotNull($feedingItem);
+        $this->assertTrue($feedingItem['enabled']);
+
+        // 6. Admin detaches cat
+        $detachResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->deleteJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}/cats/{$cat->id}");
+        $detachResp->assertStatus(200);
+
+        // Verify detached
+        $actionsDetached = $actionProvider->actionsFor($cat, $this->student);
+        $this->assertFalse($actionsDetached[0]['enabled']);
+    }
 }

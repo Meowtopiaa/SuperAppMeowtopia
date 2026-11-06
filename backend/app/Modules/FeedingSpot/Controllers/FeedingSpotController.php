@@ -117,6 +117,12 @@ class FeedingSpotController extends Controller
             $spot->territory_data
         );
 
+        $summary['cats'] = $spot->cats()->select(['cats.id', 'cats.unique_code', 'cats.name'])->get()->map(fn ($c) => [
+            'id' => $c->id,
+            'unique_code' => $c->unique_code,
+            'name' => $c->name,
+        ])->values();
+
         $summary['recent_activities'] = $recentActivities->map(fn (FeedingActivity $a) => [
             'id' => $a->id,
             'food_type' => $a->food_type,

@@ -373,4 +373,64 @@ class AdminFeedingSpotController extends Controller
             ]
         );
     }
+
+    /**
+     * GET /api/v1/admin/feeding/spots/{id}/cats
+     * Ambil daftar kucing yang terasosiasi dengan spot pakan (MEOW-23).
+     */
+    public function getSpotCats(string $id): JsonResponse
+    {
+        $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->first();
+        if (!$spot) {
+            return ApiResponse::error('Titik feeding spot tidak ditemukan.', 404, 'SPOT_NOT_FOUND');
+        }
+
+        $cats = $spot->cats()->select(['cats.id', 'cats.unique_code', 'cats.name', 'cats.presence_status', 'cats.health_status'])->get();
+
+        return ApiResponse::success([
+            'spot_id' => $spot->id,
+            'spot_code' => $spot->code,
+            'cats' => $cats,
+        ], 'Daftar kucing terkait spot berhasil diambil.');
+    }
+
+    /**
+     * POST /api/v1/admin/feeding/spots/{id}/cats
+     * Asosiasikan kucing dengan spot pakan (MEOW-23).
+     */
+    public function attachCats(Request $request, string $id): JsonResponse
+    {
+        $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->first();
+        if (!$spot) {
+            return ApiResponse::error('Titik feeding spot tidak ditemukan.', 404, 'SPOT_NOT_FOUND');
+        }
+
+        $validated = $request->validate([
+            'cat_ids' => ['required', 'array', 'min:1'],
+            'cat_ids.*' => ['required', 'string', 'size:26', 'exists:cats,id'],
+        ]);
+
+        $spot->cats()->syncWithoutDetaching($validated['cat_ids']);
+
+        return ApiResponse::success([
+            'spot_id' => $spot->id,
+            'attached_count' => count($validated['cat_ids']),
+        ], 'Kucing berhasil diasosiasikan dengan spot pakan.');
+    }
+
+    /**
+     * DELETE /api/v1/admin/feeding/spots/{id}/cats/{catId}
+     * Hapus asosiasi kucing dari spot pakan (MEOW-23).
+     */
+    public function detachCat(string $id, string $catId): JsonResponse
+    {
+        $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->first();
+        if (!$spot) {
+            return ApiResponse::error('Titik feeding spot tidak ditemukan.', 404, 'SPOT_NOT_FOUND');
+        }
+
+        $spot->cats()->detach($catId);
+
+        return ApiResponse::success(null, 'Asosiasi kucing dengan spot pakan berhasil dihapus.');
+    }
 }
