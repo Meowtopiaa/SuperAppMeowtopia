@@ -32,11 +32,12 @@ Route::prefix('feeding')->group(function () {
 
 // Admin Endpoints — /api/v1/admin/feeding/*
 Route::prefix('admin/feeding')->middleware('auth:sanctum')->group(function () {
-    // Kelola Spot & QR (Permission: spot.manage) (MEOW-7, MEOW-23)
+    // Kelola Spot & QR (Permission: spot.manage) (MEOW-7, MEOW-21, MEOW-23)
     Route::middleware('can:spot.manage')->group(function () {
         Route::post('/spots', [AdminFeedingSpotController::class, 'storeSpot']);
         Route::patch('/spots/{id}', [AdminFeedingSpotController::class, 'updateSpot']);
         Route::post('/spots/{id}/qr', [AdminFeedingSpotController::class, 'regenerateQr']);
+        Route::get('/spots/{id}/qr-sheet', [AdminFeedingSpotController::class, 'printQrSheet'])->name('admin.feeding.spots.qr-sheet');
         Route::get('/spots/{id}/cats', [AdminFeedingSpotController::class, 'getSpotCats']);
         Route::post('/spots/{id}/cats', [AdminFeedingSpotController::class, 'attachCats']);
         Route::delete('/spots/{id}/cats/{catId}', [AdminFeedingSpotController::class, 'detachCat']);
@@ -62,4 +63,9 @@ if (app()->runningInConsole()) {
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\RefreshFeedingAggregatesCommand::class);
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\CleanupFeedingMediaRetentionCommand::class);
     });
+}
+
+// Views Registration (MEOW-21, MEOW-22)
+if (function_exists('view')) {
+    view()->addNamespace('feeding-spot', __DIR__ . '/resources/views');
 }

@@ -964,4 +964,32 @@ class FeedingSpotTest extends TestCase
             ->assertJsonPath('data.has_pending_review', false);
         $this->assertNotNull($verifiedResp->json('data.last_fed_at'));
     }
+
+    public function test_meow_21_filament_resource_and_qr_sheet_view(): void
+    {
+        // 1. Admin dengan permission spot.manage dapat membuka lembar cetak QR
+        $qrSheetResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->get("/api/v1/admin/feeding/spots/{$this->activeSpot->id}/qr-sheet");
+
+        $qrSheetResp->assertStatus(200)
+            ->assertSee($this->activeSpot->name)
+            ->assertSee($this->activeSpot->code)
+            ->assertSee("MTP1.S.{$this->activeSpot->qr_token}")
+            ->assertSee('TITIK PAKAN RESMI KAMPUS');
+
+        // 2. Mahasiswa biasa ditolak (403)
+        $unauthResp = $this->actingAs($this->student, 'sanctum')
+            ->get("/api/v1/admin/feeding/spots/{$this->activeSpot->id}/qr-sheet");
+        $unauthResp->assertStatus(403);
+
+        // 3. Verifikasi skema Resource
+        $schema = \App\Modules\FeedingSpot\Filament\Resources\FeedingSpotResource::getFormSchema();
+        $this->assertArrayHasKey('code', $schema);
+        $this->assertArrayHasKey('name', $schema);
+        $this->assertArrayHasKey('status', $schema);
+
+        $columns = \App\Modules\FeedingSpot\Filament\Resources\FeedingSpotResource::getTableColumns();
+        $this->assertArrayHasKey('code', $columns);
+        $this->assertArrayHasKey('name', $columns);
+    }
 }

@@ -433,4 +433,20 @@ class AdminFeedingSpotController extends Controller
 
         return ApiResponse::success(null, 'Asosiasi kucing dengan spot pakan berhasil dihapus.');
     }
+
+    /**
+     * GET /api/v1/admin/feeding/spots/{id}/qr-sheet
+     * Tampilkan lembar cetak QR resmi untuk spot pakan (MEOW-21).
+     */
+    public function printQrSheet(string $id)
+    {
+        $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->first();
+        if (!$spot) {
+            return ApiResponse::error('Titik feeding spot tidak ditemukan.', 404, 'SPOT_NOT_FOUND');
+        }
+
+        return view('feeding-spot::filament.qr-sheet', [
+            'spot' => $spot,
+        ]);
+    }
 }
