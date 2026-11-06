@@ -340,11 +340,14 @@ class FeedingSpotController extends Controller
 
         // Idempotent replay jika sesi sudah difinalisasi
         if (in_array($activity->status, ['VERIFIED', 'UNDER_REVIEW', 'REJECTED'], true)) {
+            $pointsAwarded = (int) ($activity->reward_snapshot['points_awarded'] ?? $activity->potential_points ?? 0);
             return ApiResponse::success([
                 'activity_id' => $activity->id,
                 'status' => $activity->status,
                 'reward_status' => $activity->reward_status,
-                'points_awarded' => $activity->points_awarded,
+                'points_awarded' => $pointsAwarded,
+                'credited_points' => $pointsAwarded,
+                'reward_capped' => (bool) ($activity->reward_snapshot['reward_capped'] ?? false),
                 'is_replay' => true,
             ], 'Sesi pemberian pakan telah difinalisasi sebelumnya.');
         }
@@ -380,6 +383,15 @@ class FeedingSpotController extends Controller
 
         if ($mediaRows->count() !== count($validated['media_ids'])) {
             return ApiResponse::error('Salah satu bukti foto tidak ditemukan.', 422, 'INVALID_EVIDENCE');
+        }
+
+        foreach ($mediaRows as $mRow) {
+            if ($mRow->owner_id !== $request->user()->id) {
+                return ApiResponse::error('Bukti foto harus diunggah oleh Anda sendiri.', 403, 'FORBIDDEN');
+            }
+            if ($mRow->purpose !== 'feeding_proof') {
+                return ApiResponse::error('Tipe media bukan bukti pakan resmi.', 422, 'INVALID_EVIDENCE');
+            }
         }
 
         // Resolusi opsional kucing (AFS-13)
@@ -451,12 +463,12 @@ class FeedingSpotController extends Controller
                     idempotencyKey: "feeding.verified:{$activity->id}"
                 );
 
-                $pointsAwarded = (int) ($award['points'] ?? 0);
-                $rewardCapped = (bool) ($award['reward_capped'] ?? false);
+                $rewardCapped = (bool) ($award['reward_capped'] ?? false) || ($formulaSnapshot['reward_capped'] ?? false);
+                $pointsAwarded = $rewardCapped ? 0 : (int) ($award['points'] ?? 0);
 
                 $activity->update([
                     'status' => 'VERIFIED',
-                    'reward_status' => 'CREDITED',
+                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
                     'potential_points' => $pointsAwarded,
                     'reward_snapshot' => array_merge($formulaSnapshot, [
                         'points_awarded' => $pointsAwarded,
@@ -475,8 +487,9 @@ class FeedingSpotController extends Controller
                     'feeding_record_ref' => $activity->feeding_record_ref,
                     'spot_id' => $activity->spot_id,
                     'status' => 'VERIFIED',
-                    'reward_status' => 'CREDITED',
+                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
                     'points_awarded' => $pointsAwarded,
+                    'credited_points' => $pointsAwarded,
                     'potential_points' => $pointsAwarded,
                     'reward_capped' => $rewardCapped,
                     'food_type' => $activity->food_type,
@@ -512,6 +525,7 @@ class FeedingSpotController extends Controller
                 'status' => $activity->status,
                 'reward_status' => $activity->reward_status,
                 'points_awarded' => 0,
+                'credited_points' => 0,
                 'potential_points' => (int) ($formulaSnapshot['dynamic_points'] ?? 10),
                 'reward_capped' => false,
                 'food_type' => $activity->food_type,

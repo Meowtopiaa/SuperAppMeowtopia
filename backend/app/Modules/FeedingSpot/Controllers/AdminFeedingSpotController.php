@@ -260,13 +260,13 @@ class AdminFeedingSpotController extends Controller
                     idempotencyKey: "feeding.verified:{$activity->id}"
                 );
 
-                $pointsAwarded = (int) ($award['points'] ?? 0);
-                $rewardCapped = (bool) ($award['reward_capped'] ?? false);
+                $rewardCapped = (bool) ($award['reward_capped'] ?? false) || ($formulaSnapshot['reward_capped'] ?? false);
+                $pointsAwarded = $rewardCapped ? 0 : (int) ($award['points'] ?? 0);
                 $snapshot = $activity->reward_snapshot ?? [];
 
                 $activity->update([
                     'status' => 'VERIFIED',
-                    'reward_status' => 'CREDITED',
+                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
                     'potential_points' => $pointsAwarded,
                     'reward_snapshot' => array_merge($snapshot, $formulaSnapshot, [
                         'points_awarded' => $pointsAwarded,
@@ -283,8 +283,9 @@ class AdminFeedingSpotController extends Controller
                     'activity_id' => $activity->id,
                     'decision' => 'VERIFIED',
                     'status' => 'VERIFIED',
-                    'reward_status' => 'CREDITED',
+                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
                     'points_awarded' => $pointsAwarded,
+                    'credited_points' => $pointsAwarded,
                     'reward_capped' => $rewardCapped,
                     'reviewed_by' => $reviewer->id,
                     'reviewed_at' => now()->toIso8601String(),

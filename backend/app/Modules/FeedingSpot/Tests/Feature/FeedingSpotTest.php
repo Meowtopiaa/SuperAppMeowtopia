@@ -56,6 +56,20 @@ class FeedingSpotTest extends TestCase
 
         $this->seed(FeedingSettingSeeder::class);
 
+        DB::table('point_rules')->updateOrInsert(
+            ['rule_key' => 'feeding.verified'],
+            [
+                'id' => (string) Str::ulid(),
+                'rule_key' => 'feeding.verified',
+                'module' => 'FeedingSpot',
+                'points' => 10,
+                'daily_cap_count' => 3,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
         $this->student = User::create([
             'id' => (string) Str::ulid(),
             'name' => 'Mahasiswa Uji',
@@ -405,18 +419,21 @@ class FeedingSpotTest extends TestCase
 
     public function test_meow_11_finalize_session_point_service_integration_and_optional_sighting(): void
     {
-        DB::table('point_rules')->insert([
-            'id' => (string) Str::ulid(),
-            'rule_key' => 'feeding.verified',
-            'module' => 'FeedingSpot',
-            'points' => 10,
-            'daily_cap_count' => 3,
-            'daily_cap_points' => 60,
-            'description' => 'Aktivitas pemberian pakan terverifikasi',
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::table('point_rules')->updateOrInsert(
+            ['rule_key' => 'feeding.verified'],
+            [
+                'id' => (string) Str::ulid(),
+                'rule_key' => 'feeding.verified',
+                'module' => 'FeedingSpot',
+                'points' => 10,
+                'daily_cap_count' => 3,
+                'daily_cap_points' => 60,
+                'description' => 'Aktivitas pemberian pakan terverifikasi',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
 
         DB::table('point_balances')->insert([
             'user_id' => $this->student->id,
@@ -537,18 +554,21 @@ class FeedingSpotTest extends TestCase
 
     public function test_meow_12_review_queue_and_reviewer_decision_prevent_self_review_and_award_points(): void
     {
-        DB::table('point_rules')->insert([
-            'id' => (string) Str::ulid(),
-            'rule_key' => 'feeding.verified',
-            'module' => 'FeedingSpot',
-            'points' => 10,
-            'daily_cap_count' => 3,
-            'daily_cap_points' => 60,
-            'description' => 'Aktivitas pemberian pakan terverifikasi',
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::table('point_rules')->updateOrInsert(
+            ['rule_key' => 'feeding.verified'],
+            [
+                'id' => (string) Str::ulid(),
+                'rule_key' => 'feeding.verified',
+                'module' => 'FeedingSpot',
+                'points' => 10,
+                'daily_cap_count' => 3,
+                'daily_cap_points' => 60,
+                'description' => 'Aktivitas pemberian pakan terverifikasi',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
 
         DB::table('point_balances')->insert([
             'user_id' => $this->student->id,
@@ -1047,5 +1067,206 @@ class FeedingSpotTest extends TestCase
 
         $query = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getEloquentQuery();
         $this->assertTrue($query->where('id', $activity->id)->exists());
+    }
+
+    public function test_meow_19_it_06_reward_status_separation_and_daily_cap_and_idempotency(): void
+    {
+        // 1. Reward status terpisah dari activity status (IT-06)
+        // Buat 3 aktivitas terverifikasi sebelumnya pada hari yang sama untuk mencapai daily_reward_cap (3 kali)
+        for ($i = 1; $i <= 3; $i++) {
+            $prevActId = (string) Str::ulid();
+            FeedingActivity::create([
+                'id' => $prevActId,
+                'feeding_record_ref' => "REF-CAP-PREV-{$i}",
+                'user_id' => $this->student->id,
+                'spot_id' => $this->activeSpot->id,
+                'location_lat' => (float) $this->activeSpot->latitude,
+                'location_lng' => (float) $this->activeSpot->longitude,
+                'status' => 'VERIFIED',
+                'reward_status' => 'CREDITED',
+                'scanned_at' => now()->subHours(10 - $i),
+                'finalized_at' => now()->subHours(10 - $i),
+            ]);
+
+            DB::table('point_transactions')->insert([
+                'id' => (string) Str::ulid(),
+                'user_id' => $this->student->id,
+                'rule_key' => 'feeding.verified',
+                'points' => 10,
+                'status' => 'CREDITED',
+                'source_module' => 'FeedingSpot',
+                'source_type' => 'feeding_activity',
+                'source_ref_id' => $prevActId,
+                'idempotency_key' => "seed-tx-{$i}-" . (string) Str::ulid(),
+                'created_at' => now()->subHours(10 - $i),
+                'updated_at' => now()->subHours(10 - $i),
+            ]);
+        }
+
+        $spot4 = FeedingSpot::create([
+            'id' => (string) Str::ulid(),
+            'code' => 'SPOT-CAP-04',
+            'name' => 'Spot Uji Daily Cap 4',
+            'description' => 'Spot terpisah agar tidak kena cooldown 6 jam',
+            'latitude' => -6.9748,
+            'longitude' => 107.6308,
+            'qr_token' => 'TOKEN_SPOT_CAP_04',
+            'status' => 'ACTIVE',
+        ]);
+
+        // Jalankan pengajuan ke-4 hari ini (melebihi daily cap)
+        $m1 = $this->createMediaRecord($this->student, hash('sha256', 'm-cap-1'));
+        $m2 = $this->createMediaRecord($this->student, hash('sha256', 'm-cap-2'));
+
+        $sessionResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-cap-session-01')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => $spot4->qr_token,
+            ]);
+        $sessionResp->assertStatus(201);
+        $actId = $sessionResp->json('data.activity_id');
+
+        $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-cap-intent-01')
+            ->postJson("/api/v1/feeding/activities/{$actId}/intent");
+
+        $finalizeResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-cap-finalize-01')
+            ->postJson("/api/v1/feeding/activities/{$actId}/finalize", [
+                'media_ids' => [$m1, $m2],
+                'food_type' => 'dry_food',
+                'food_amount' => '1 mangkuk',
+            ]);
+
+        // Status tetap terverifikasi, namun reward capped
+        $finalizeResp->assertStatus(200)
+            ->assertJsonPath('data.status', 'VERIFIED')
+            ->assertJsonPath('data.reward_capped', true)
+            ->assertJsonPath('data.credited_points', 0);
+
+        $activity = FeedingActivity::find($actId);
+        $this->assertEquals('VERIFIED', $activity->status);
+        $this->assertEquals('NOT_ELIGIBLE', $activity->reward_status);
+        $this->assertTrue($activity->reward_snapshot['reward_capped']);
+
+        // 2. Idempotensi (IT-05): request ulang dengan header yang sama tidak menambah reward ganda
+        $retryResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-cap-finalize-01')
+            ->postJson("/api/v1/feeding/activities/{$actId}/finalize", [
+                'media_ids' => [$m1, $m2],
+                'food_type' => 'dry_food',
+                'food_amount' => '1 mangkuk',
+            ]);
+        $retryResp->assertStatus(200)
+            ->assertJsonPath('data.activity_id', $actId)
+            ->assertJsonPath('data.credited_points', 0);
+    }
+
+    public function test_meow_19_it_11_cross_user_access_control_and_media_ownership(): void
+    {
+        $otherStudent = User::create([
+            'id' => (string) Str::ulid(),
+            'name' => 'Other Student',
+            'email' => 'other@student.telkomuniversity.ac.id',
+            'password' => Hash::make('password123'),
+            'user_type' => 'MAHASISWA',
+            'is_active' => true,
+        ]);
+        $otherStudent->assignRole('user');
+
+        // Sesi milik student A
+        $sessionResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-cross-01')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => $this->activeSpot->qr_token,
+            ]);
+        $sessionResp->assertStatus(201);
+        $actId = $sessionResp->json('data.activity_id');
+
+        // Student B mencoba konfirmasi intent sesi student A -> Ditolak (403 FORBIDDEN)
+        $intentForbidden = $this->actingAs($otherStudent, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-cross-intent')
+            ->postJson("/api/v1/feeding/activities/{$actId}/intent");
+        $intentForbidden->assertStatus(403)
+            ->assertJsonPath('code', 'FORBIDDEN');
+
+        // Student B mencoba finalisasi sesi student A -> Ditolak (403 FORBIDDEN)
+        $finalizeForbidden = $this->actingAs($otherStudent, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-cross-finalize')
+            ->postJson("/api/v1/feeding/activities/{$actId}/finalize", [
+                'media_ids' => ['01INVALIDMEDIA000000000000'],
+            ]);
+        $finalizeForbidden->assertStatus(403)
+            ->assertJsonPath('code', 'FORBIDDEN');
+
+        // Kepemilikan media: Student A membuat media, Student B membuka sesinya sendiri tapi melampirkan media milik Student A
+        $mediaOfStudentA = $this->createMediaRecord($this->student, hash('sha256', 'media-of-a'));
+
+        $otherSessionResp = $this->actingAs($otherStudent, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-other-sess-01')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => $this->activeSpot->qr_token,
+            ]);
+        $otherActId = $otherSessionResp->json('data.activity_id');
+
+        $this->actingAs($otherStudent, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-other-intent-01')
+            ->postJson("/api/v1/feeding/activities/{$otherActId}/intent");
+
+        $mediaTheftResp = $this->actingAs($otherStudent, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-other-theft-01')
+            ->postJson("/api/v1/feeding/activities/{$otherActId}/finalize", [
+                'media_ids' => [$mediaOfStudentA],
+                'food_type' => 'dry_food',
+            ]);
+
+        $mediaTheftResp->assertStatus(403)
+            ->assertJsonPath('code', 'FORBIDDEN')
+            ->assertJsonPath('message', 'Bukti foto harus diunggah oleh Anda sendiri.');
+    }
+
+    public function test_meow_19_it_17_public_endpoints_privacy_and_no_user_gps(): void
+    {
+        // Buat aktivitas terverifikasi
+        $act = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-PRIVACY-01',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'VERIFIED',
+            'reward_status' => 'CREDITED',
+            'food_type' => 'dry_food',
+            'food_amount' => '1 mangkuk',
+            'scanned_at' => now(),
+            'finalized_at' => now(),
+        ]);
+
+        // 1. Endpoint publik spots
+        $spotsResp = $this->getJson('/api/v1/feeding/spots');
+        $spotsResp->assertStatus(200);
+
+        $spotsContent = $spotsResp->getContent();
+        $this->assertStringNotContainsString($this->student->email, $spotsContent);
+        $this->assertStringNotContainsString('phone', $spotsContent);
+        $this->assertStringNotContainsString('user_lat', $spotsContent);
+        $this->assertStringNotContainsString('user_lng', $spotsContent);
+
+        // 2. Endpoint detail spot
+        $detailResp = $this->getJson("/api/v1/feeding/spots/{$this->activeSpot->id}");
+        $detailResp->assertStatus(200);
+
+        $detailContent = $detailResp->getContent();
+        $this->assertStringNotContainsString($this->student->email, $detailContent);
+        $this->assertStringNotContainsString('identity_number', $detailContent);
+        $this->assertStringNotContainsString('phone', $detailContent);
+
+        // 3. Endpoint heatmap: hanya memuat koordinat titik spot resmi, tidak ada data feeder
+        $heatmapResp = $this->getJson('/api/v1/feeding/heatmap');
+        $heatmapResp->assertStatus(200);
+        $heatmapContent = $heatmapResp->getContent();
+        $this->assertStringNotContainsString($this->student->name, $heatmapContent);
+        $this->assertStringNotContainsString($this->student->email, $heatmapContent);
     }
 }
