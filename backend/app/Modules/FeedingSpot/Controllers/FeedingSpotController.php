@@ -722,6 +722,8 @@ class FeedingSpotController extends Controller
                 'pending_count' => (int) ($agg?->pending_count ?? 0),
                 'need_score' => $needScore,
                 'last_fed_at' => $lastFedIso,
+                'computed_at' => $agg?->computed_at ? Carbon::parse($agg->computed_at)->toIso8601String() : null,
+                'is_stale' => $agg ? Carbon::parse($agg->computed_at)->lt(now()->subHours(1)) : true,
             ],
         ];
     }

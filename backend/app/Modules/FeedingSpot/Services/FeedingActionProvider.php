@@ -51,3 +51,4 @@ class FeedingActionProvider implements CatActionProviderInterface
         ];
     }
 }
+

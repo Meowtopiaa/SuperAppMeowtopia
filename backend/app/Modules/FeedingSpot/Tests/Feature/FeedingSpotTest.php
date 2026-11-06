@@ -779,4 +779,137 @@ class FeedingSpotTest extends TestCase
         $actionsDetached = $actionProvider->actionsFor($cat, $this->student);
         $this->assertFalse($actionsDetached[0]['enabled']);
     }
+
+    public function test_meow_24_scheduled_jobs_expire_sessions_refresh_aggregates_and_retention(): void
+    {
+        // 1. Uji expire-sessions
+        $draftNoIntentExpired = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-EXP-01',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'DRAFT',
+            'scanned_at' => now()->subMinutes(16),
+            'reward_status' => 'PENDING',
+        ]);
+
+        $draftWithIntentExpired = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-EXP-02',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'DRAFT',
+            'scanned_at' => now()->subMinutes(70),
+            'intent_at' => now()->subMinutes(65),
+            'finalize_deadline_at' => now()->subMinutes(5),
+            'reward_status' => 'PENDING',
+        ]);
+
+        $draftFresh = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-EXP-03',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'DRAFT',
+            'scanned_at' => now()->subMinutes(5),
+            'reward_status' => 'PENDING',
+        ]);
+
+        $this->artisan('feeding:expire-sessions')->assertSuccessful();
+
+        $this->assertEquals('EXPIRED', $draftNoIntentExpired->fresh()->status);
+        $this->assertEquals('NOT_ELIGIBLE', $draftNoIntentExpired->fresh()->reward_status);
+        $this->assertEquals('EXPIRED', $draftWithIntentExpired->fresh()->status);
+        $this->assertEquals('NOT_ELIGIBLE', $draftWithIntentExpired->fresh()->reward_status);
+        $this->assertEquals('DRAFT', $draftFresh->fresh()->status);
+
+        // 2. Uji refresh-aggregates
+        FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-AGG-01',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'VERIFIED',
+            'scanned_at' => now()->subDays(2),
+            'finalized_at' => now()->subDays(2),
+            'reward_status' => 'CREDITED',
+        ]);
+
+        $this->artisan('feeding:refresh-aggregates', ['--spot' => $this->activeSpot->id])->assertSuccessful();
+
+        $agg = \App\Modules\FeedingSpot\Models\FeedingAggregate::where('spot_id', $this->activeSpot->id)->first();
+        $this->assertNotNull($agg);
+        $this->assertEquals(1, $agg->verified_count);
+        $this->assertNotNull($agg->computed_at);
+
+        // Pastikan endpoint public spot merender is_stale: false dan computed_at
+        $spotResp = $this->getJson("/api/v1/feeding/spots/{$this->activeSpot->id}");
+        $spotResp->assertStatus(200)
+            ->assertJsonPath('data.aggregate.is_stale', false);
+        $this->assertNotNull($spotResp->json('data.aggregate.computed_at'));
+
+        // 3. Uji cleanup-retention (180 hari VERIFIED, 30 hari REJECTED)
+        $mOldVerified = $this->createMediaRecord($this->student, hash('sha256', 'old-ver'));
+        $mOldRejected = $this->createMediaRecord($this->student, hash('sha256', 'old-rej'));
+        $mRecent = $this->createMediaRecord($this->student, hash('sha256', 'recent'));
+
+        $actOldVerified = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-RET-01',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'VERIFIED',
+            'scanned_at' => now()->subDays(190),
+            'finalized_at' => now()->subDays(185),
+            'reward_status' => 'CREDITED',
+        ]);
+        FeedingEvidence::create(['activity_id' => $actOldVerified->id, 'media_id' => $mOldVerified, 'captured_at' => now()->subDays(185)]);
+
+        $actOldRejected = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-RET-02',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'REJECTED',
+            'scanned_at' => now()->subDays(40),
+            'finalized_at' => now()->subDays(35),
+            'reward_status' => 'NOT_ELIGIBLE',
+        ]);
+        DB::table('feeding_activities')->where('id', $actOldRejected->id)->update([
+            'updated_at' => now()->subDays(35),
+        ]);
+        FeedingEvidence::create(['activity_id' => $actOldRejected->id, 'media_id' => $mOldRejected, 'captured_at' => now()->subDays(35)]);
+
+        $actRecent = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-RET-03',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'VERIFIED',
+            'scanned_at' => now()->subDays(5),
+            'finalized_at' => now()->subDays(5),
+            'reward_status' => 'CREDITED',
+        ]);
+        FeedingEvidence::create(['activity_id' => $actRecent->id, 'media_id' => $mRecent, 'captured_at' => now()->subDays(5)]);
+
+        $this->artisan('feeding:cleanup-retention')->assertSuccessful();
+
+        $this->assertDatabaseMissing('feeding_evidence', ['media_id' => $mOldVerified]);
+        $this->assertDatabaseMissing('feeding_evidence', ['media_id' => $mOldRejected]);
+        $this->assertDatabaseHas('feeding_evidence', ['media_id' => $mRecent]);
+    }
 }

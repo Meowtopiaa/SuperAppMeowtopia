@@ -54,3 +54,12 @@ Route::prefix('feeding-spots')->group(function () {
     Route::get('/', [FeedingSpotController::class, 'listSpots']);
     Route::get('/{id}', [FeedingSpotController::class, 'showSpot']);
 });
+
+// Console Commands Registration (MEOW-24)
+if (app()->runningInConsole()) {
+    \Illuminate\Console\Application::starting(function ($artisan) {
+        $artisan->resolve(\App\Modules\FeedingSpot\Commands\ExpireFeedingSessionsCommand::class);
+        $artisan->resolve(\App\Modules\FeedingSpot\Commands\RefreshFeedingAggregatesCommand::class);
+        $artisan->resolve(\App\Modules\FeedingSpot\Commands\CleanupFeedingMediaRetentionCommand::class);
+    });
+}
