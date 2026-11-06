@@ -66,6 +66,10 @@ components:
           format: date-time
           nullable: true
           example: "2026-04-19T06:30:00Z"
+        has_pending_review:
+          type: boolean
+          example: false
+          description: Menunjukkan apakah terdapat pengajuan pakan pada spot ini yang sedang menunggu verifikasi reviewer (UNDER_REVIEW).
         aggregate:
           type: object
           properties:
@@ -89,6 +93,15 @@ components:
               type: string
               format: date-time
               nullable: true
+            computed_at:
+              type: string
+              format: date-time
+              nullable: true
+              example: "2026-11-06T12:00:00Z"
+            is_stale:
+              type: boolean
+              example: false
+              description: True jika hasil agregat di-cache lebih lama dari interval penyegaran (default 30 menit).
 
     ApiErrorResponse:
       type: object
@@ -382,3 +395,106 @@ paths:
           description: Keputusan review disimpan (dan poin dikreditkan via PointService::award jika VERIFIED, atau di-reverse jika sebelumnya CREDITED)
         "403":
           description: Pelanggaran SELF_REVIEW_FORBIDDEN atau tidak memiliki permission feeding.review
+
+  /admin/feeding/spots/{id}/qr-sheet:
+    get:
+      summary: Cetak lembar QR feeding spot siap tempel (Permission spot.manage) (MEOW-21)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Halaman HTML lembar cetak QR code dengan instruksi relawan dan branding Meowtopia
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /admin/feeding/reviews/{id}:
+    get:
+      summary: Halaman inspeksi bukti foto untuk antrean review (Permission feeding.review) (MEOW-22)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Halaman HTML inspeksi foto bukti pengajuan, metadata pakan, kucing terkait, dan pelanggaran rule
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /admin/feeding/spots/{id}/cats:
+    get:
+      summary: Daftar kucing yang berasosiasi dengan feeding spot ini (Permission spot.manage) (MEOW-23)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Daftar kucing di spot berhasil diambil
+    post:
+      summary: Kaitkan satu atau beberapa kucing ke feeding spot (Permission spot.manage) (MEOW-23)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cat_ids]
+              properties:
+                cat_ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Kucing berhasil dikaitkan ke feeding spot
+
+  /admin/feeding/spots/{id}/cats/{catId}:
+    delete:
+      summary: Lepaskan relasi kucing dari feeding spot (Permission spot.manage) (MEOW-23)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: catId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Relasi kucing berhasil dihapus dari spot
