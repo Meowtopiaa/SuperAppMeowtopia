@@ -992,4 +992,60 @@ class FeedingSpotTest extends TestCase
         $this->assertArrayHasKey('code', $columns);
         $this->assertArrayHasKey('name', $columns);
     }
+
+    public function test_meow_22_filament_review_queue_resource_and_evidence_view(): void
+    {
+        $mediaId = $this->createMediaRecord($this->student, hash('sha256', 'm22-photo'));
+        $activity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-M22-REVIEW',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'UNDER_REVIEW',
+            'scanned_at' => now(),
+            'finalized_at' => now(),
+            'food_type' => 'wet_food',
+            'food_amount' => '1 sachet',
+            'reward_status' => 'PENDING',
+        ]);
+
+        FeedingEvidence::create([
+            'activity_id' => $activity->id,
+            'media_id' => $mediaId,
+            'captured_at' => now(),
+            'sort_order' => 0,
+        ]);
+
+        FeedingRuleResult::create([
+            'activity_id' => $activity->id,
+            'rule' => 'R2_NEW_USER',
+            'result' => 'REVIEW',
+            'detail' => 'Dua pengajuan pertama relawan baru diarahkan ke verifikasi manual',
+        ]);
+
+        // 1. Reviewer dengan feeding.review dapat mengakses halaman inspeksi bukti foto
+        $reviewPageResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->get("/api/v1/admin/feeding/reviews/{$activity->id}");
+
+        $reviewPageResp->assertStatus(200)
+            ->assertSee('REF-M22-REVIEW')
+            ->assertSee($this->student->name)
+            ->assertSee('R2_NEW_USER')
+            ->assertSee('Foto Bukti Pemberian Makan');
+
+        // 2. Mahasiswa tanpa feeding.review ditolak 403
+        $forbiddenResp = $this->actingAs($this->student, 'sanctum')
+            ->get("/api/v1/admin/feeding/reviews/{$activity->id}");
+        $forbiddenResp->assertStatus(403);
+
+        // 3. Verifikasi Resource query dan badge
+        $badge = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getNavigationBadge();
+        $this->assertNotNull($badge);
+        $this->assertGreaterThanOrEqual(1, (int) $badge);
+
+        $query = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getEloquentQuery();
+        $this->assertTrue($query->where('id', $activity->id)->exists());
+    }
 }

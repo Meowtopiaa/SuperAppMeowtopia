@@ -449,4 +449,24 @@ class AdminFeedingSpotController extends Controller
             'spot' => $spot,
         ]);
     }
+
+    /**
+     * GET /api/v1/admin/feeding/reviews/{id}
+     * Halaman inspeksi bukti foto & hasil rule engine untuk reviewer (MEOW-22).
+     */
+    public function showReviewEvidence(string $id)
+    {
+        $activity = FeedingActivity::with(['user', 'spot', 'evidence', 'ruleResults'])
+            ->where('id', $id)
+            ->orWhere('feeding_record_ref', $id)
+            ->first();
+
+        if (!$activity) {
+            return ApiResponse::error('Aktivitas pemberian pakan tidak ditemukan.', 404, 'ACTIVITY_NOT_FOUND');
+        }
+
+        return view('feeding-spot::filament.review-evidence', [
+            'activity' => $activity,
+        ]);
+    }
 }

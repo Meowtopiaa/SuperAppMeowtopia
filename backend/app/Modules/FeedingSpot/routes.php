@@ -43,9 +43,10 @@ Route::prefix('admin/feeding')->middleware('auth:sanctum')->group(function () {
         Route::delete('/spots/{id}/cats/{catId}', [AdminFeedingSpotController::class, 'detachCat']);
     });
 
-    // Antrean Review & Keputusan Reviewer (Permission: feeding.review) (MEOW-12)
+    // Antrean Review & Keputusan Reviewer (Permission: feeding.review) (MEOW-12, MEOW-22)
     Route::middleware('can:feeding.review')->group(function () {
         Route::get('/review-queue', [AdminFeedingSpotController::class, 'reviewQueue']);
+        Route::get('/reviews/{id}', [AdminFeedingSpotController::class, 'showReviewEvidence'])->name('admin.feeding.reviews.show');
         Route::post('/activities/{id}/review', [AdminFeedingSpotController::class, 'reviewActivity']);
     });
 });
