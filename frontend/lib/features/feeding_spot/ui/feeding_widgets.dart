@@ -62,16 +62,20 @@ class FeedingSpotPreviewCard extends StatelessWidget {
   final bool isDemo;
 
   @override
-  Widget build(BuildContext context) => CinematicCard(
-    image: isDemo
-        ? AssetImage(spot.imageAsset)
-        : spot.imageUrl == null
-        ? null
-        : NetworkImage(spot.imageUrl!),
-    imageOnLeft: true,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-    onTap: () => context.push('/feeding/spot/${spot.id}'),
-    child: LayoutBuilder(
+  Widget build(BuildContext context) {
+    ImageProvider<Object>? cardImage;
+    if (isDemo) {
+      cardImage = AssetImage(spot.imageAsset);
+    } else if (spot.imageUrl != null) {
+      cardImage = NetworkImage(spot.imageUrl!);
+    }
+
+    return CinematicCard(
+      image: cardImage,
+      imageOnLeft: true,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      onTap: () => context.push('/feeding/spot/${spot.id}'),
+      child: LayoutBuilder(
       builder: (context, constraints) => Row(
         children: [
           SizedBox(width: constraints.maxWidth * .25),
@@ -120,6 +124,7 @@ class FeedingSpotPreviewCard extends StatelessWidget {
       ),
     ),
   );
+  }
 }
 
 class CampusSpotMap extends StatelessWidget {

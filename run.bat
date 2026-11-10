@@ -41,32 +41,39 @@ cd /d "%ROOT_DIR%backend"
 php artisan migrate --graceful >nul 2>&1
 cd /d "%ROOT_DIR%"
 
+:: 4. Deteksi Flutter SDK (Sistem PATH atau SDK Lokal di .tools\flutter)
+set "FLUTTER_AVAILABLE=0"
+where flutter >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    set "FLUTTER_AVAILABLE=1"
+) else (
+    if exist "%ROOT_DIR%.tools\flutter\bin\flutter.bat" (
+        set "PATH=%ROOT_DIR%.tools\flutter\bin;%PATH%"
+        set "FLUTTER_AVAILABLE=1"
+        echo [INFO] Menggunakan Flutter SDK lokal terisolasi (.tools\flutter)
+    )
+)
+
 echo.
 echo [1/2] Menjalankan Server Backend (Laravel API di http://127.0.0.1:8000)...
 start "Meowtopia - Backend (Laravel API :8000)" cmd /k "cd /d "%ROOT_DIR%backend" && title Meowtopia Backend (Port 8000) && color 0A && echo ======================================== && echo       MEOWTOPIA BACKEND (LARAVEL)       && echo ======================================== && echo URL: http://127.0.0.1:8000 && echo API: http://127.0.0.1:8000/api/v1 && echo. && php artisan serve --host=127.0.0.1 --port=8000"
 
-:: 4. Verifikasi ketersediaan Flutter
-where flutter >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo.
-    echo [PERINGATAN] Perintah 'flutter' belum terdeteksi di PATH sistem Anda!
-    echo Backend (Laravel API) tetap berjalan normal di http://127.0.0.1:8000.
-    echo.
-    echo Solusi:
-    echo 1. Jika Flutter SDK sudah diunduh, tambahkan folder 'flutter\bin' ke Environment Variables PATH.
-    echo 2. Jika belum terinstal, pasang melalui https://docs.flutter.dev/get-started/install/windows
-    echo    atau jalankan: winget install Google.Flutter
-    echo.
-) else (
+if "%FLUTTER_AVAILABLE%"=="1" (
     echo [2/2] Menjalankan Aplikasi Frontend (Flutter)...
     start "Meowtopia - Frontend (Flutter)" cmd /k "cd /d "%ROOT_DIR%frontend" && title Meowtopia Frontend (Flutter) && color 0B && echo ======================================== && echo       MEOWTOPIA FRONTEND (FLUTTER)       && echo ======================================== && echo Petunjuk: && echo   - Tekan 'r' untuk Hot Reload && echo   - Tekan 'R' untuk Hot Restart && echo   - Tekan 'q' untuk keluar && echo. && flutter run"
+) else (
+    echo.
+    echo [PERINGATAN] Flutter SDK belum terdeteksi.
+    echo Backend tetap berjalan normal.
 )
 
 echo.
 echo ======================================================================
-echo [INFO] Status Layanan:
+echo [SUKSES] Backend dan Frontend Meowtopia siap digunakan!
+echo.
 echo   - Backend API : http://127.0.0.1:8000/api/v1
 echo   - Admin Panel : http://127.0.0.1:8000/admin
+echo   - Frontend UI : Jendela terminal Flutter (Hot Reload: 'r')
 echo.
 echo Anda dapat menutup jendela launcher ini kapan saja.
 echo ======================================================================

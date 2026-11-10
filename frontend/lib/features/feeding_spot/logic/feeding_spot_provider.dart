@@ -188,10 +188,6 @@ class FeedingSpotProvider extends ChangeNotifier {
         final startedAt = data['scanned_at'] != null
             ? DateTime.tryParse(data['scanned_at'].toString()) ?? now
             : now;
-        final expiresAt = data['finalize_deadline_at'] != null
-            ? DateTime.tryParse(data['finalize_deadline_at'].toString()) ??
-                  now.add(const Duration(minutes: 15))
-            : now.add(const Duration(minutes: 15));
 
         final intentDeadlineAt = data['intent_deadline_at'] != null
             ? DateTime.tryParse(data['intent_deadline_at'].toString())

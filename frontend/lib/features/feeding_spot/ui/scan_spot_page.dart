@@ -136,7 +136,7 @@ class _ScanSpotPageState extends State<ScanSpotPage>
                                 if (value != null) _openToken(value);
                               }
                             },
-                            errorBuilder: (context, error) => Container(
+                            errorBuilder: (context, error, child) => Container(
                               color: MeowStyle.slate,
                               alignment: Alignment.center,
                               padding: const EdgeInsets.all(24),

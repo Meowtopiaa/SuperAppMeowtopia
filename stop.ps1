@@ -15,3 +15,4 @@ taskkill /F /FI "WINDOWTITLE eq Meowtopia Frontend*" 2>$null | Out-Null
 Write-Host ""
 Write-Host "[SUKSES] Semua layanan Meowtopia telah dihentikan." -ForegroundColor Green
 Write-Host ""
+
