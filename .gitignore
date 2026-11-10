@@ -17,6 +17,9 @@ Thumbs.db
 *.sln
 *.sw?
 
+# Local development tools
+.tools/
+
 # ------------------------------------------
 # Backend (Laravel)
 # ------------------------------------------
@@ -46,6 +49,7 @@ backend/yarn-error.log
 # Frontend (Flutter)
 # ------------------------------------------
 frontend/.dart_tool/
+frontend/.widget_preview/
 frontend/.flutter-plugins
 frontend/.flutter-plugins-dependencies
 frontend/.packages

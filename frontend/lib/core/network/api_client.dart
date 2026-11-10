@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import '../constants/app_constants.dart';
 import '../storage/token_storage.dart';
 import 'api_exception.dart';
@@ -9,6 +10,7 @@ class ApiClient {
 
   late final Dio dio;
   final TokenStorage _tokenStorage = TokenStorage();
+  final Uuid _uuid = const Uuid();
 
   ApiClient._internal() {
     dio = Dio(
@@ -26,22 +28,40 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // 1. Attach Bearer Token
           final token = await _tokenStorage.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+
+          // 2. Automatically generate Idempotency-Key for mutation requests if not present
+          final method = options.method.toUpperCase();
+          if (['POST', 'PUT', 'PATCH', 'DELETE'].contains(method)) {
+            if (!options.headers.containsKey('Idempotency-Key')) {
+              options.headers['Idempotency-Key'] = _uuid.v4();
+            }
+          }
+
           return handler.next(options);
         },
         onError: (DioException e, handler) {
-          final errorMessage = _extractErrorMessage(e);
+          ApiException apiException;
+          if (e.response?.data is Map<String, dynamic>) {
+            apiException = ApiException.fromJson(
+              e.response!.data as Map<String, dynamic>,
+              e.response?.statusCode,
+            );
+          } else {
+            apiException = ApiException(
+              message: e.message ?? 'Koneksi ke server bermasalah.',
+              statusCode: e.response?.statusCode,
+            );
+          }
+
           return handler.reject(
             DioException(
               requestOptions: e.requestOptions,
-              error: ApiException(
-                message: errorMessage,
-                statusCode: e.response?.statusCode,
-                errors: e.response?.data is Map ? e.response?.data['errors'] : null,
-              ),
+              error: apiException,
               response: e.response,
               type: e.type,
             ),
@@ -51,56 +71,24 @@ class ApiClient {
     );
   }
 
-  String _extractErrorMessage(DioException e) {
-    if (e.response?.data is Map) {
-      final data = e.response!.data as Map;
-      if (data.containsKey('message')) {
-        return data['message'].toString();
-      }
-    }
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return 'Koneksi ke server timeout. Silakan periksa jaringan Anda.';
-      case DioExceptionType.badResponse:
-        return 'Terjadi kesalahan pada server (${e.response?.statusCode}).';
-      case DioExceptionType.connectionError:
-        return 'Tidak dapat terhubung ke server Meowtopia. Pastikan backend aktif.';
-      default:
-        return 'Terjadi kesalahan tak terduga: ${e.message}';
-    }
-  }
-
+  // HTTP Helper Methods
   Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
-    try {
-      return await dio.get(path, queryParameters: queryParameters);
-    } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
-    }
+    return dio.get(path, queryParameters: queryParameters);
   }
 
-  Future<Response> post(String path, {dynamic data}) async {
-    try {
-      return await dio.post(path, data: data);
-    } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
-    }
+  Future<Response> post(String path, {dynamic data, Map<String, dynamic>? headers}) async {
+    return dio.post(path, data: data, options: Options(headers: headers));
   }
 
-  Future<Response> put(String path, {dynamic data}) async {
-    try {
-      return await dio.put(path, data: data);
-    } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
-    }
+  Future<Response> put(String path, {dynamic data, Map<String, dynamic>? headers}) async {
+    return dio.put(path, data: data, options: Options(headers: headers));
   }
 
-  Future<Response> delete(String path) async {
-    try {
-      return await dio.delete(path);
-    } on DioException catch (e) {
-      throw (e.error is ApiException) ? e.error as ApiException : ApiException(message: e.message ?? 'Unknown error');
-    }
+  Future<Response> patch(String path, {dynamic data, Map<String, dynamic>? headers}) async {
+    return dio.patch(path, data: data, options: Options(headers: headers));
+  }
+
+  Future<Response> delete(String path, {Map<String, dynamic>? headers}) async {
+    return dio.delete(path, options: Options(headers: headers));
   }
 }

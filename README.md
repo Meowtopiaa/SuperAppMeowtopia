@@ -19,10 +19,10 @@
 
 | No | Kelompok | Modul Backend (`backend/app/Modules/`) | Fitur Frontend (`frontend/lib/features/`) | Deskripsi Fitur |
 |:--:|:---|:---|:---|:---|
-| **-** | **Core / Shared** | `Core` & `Cat` | `auth/` & `cat/` | Autentikasi SSO/Sanctum, Master data kucing & kalung QR, profil pengguna. |
-| **1** | **Acumalaka** | `FeedingSpot` | `feeding_spot/` | **Adopt Feeding Spot**: Manajemen titik makan resmi kampus, scan QR spot, unggah bukti foto, verifikasi kondisi mangkok makan, dan reward poin. |
+| **-** | **Core / Shared** | `Core` & `Cat` | `auth/` & `cat/` | Autentikasi Sanctum & OTP, Master data kucing & kalung QR, profil pengguna, ledger poin, scanner pusat. |
+| **1** | **Acumalaka** | `FeedingSpot` | `feeding_spot/` | **Adopt Feeding Spot**: Manajemen titik makan resmi kampus, scan QR spot, unggah bukti foto (kamera saja), verifikasi kondisi mangkok makan, dan reward poin. |
 | **2** | **SUPER-SUB** | `CatHunter` | `cat_hunter/` | **Telcat**: Game koleksi kucing kampus turn-based encounter (bukan AR virtual), encounter kalung QR, input kondisi kucing, log GPS crowdsourced heatmap, dex koleksi, & leaderboard. |
-| **3** | **E-Nigma** | `CatAdoption` | `cat_adoption/` | **Adopsi & Rehoming**: Formulir komitmen/kesiapan adopter, verifikasi kelayakan admin, handover serah terima kucing via QR, monitoring "Kucing Saya" berkala (bi-weekly), kendala & pengembalian rehoming. |
+| **3** | **E-Nigma** | `CatAdoption` | `cat_adoption/` | **Adopsi & Rehoming**: Formulir komitmen/kesiapan adopter mahasiswa, verifikasi kelayakan admin, handover serah terima kucing via QR, monitoring "Kucing Saya" berkala (bi-weekly), kendala & pengembalian rehoming. |
 | **4** | **Optimind** | `IncidentReport` | `incident_report/` | **Emergency Incident Reporting System**: Pelaporan darurat kucing sakit/terluka/terjebak, pin lokasi GPS darurat & foto insiden, status triage penanganan relawan/klinik. |
 | **5** | **Rekans Caps** | `CatIdentification` | `cat_identification/` | **Sistem Identifikasi Kucing**: Identifikasi kucing tak dikenal / kalung hilang berbasis scan QR, pengenalan foto AI, dan kuesioner pertanyaan ciri fisik (corak bulu, ekor, telinga). |
 
@@ -32,194 +32,137 @@
 
 ```
 Meowtopia/
-├── .gitignore
-├── README.md
+├── .github/                             # CI, CODEOWNERS, dan PR Template
+├── docker-compose.yml                   # PostGIS, Redis, MinIO, Mailpit
+├── docs/                                # PRD.md, api/, erd/, decisions/
 ├── backend/                             # Backend Laravel (Modular Architecture)
 │   ├── app/
 │   │   ├── Http/Controllers/Controller.php
-│   │   ├── Models/User.php              # Model User default untuk Auth Sanctum
+│   │   ├── Models/User.php              # Model User dengan ULID & Spatie Role
 │   │   ├── Providers/
 │   │   │   └── ModuleServiceProvider.php # Auto-loader migration & route tiap modul
 │   │   ├── Support/
 │   │   │   └── ApiResponse.php          # Standard JSON API response helper
 │   │   └── Modules/
-│   │       ├── Core/                    # Auth, Role, SSO, Base User
+│   │       ├── Core/                    # Auth OTP, Role, Ledger Poin, Media, Idempotency
 │   │       ├── Cat/                     # Master Data Kucing & Token QR Kalung
+│   │       ├── CatIdentification/       # Modul Kelompok Rekans Caps
 │   │       ├── FeedingSpot/             # Modul Kelompok Acumalaka
 │   │       ├── CatHunter/               # Modul Kelompok SUPER-SUB
 │   │       ├── CatAdoption/             # Modul Kelompok E-Nigma
-│   │       ├── IncidentReport/          # Modul Kelompok Optimind
-│   │       └── CatIdentification/       # Modul Kelompok Rekans Caps
+│   │       └── IncidentReport/          # Modul Kelompok Optimind
 │   ├── bootstrap/
-│   │   ├── app.php
-│   │   └── providers.php                # Registrasi ModuleServiceProvider
-│   ├── routes/
-│   │   └── api.php                      # Root API routes
-│   ├── database/
-│   │   └── seeders/DatabaseSeeder.php   # Seeder terpusat
+│   ├── routes/api.php
+│   ├── database/seeders/DatabaseSeeder.php
 │   ├── composer.json
 │   └── .env.example
 │
 └── frontend/                            # Mobile Frontend Flutter (Feature-First Architecture)
     ├── assets/
-    │   └── images/logo.png              # Logo Resmi Meowtopia
+    │   └── images/logo.png
     ├── lib/
     │   ├── main.dart
     │   ├── app.dart                     # MaterialApp + GoRouter + AppTheme
     │   ├── core/
     │   │   ├── constants/app_constants.dart
-    │   │   ├── network/                 # Dio Client & ApiException
+    │   │   ├── network/                 # Dio Client, Idempotency & Token Interceptor
     │   │   ├── router/app_router.dart   # ShellRoute + Tab Navigation
-    │   │   ├── storage/token_storage.dart
-    │   │   ├── theme/app_theme.dart     # Palette oranye hangat & modern
-    │   │   └── widgets/                 # Reusable Button, Loading, Error View
-    │   ├── features/
-    │   │   ├── auth/                    # Login, Register
-    │   │   ├── cat/                     # Detail Kucing, Tampilan QR Kalung
-    │   │   ├── feeding_spot/            # Kelompok Acumalaka
-    │   │   ├── cat_hunter/              # Kelompok SUPER-SUB
-    │   │   ├── cat_adoption/            # Kelompok E-Nigma
-    │   │   ├── incident_report/         # Kelompok Optimind
-    │   │   └── cat_identification/      # Kelompok Rekans Caps
-    └── pubspec.yaml                     # Dependencies (Provider, Dio, GoRouter, dll.)
+    │   │   ├── scanner/                 # Central ScannerPage & QR Parser
+    │   │   ├── camera/                  # CameraCapturePage
+    │   │   ├── hub/                     # CatActionRegistry
+    │   │   └── theme/app_theme.dart     # Palette oranye hangat & modern
+    │   └── features/
+    │       ├── shell/                   # MainNavigationShell (Beranda, Berburu, Scan, Lapor, Profil)
+    │       ├── home/                    # Beranda (PM)
+    │       ├── profile/                 # Profil & Poin (PM)
+    │       ├── auth/                    # Login, Register, OTP
+    │       ├── cat/                     # Detail Kucing
+    │       ├── feeding_spot/            # Acumalaka
+    │       ├── cat_hunter/              # SUPER-SUB
+    │       ├── cat_adoption/            # E-Nigma
+    │       ├── incident_report/         # Optimind
+    │       └── cat_identification/      # Rekans Caps
+    └── pubspec.yaml
 ```
 
 ---
 
-## 📜 Terms & Conditions: Aturan & Tata Cara Menggunakan Struktur Monorepo
+## 📜 Aturan Keras Pengkodean (*Hard Rules*)
 
-Karena proyek ini dikerjakan secara paralel oleh **5 kelompok yang berbeda**, seluruh anggota kelompok **WAJIB** membaca dan mematuhi panduan aturan di bawah ini guna mencegah konflik kode (*merge conflict*), kerusakan database, maupun ketidakkonsistenan arsitektur:
-
-### 1. 🛡️ Batasan Wilayah Kerja (Domain Boundaries)
-Setiap kelompok memiliki hak akses dan tanggung jawab penuh pada foldernya masing-masing:
-* **Backend**:
-  * Kelompok hanya boleh membuat controller, model, request, service, dan migration di dalam:
-    `backend/app/Modules/<NamaModulKelompok Anda>/`
-* **Frontend**:
-  * Kelompok hanya boleh membuat halaman UI, service, model, provider, dan sub-routes di dalam:
-    `frontend/lib/features/<nama_fitur_kelompok Anda>/`
-
-> [!WARNING]
-> **ZONA TERPROTEKSI (SHARED CORE)**  
-> File/folder berikut merupakan fondasi bersama:
-> - `backend/app/Modules/Core/` & `backend/app/Modules/Cat/`
-> - `backend/app/Models/User.php`
-> - `backend/app/Providers/ModuleServiceProvider.php`
-> - `frontend/lib/core/` (router, network, storage, theme, widgets)
-> - `frontend/lib/features/shell/`  
-> ⚠️ **DILARANG KERAS** mengubah isi file-file ini tanpa kesepakatan bersama antar kelompok atau Technical Lead!
+Acuan dan pedoman utama: `docs/PRD.md` (PRD Final v1.1).
+1. **Satu tabel `cats`:** Hanya satu tabel master kucing. Modul dilarang membuat tabel kucing, saldo poin, atau laporan insiden sendiri.
+2. **Poin & Status Kucing:** Poin hanya melalui `PointService::award()`. Status kucing hanya melalui `CatStatusService::change()`.
+3. **RBAC & Autentikasi:** Izin diperiksa melalui permission atau policy Spatie, bukan string role. Registrasi tidak menerima role dari input pengguna.
+4. **Idempotensi:** Endpoint tulis yang rawan duplikat (bertanda † di PRD) wajib menyertakan header `Idempotency-Key`.
+5. **Format Respons API:** Wajib melalui `app/Support/ApiResponse`:
+   * Sukses: `{ success: true, message, data, meta? }`
+   * Gagal: `{ success: false, code, message, errors?, request_id }`
+6. **Migrasi Database:** Hanya di `Modules/<Nama>/Database/Migrations` (M kapital), wajib memiliki `down()`, dan nama tabel berawalan prefix modul (`feeding_`, `adoption_`, `incident_`). Migrasi yang sudah di-merge tidak boleh diedit.
+7. **Integritas Core:** Modul kelompok dilarang mengubah file Core, Providers, Support, routes root, atau `frontend/lib/core`.
+8. **Acumalaka & GPS:** Tidak ada GPS untuk verifikasi pakan. GPS hanya dipakai di HP untuk mengurutkan daftar spot terdekat tanpa dikirim atau disimpan ke server.
+9. **Privasi Data:** Data pribadi (nomor telepon, foto rumah, koordinat presisi) dilarang dikembalikan pada endpoint publik.
+10. **Pesan Sukses:** Pesan sukses hanya dikembalikan setelah data benar-benar tersimpan di database.
 
 ---
 
-### 2. 🗄️ Aturan Database & Migrasi (Database Rules)
-1. **Pemberian Nama Tabel**:
-   Nama tabel yang dibuat pada file migrasi wajib mencerminkan modul kelompok dan berformat jamak (*snake_case plural*), contoh:
-   * Acumalaka: `feeding_spots`, `feeding_activities`
-   * SUPER-SUB: `cat_encounters`, `user_cat_dex`
-   * E-Nigma: `adoption_applications`, `adoption_followups`
-   * Optimind: `incident_reports`
-   * Rekans Caps: `identification_questions`, `identification_attempts`
-2. **Relasi Foreign Key ke Tabel Shared (`users` dan `cats`)**:
-   * Gunakan `foreignId('user_id')->constrained('users')`.
-   * Tentukan aksi penghapusan dengan cermat (gunakan `nullOnDelete()` jika data riwayat ingin tetap tersimpan, atau `cascadeOnDelete()` jika data terikat penuh).
-3. **Aturan Migrasi Tidak Boleh Diedit (Immutable Migrations)**:
-   * File migration yang sudah di-merge ke branch `main` **TIDAK BOLEH DIUBAH ATAU DIHAPUS**.
-   * Jika memerlukan penambahan kolom baru atau perubahan tipe data, buat file migration baru:
-     ```bash
-     php artisan make:migration add_columns_to_table_name --path=app/Modules/<ModulAnda>/Database/Migrations
-     ```
-
----
-
-### 3. 🌐 Aturan API & Standarisasi Response Backend
-1. **Wajib Menggunakan Helper `ApiResponse`**:
-   Semua Controller wajib mengembalikan JSON menggunakan `App\Support\ApiResponse` agar format response di frontend seragam:
-   ```php
-   // Respon Berhasil (200 OK)
-   return ApiResponse::success($data, 'Kucing berhasil ditemukan');
-
-   // Respon Data Baru Dibuat (201 Created)
-   return ApiResponse::created($cat, 'Pendaftaran kucing berhasil');
-
-   // Respon Error (4xx / 5xx)
-   return ApiResponse::error('Kucing tidak ditemukan', 404, $errors);
-
-   // Respon Paginasi
-   return ApiResponse::paginated($cats, 'Daftar kucing berhasil dimuat');
-   ```
-2. **Routing Modul**:
-   * Daftarkan route di file `backend/app/Modules/<NamaModul>/routes.php`.
-   * Route ini sudah otomatis dimuat oleh `ModuleServiceProvider` dengan prefix URL `/api/v1/`.
-   * Gunakan middleware `auth:sanctum` untuk endpoint yang memerlukan login pengguna.
-
----
-
-### 4. 📱 Aturan Frontend Flutter
-1. **State Management Bersama**:
-   * Sesuai kesepakatan, gunakan package **`provider`** (`ChangeNotifierProvider`).
-   * Setiap modul memiliki provider masing-masing (contoh: `FeedingSpotProvider`, `CatHunterProvider`, dll.) yang diletakkan pada folder `logic/`.
-2. **Koneksi HTTP / API**:
-   * Wajib menggunakan singleton `ApiClient()` dari `core/network/api_client.dart`.
-   * Token autentikasi Bearer akan otomatis dipasang oleh interceptor pada setiap request yang dikirim.
-3. **Konsistensi Tampilan & Tema (Design System)**:
-   * Hindari penggunaan kode warna acak (hardcoded hex). Selalu gunakan token dari `AppConstants` (`AppConstants.primaryColor`, `AppConstants.dangerColor`, dll.).
-   * Gunakan widget yang sudah distandarkan pada `core/widgets/`:
-     * `CustomButton` (untuk tombol utama dengan status loading)
-     * `LoadingIndicator` (untuk animasi loading)
-     * `ErrorView` (untuk tampilan pesan error dan tombol coba lagi)
-4. **Sub-Routing GoRouter**:
-   * Definisikan daftar rute di `<nama_fitur>_routes.dart` masing-masing modul.
-   * Rute tersebut sudah terpasang rapi ke dalam `StatefulShellRoute` pada `AppRouter` sehingga navigasi Bottom Navigation Bar tetap konsisten.
-
----
-
-### 5. 🌿 Aturan Git Workflow & Kolaborasi Tim (Rules of Engagement)
+## 🌿 Aturan Git Workflow & Kolaborasi Tim
 
 ```
-main (BRANCH TERPROTEKSI - Selalu Stabil)
+main (Produksi - Tag Rilis Resmi)
   │
-  ├── feature/feeding-spot-acumalaka       (Kelompok 1)
-  ├── feature/cat-hunter-supersub          (Kelompok 2)
-  ├── feature/cat-adoption-enigma          (Kelompok 3)
-  ├── feature/incident-report-optimind     (Kelompok 4)
-  └── feature/cat-identification-rekanscaps(Kelompok 5)
+  └── development (Integrasi Utama & Fondasi Bersama v0.1-core)
+        │
+        ├── team/acumalaka        (Kelompok 1 - FeedingSpot)
+        ├── team/super-sub        (Kelompok 2 - CatHunter)
+        ├── team/enigma           (Kelompok 3 - CatAdoption)
+        ├── team/optimind         (Kelompok 4 - IncidentReport)
+        └── team/rekans-caps      (Kelompok 5 - CatIdentification)
 ```
 
-1. **Dilarang Keras Push Langsung ke Branch `main`**:
-   Semua pekerjaan wajib dilakukan pada branch fitur terpisah.
-2. **Siklus Kerja Setiap Anggota Kelompok**:
+1. **Struktur Branch Resmi**:
+   * `main`: Produksi. Hanya diisi lewat PR dari `development` setelah uji integrasi terpadu.
+   * `development`: Integrasi harian bersama. Semua branch kelompok bermuara di sini.
+   * `team/<kelompok>`: Base branch resmi masing-masing kelompok capstone.
+   * `team/<kelompok>/<tugas>`: Branch fitur individual anggota tim (misal `team/acumalaka/feat-intent-finalize`).
+2. **Siklus Kerja Anggota Kelompok**:
    ```bash
-   # 1. Pastikan branch main lokal Anda paling mutakhir
-   git checkout main
-   git pull origin main
+   # 1. Pindah ke branch tim kelompok Anda dan sinkronkan development
+   git checkout team/<kelompok>
+   git fetch origin
+   git merge origin/development
 
-   # 2. Buat atau pindah ke branch kelompok Anda
-   git checkout -b feature/<nama-kelompok>-<nama-fitur>
+   # 2. Buat branch tugas individual
+   git checkout -b team/<kelompok>/<nama-tugas>
 
-   # 3. Lakukan pekerjaan (coding) hanya pada folder kelompok Anda
+   # 3. Kerjakan tugas pada modul kelompok Anda
    git add .
-   git commit -m "feat(feeding-spot): implementasi scan qr feeding spot"
+   git commit -m "feat(modul): deskripsi perubahan"
 
-   # 4. Sebelum membuat Pull Request (PR), tarik pembaruan terbaru dari main
-   git checkout main
-   git pull origin main
-   git checkout feature/<nama-kelompok>-<nama-fitur>
-   git merge main
-
-   # 5. Push ke repository remote dan buka Pull Request (PR)
-   git push origin feature/<nama-kelompok>-<nama-fitur>
+   # 4. Buka PR ke branch team/<kelompok> (internal tim)
+   # 5. Ketua tim membuka PR dari team/<kelompok> ke development untuk direview PM
    ```
-3. **Penyelesaian Konflik (*Merge Conflict*)**:
-   * Jika terjadi konflik pada file konfigurasi bersama (seperti `composer.json`, `pubspec.yaml`, `main.dart`, atau `routes/api.php`), **JANGAN MENIMPA / HAPUS KODE KELOMPOK LAIN SECARA SEPIHAK**.
-   * Lakukan komunikasi langsung antar perwakilan kelompok untuk menyelesaikan baris kode yang bentrok.
-4. **Penambahan Package / Library Baru**:
-   * Jika ada kelompok yang membutuhkan library Composer atau dependency Flutter baru, wajib mengumumkan terlebih dahulu di grup koordinasi agar tidak terjadi bentrok versi library.
+3. **Konvensi Commit**:
+   Format: `tipe(modul): deskripsi`
+   Contoh:
+   * `feat(feeding_spot): implementasi finalisasi pemberian makan R1-R8`
+   * `fix(incident_report): perbaiki validasi upload bukti foto darurat`
+   * `refactor(cat_hunter): optimasi kalkulasi giliran encounter`
 
 ---
 
 ## 🚀 Panduan Menjalankan Proyek
 
-### 1. Backend (Laravel)
+### 1. Prasyarat & Docker (Local Dev)
+Jalankan dependensi database PostgreSQL + PostGIS, Redis, MinIO, dan Mailpit:
+```bash
+docker compose up -d
+```
+* PostgreSQL/PostGIS: `localhost:5432` (db: `meowtopia`, user: `meowtopia`, pass: `secret`)
+* Redis: `localhost:6379`
+* MinIO Console: `http://localhost:9001` (user: `minio`, pass: `minio12345`)
+* Mailpit (Email OTP Web UI): `http://localhost:8025`
+
+### 2. Backend (Laravel API)
 ```bash
 cd backend
 composer install
@@ -228,11 +171,12 @@ php artisan key:generate
 php artisan migrate --seed
 php artisan serve
 ```
-Backend API akan berjalan di `http://127.0.0.1:8000/api/v1/`.
+Backend REST API akan berjalan di `http://127.0.0.1:8000/api/v1/`.
 
-### 2. Frontend (Flutter)
+### 3. Frontend (Flutter App)
 ```bash
 cd frontend
 flutter pub get
-flutter run
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
 ```
+*(Catatan: `10.0.2.2` untuk emulator Android. Untuk HP fisik, gunakan IP LAN laptop).*

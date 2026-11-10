@@ -14,11 +14,11 @@ class ModuleServiceProvider extends ServiceProvider
     protected array $moduleOrder = [
         'Core',
         'Cat',
+        'CatIdentification',
         'FeedingSpot',
         'CatHunter',
         'CatAdoption',
         'IncidentReport',
-        'CatIdentification',
     ];
 
     /**
@@ -52,13 +52,13 @@ class ModuleServiceProvider extends ServiceProvider
         foreach ($sortedModules as $module) {
             $moduleDir = $modulesPath . '/' . $module;
 
-            // 1. Load Migrations
+            // 1. Load Migrations (Case-sensitive uppercase M)
             $migrationPath = $moduleDir . '/Database/Migrations';
             if (is_dir($migrationPath)) {
                 $this->loadMigrationsFrom($migrationPath);
             }
 
-            // 2. Load API Routes
+            // 2. Load API Routes with /api/v1 prefix
             $routesFile = $moduleDir . '/routes.php';
             if (file_exists($routesFile)) {
                 Route::prefix('api/v1')

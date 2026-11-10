@@ -2,29 +2,32 @@
 
 namespace App\Modules\CatHunter\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Modules\Cat\Models\Cat;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class UserCatDex extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
 
     protected $table = 'user_cat_dex';
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'user_id',
         'cat_id',
-        'encounters_count',
-        'first_captured_at',
-        'last_interacted_at',
-        'friendship_level',
+        'state',              // SEEN, TAMED
+        'tamed_at',
+        'times_encountered',
+        'last_greeted_at',
     ];
 
     protected $casts = [
-        'first_captured_at' => 'datetime',
-        'last_interacted_at' => 'datetime',
+        'tamed_at' => 'datetime',
+        'last_greeted_at' => 'datetime',
     ];
 
     public function user()

@@ -2,28 +2,33 @@
 
 namespace App\Modules\CatIdentification\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Modules\Cat\Models\Cat;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class IdentificationAttempt extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
+
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
         'user_id',
-        'matched_cat_id',
-        'photo_path',
-        'answers',          // JSON answers to questions
-        'confidence_score', // 0 - 100
-        'method',           // qr, photo_ai, questionnaire
-        'status',           // confirmed, rejected, inconclusive
+        'method',             // PHOTO, AKINATOR
+        'model_version',
+        'input_media_id',
+        'answers',
+        'candidates',
+        'result',             // MATCHED, INCONCLUSIVE, NOT_CAT
+        'confirmed_cat_id',
     ];
 
     protected $casts = [
         'answers' => 'array',
-        'confidence_score' => 'float',
+        'candidates' => 'array',
     ];
 
     public function user()
@@ -31,8 +36,8 @@ class IdentificationAttempt extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function matchedCat()
+    public function confirmedCat()
     {
-        return $this->belongsTo(Cat::class, 'matched_cat_id');
+        return $this->belongsTo(Cat::class, 'confirmed_cat_id');
     }
 }

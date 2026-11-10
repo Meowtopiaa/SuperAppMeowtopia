@@ -33,8 +33,12 @@ class IncidentReportModel {
       urgencyLevel: json['urgency_level'] ?? 'medium',
       description: json['description'] ?? '',
       photoUrl: json['photo_url'],
-      latitude: json['latitude'] != null ? double.parse(json['latitude'].toString()) : 0.0,
-      longitude: json['longitude'] != null ? double.parse(json['longitude'].toString()) : 0.0,
+      latitude: json['latitude'] != null
+          ? double.parse(json['latitude'].toString())
+          : 0.0,
+      longitude: json['longitude'] != null
+          ? double.parse(json['longitude'].toString())
+          : 0.0,
       locationNote: json['location_note'],
       status: json['status'] ?? 'reported',
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),

@@ -1,0 +1,77 @@
+{
+  "file_key": "tpFr4LvJtPshvfm7Y9Fciz",
+  "assets": [
+    {
+      "asset": "assets/images/figma/feeding-proof.png",
+      "source_node": "1:3"
+    },
+    {
+      "asset": "assets/icons/figma/camera.svg",
+      "source_node": "1:3",
+      "native_width": "16.6667",
+      "native_height": "15"
+    },
+    {
+      "asset": "assets/icons/figma/photo-policy.svg",
+      "source_node": "1:3",
+      "native_width": "16.5",
+      "native_height": "15.75"
+    },
+    {
+      "asset": "assets/icons/figma/retake-photo.svg",
+      "source_node": "1:3",
+      "native_width": "12.5",
+      "native_height": "11.25"
+    },
+    {
+      "asset": "assets/icons/figma/food-quantity.svg",
+      "source_node": "1:3",
+      "native_width": "28.6667",
+      "native_height": "16.6667"
+    },
+    {
+      "asset": "assets/icons/figma/notes.svg",
+      "source_node": "1:3",
+      "native_width": "15",
+      "native_height": "13.3333"
+    },
+    {
+      "asset": "assets/images/figma/spot-scan-background.png",
+      "source_node": "1:180"
+    },
+    {
+      "asset": "assets/images/figma/ginger-cat-hero.png",
+      "source_node": "1:508"
+    },
+    {
+      "asset": "assets/images/figma/meowtopia-badge.png",
+      "source_node": "1:508"
+    },
+    {
+      "asset": "assets/images/figma/feeding-proof-summary.png",
+      "source_node": "1:508"
+    },
+    {
+      "asset": "assets/images/figma/meowtopia-logo.png",
+      "source_node": "2:3"
+    },
+    {
+      "asset": "assets/images/figma/feeding-shelter.png",
+      "source_node": "1:354"
+    },
+    {
+      "asset": "assets/images/figma/oyen.png",
+      "source_node": "1:423"
+    },
+    {
+      "asset": "assets/images/figma/mochi.png",
+      "source_node": "1:423"
+    },
+    {
+      "asset": "assets/icons/figma/campus-map.svg",
+      "source_node": "1:266",
+      "native_width": "314",
+      "native_height": "190"
+    }
+  ]
+}

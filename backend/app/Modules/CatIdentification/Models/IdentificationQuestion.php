@@ -2,23 +2,25 @@
 
 namespace App\Modules\CatIdentification\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class IdentificationQuestion extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUlids;
+
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected $fillable = [
+        'code',
         'question_text',
-        'trait_category', // color, ear_shape, tail_shape, pattern
-        'options',        // JSON array of selectable options
-        'order',
+        'sort_order',
         'is_active',
     ];
 
     protected $casts = [
-        'options' => 'array',
         'is_active' => 'boolean',
     ];
 }

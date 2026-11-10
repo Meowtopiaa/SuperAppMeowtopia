@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../cat/data/cat_model.dart';
 import '../data/identification_service.dart';
 import '../data/question_model.dart';
@@ -63,7 +64,10 @@ class IdentificationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _service.identifyCat(method: 'questionnaire', answers: answers);
+      final res = await _service.identifyCat(
+        method: 'questionnaire',
+        answers: answers,
+      );
       _matchedCat = res['matched_cat'] as CatModel?;
       _confidence = res['confidence'] as double;
       _status = res['status'] as String;

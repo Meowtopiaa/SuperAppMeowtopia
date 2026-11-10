@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../logic/auth_provider.dart';
@@ -43,7 +44,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
 
     if (mounted && success) {
-      context.go('/feeding');
+      context.go('/home');
     } else if (mounted && auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -73,7 +74,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     labelText: 'Nama Lengkap',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'Nama wajib diisi' : null,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Nama wajib diisi' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -82,7 +84,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     labelText: 'Email Kampus / Pribadi',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
-                  validator: (val) => val == null || !val.contains('@') ? 'Email tidak valid' : null,
+                  validator: (val) => val == null || !val.contains('@')
+                      ? 'Email tidak valid'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -108,7 +112,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     labelText: 'Kata Sandi',
                     prefixIcon: Icon(Icons.lock_outline),
                   ),
-                  validator: (val) => val == null || val.length < 8 ? 'Minimal 8 karakter' : null,
+                  validator: (val) => val == null || val.length < 8
+                      ? 'Minimal 8 karakter'
+                      : null,
                 ),
                 const SizedBox(height: 24),
                 CustomButton(

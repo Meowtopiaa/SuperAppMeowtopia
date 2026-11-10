@@ -24,12 +24,15 @@ class AdoptionService {
     required bool familyPermission,
     Map<String, dynamic>? commitmentAnswers,
   }) async {
-    await _client.post('/adoption/apply', data: {
-      'cat_id': catId,
-      'housing_type': housingType,
-      'financial_readiness': financialReadiness,
-      'family_permission': familyPermission,
-      'commitment_answers': commitmentAnswers,
-    });
+    await _client.post(
+      '/adoption/apply',
+      data: {
+        'cat_id': catId,
+        'housing_type': housingType,
+        'financial_readiness': financialReadiness,
+        'family_permission': familyPermission,
+        'commitment_answers': commitmentAnswers,
+      },
+    );
   }
 }

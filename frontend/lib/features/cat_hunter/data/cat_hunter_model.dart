@@ -23,7 +23,8 @@ class UserCatDexModel {
       catId: json['cat_id'] ?? 0,
       encountersCount: json['encounters_count'] ?? 1,
       friendshipLevel: json['friendship_level'] ?? 1,
-      firstCapturedAt: DateTime.tryParse(json['first_captured_at'] ?? '') ?? DateTime.now(),
+      firstCapturedAt:
+          DateTime.tryParse(json['first_captured_at'] ?? '') ?? DateTime.now(),
       cat: json['cat'] != null ? CatModel.fromJson(json['cat']) : null,
     );
   }
