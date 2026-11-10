@@ -3,27 +3,21 @@
 namespace App\Modules\FeedingSpot\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Services\PointService;
-use App\Modules\FeedingSpot\Events\FeedingVerified;
 use App\Modules\FeedingSpot\Models\FeedingActivity;
-use App\Modules\FeedingSpot\Models\FeedingAggregate;
-use App\Modules\FeedingSpot\Models\FeedingEvidence;
-use App\Modules\FeedingSpot\Models\FeedingReview;
-use App\Modules\FeedingSpot\Models\FeedingRuleResult;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
-use App\Modules\FeedingSpot\Services\FeedingRewardService;
+use App\Modules\FeedingSpot\Services\FeedingReviewService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AdminFeedingSpotController extends Controller
 {
     public function __construct(
-        private readonly PointService $pointService,
-        private readonly FeedingRewardService $rewardService,
+        private readonly FeedingReviewService $reviewService,
     ) {}
 
     /**
@@ -135,7 +129,7 @@ class AdminFeedingSpotController extends Controller
 
     /**
      * GET /api/v1/admin/feeding/review-queue
-     * Daftar antrean pengajuan pemberian makan berstatus UNDER_REVIEW (AFS-07, MEOW-12).
+     * Daftar antrean pengajuan pemberian makan berstatus UNDER_REVIEW (AFS-07, MEOW-12, MEOW-22).
      * Permission: feeding.review
      */
     public function reviewQueue(Request $request): JsonResponse
@@ -144,58 +138,13 @@ class AdminFeedingSpotController extends Controller
             ? $request->string('status')->upper()->toString()
             : 'UNDER_REVIEW';
 
-        $items = FeedingActivity::query()
-            ->where('status', $status)
-            ->with([
-                'user:id,name,email,user_type',
-                'spot:id,code,name,latitude,longitude,status',
-                'cat:id,unique_code,name',
-                'evidence',
-                'ruleResults',
-                'reviews.reviewer:id,name',
-            ])
+        $excludeSelf = $request->boolean('exclude_self', false);
+
+        $items = $this->reviewService
+            ->getReviewQueueQuery($request->user(), excludeSelf: $excludeSelf, status: $status)
             ->orderBy('finalized_at')
             ->get()
-            ->map(fn (FeedingActivity $a) => [
-                'id' => $a->id,
-                'feeding_record_ref' => $a->feeding_record_ref,
-                'status' => $a->status,
-                'reward_status' => $a->reward_status,
-                'points_awarded' => $a->points_awarded,
-                'food_type' => $a->food_type,
-                'food_amount' => $a->food_amount,
-                'notes' => $a->notes,
-                'flags' => $a->flags ?? [],
-                'scanned_at' => $a->scanned_at?->toIso8601String(),
-                'submitted_at' => $a->finalized_at?->toIso8601String(),
-                'verified_at' => $a->status === 'VERIFIED' ? $a->finalized_at?->toIso8601String() : null,
-                'user' => $a->user ? [
-                    'id' => $a->user->id,
-                    'name' => $a->user->name,
-                    'email' => $a->user->email,
-                    'user_type' => $a->user->user_type,
-                ] : null,
-                'spot' => $a->spot ? [
-                    'id' => $a->spot->id,
-                    'code' => $a->spot->code,
-                    'name' => $a->spot->name,
-                ] : null,
-                'cat' => $a->cat ? [
-                    'id' => $a->cat->id,
-                    'unique_code' => $a->cat->unique_code,
-                    'name' => $a->cat->name,
-                ] : null,
-                'evidence' => $a->evidence->map(fn (FeedingEvidence $e) => [
-                    'id' => $e->id,
-                    'media_id' => $e->media_id,
-                    'sort_order' => $e->sort_order,
-                ])->values(),
-                'rule_results' => $a->ruleResults->map(fn (FeedingRuleResult $r) => [
-                    'rule' => $r->rule,
-                    'result' => $r->result,
-                    'detail' => $r->detail,
-                ])->values(),
-            ])
+            ->map(fn (FeedingActivity $a) => $this->reviewService->formatQueueItem($a))
             ->values();
 
         return ApiResponse::success($items, 'Antrean review pemberian pakan berhasil diambil.');
@@ -203,7 +152,7 @@ class AdminFeedingSpotController extends Controller
 
     /**
      * POST /api/v1/admin/feeding/activities/{id}/review
-     * Simpan keputusan reviewer (VERIFIED atau REJECTED) dengan larangan self-review (AFS-07, AFS-10, MEOW-12).
+     * Simpan keputusan reviewer (VERIFIED atau REJECTED) dengan larangan self-review (AFS-07, AFS-10, MEOW-12, MEOW-22).
      * Permission: feeding.review
      */
     public function reviewActivity(Request $request, string $id): JsonResponse
@@ -226,11 +175,11 @@ class AdminFeedingSpotController extends Controller
 
         $validated = $request->validate([
             'decision' => ['required', 'string', Rule::in(['VERIFIED', 'REJECTED'])],
-            'notes' => ['nullable', 'string', 'max:1000'],
-            'reason' => ['nullable', 'string', 'max:1000'],
+            'notes' => ['required_without:reason', 'nullable', 'string', 'max:1000'],
+            'reason' => ['required_without:notes', 'nullable', 'string', 'max:1000'],
         ]);
 
-        if (!in_array($activity->status, ['UNDER_REVIEW', 'SUBMITTED', 'VERIFIED'], true)) {
+        if (!in_array($activity->status, ['UNDER_REVIEW', 'SUBMITTED', 'VERIFIED', 'REJECTED'], true)) {
             return ApiResponse::error(
                 "Aktivitas berstatus {$activity->status} tidak dapat direview.",
                 422,
@@ -241,138 +190,9 @@ class AdminFeedingSpotController extends Controller
         $decision = $validated['decision'];
         $reason = $validated['notes'] ?? $validated['reason'] ?? null;
 
-        $payload = DB::transaction(function () use ($activity, $reviewer, $decision, $reason) {
-            FeedingReview::create([
-                'activity_id' => $activity->id,
-                'reviewer_id' => $reviewer->id,
-                'decision' => $decision,
-                'reason' => $reason,
-            ]);
-
-            if ($decision === 'VERIFIED') {
-                $formulaSnapshot = $this->rewardService->calculateRewardSnapshot($activity, now());
-                $award = $this->pointService->award(
-                    user: $activity->user,
-                    ruleKey: 'feeding.verified',
-                    sourceModule: 'FeedingSpot',
-                    sourceType: 'feeding_activity',
-                    sourceRefId: $activity->id,
-                    idempotencyKey: "feeding.verified:{$activity->id}"
-                );
-
-                $rewardCapped = (bool) ($award['reward_capped'] ?? false) || ($formulaSnapshot['reward_capped'] ?? false);
-                $pointsAwarded = $rewardCapped ? 0 : (int) ($award['points'] ?? 0);
-                $snapshot = $activity->reward_snapshot ?? [];
-
-                $activity->update([
-                    'status' => 'VERIFIED',
-                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
-                    'potential_points' => $pointsAwarded,
-                    'reward_snapshot' => array_merge($snapshot, $formulaSnapshot, [
-                        'points_awarded' => $pointsAwarded,
-                        'reward_capped' => $rewardCapped,
-                        'transaction_id' => $award['transaction_id'] ?? null,
-                        'review_reason' => $reason,
-                    ]),
-                ]);
-
-                $this->refreshSpotAggregate($activity->spot_id);
-                event(new FeedingVerified($activity->fresh()));
-
-                return [
-                    'activity_id' => $activity->id,
-                    'decision' => 'VERIFIED',
-                    'status' => 'VERIFIED',
-                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
-                    'points_awarded' => $pointsAwarded,
-                    'credited_points' => $pointsAwarded,
-                    'reward_capped' => $rewardCapped,
-                    'reviewed_by' => $reviewer->id,
-                    'reviewed_at' => now()->toIso8601String(),
-                ];
-            }
-
-            // REJECTED: jika sebelumnya sudah CREDITED, jalankan reversal poin (AFS-12)
-            if ($activity->reward_status === 'CREDITED') {
-                $reversal = $this->rewardService->reverseReward(
-                    $activity,
-                    $reason ?? 'Dibatalkan oleh reviewer saat audit.',
-                    $reviewer->id
-                );
-                $activity->update(['status' => 'REJECTED']);
-                $this->refreshSpotAggregate($activity->spot_id);
-
-                return [
-                    'activity_id' => $activity->id,
-                    'decision' => 'REJECTED',
-                    'status' => 'REJECTED',
-                    'reward_status' => 'REVERSED',
-                    'points_awarded' => 0,
-                    'reversed_points' => $reversal['reversed_points'],
-                    'new_balance' => $reversal['new_balance'],
-                    'reward_capped' => false,
-                    'reviewed_by' => $reviewer->id,
-                    'reviewed_at' => now()->toIso8601String(),
-                ];
-            }
-
-            $snapshot = $activity->reward_snapshot ?? [];
-            $activity->update([
-                'status' => 'REJECTED',
-                'reward_status' => 'NOT_ELIGIBLE',
-                'reward_snapshot' => array_merge($snapshot, [
-                    'points_awarded' => 0,
-                    'review_reason' => $reason,
-                ]),
-            ]);
-
-            $this->refreshSpotAggregate($activity->spot_id);
-
-            return [
-                'activity_id' => $activity->id,
-                'decision' => 'REJECTED',
-                'status' => 'REJECTED',
-                'reward_status' => 'NOT_ELIGIBLE',
-                'points_awarded' => 0,
-                'reward_capped' => false,
-                'reviewed_by' => $reviewer->id,
-                'reviewed_at' => now()->toIso8601String(),
-            ];
-        });
+        $payload = $this->reviewService->reviewActivity($activity, $reviewer, $decision, $reason);
 
         return ApiResponse::success($payload, 'Keputusan review berhasil disimpan.');
-    }
-
-    /**
-     * Perbarui agregat 14 hari terakhir untuk spot (feeding_aggregates).
-     */
-    private function refreshSpotAggregate(string $spotId): FeedingAggregate
-    {
-        $windowStart = now()->subDays(14)->startOfDay();
-        $windowEnd = now();
-
-        $verifiedCount = FeedingActivity::query()
-            ->where('spot_id', $spotId)
-            ->where('status', 'VERIFIED')
-            ->where('finalized_at', '>=', $windowStart)
-            ->count();
-
-        $pendingCount = FeedingActivity::query()
-            ->where('spot_id', $spotId)
-            ->where('status', 'UNDER_REVIEW')
-            ->where('finalized_at', '>=', $windowStart)
-            ->count();
-
-        return FeedingAggregate::updateOrCreate(
-            ['spot_id' => $spotId],
-            [
-                'window_start' => $windowStart,
-                'window_end' => $windowEnd,
-                'verified_count' => $verifiedCount,
-                'pending_count' => $pendingCount,
-                'computed_at' => now(),
-            ]
-        );
     }
 
     /**
@@ -454,10 +274,17 @@ class AdminFeedingSpotController extends Controller
     /**
      * GET /api/v1/admin/feeding/reviews/{id}
      * Halaman inspeksi bukti foto & hasil rule engine untuk reviewer (MEOW-22).
+     * Menolak 403 bila reviewer memaksa membuka pengajuan miliknya sendiri,
+     * dan tidak memuat data pribadi pengguna (tanpa phone/identity_number/email).
      */
-    public function showReviewEvidence(string $id)
+    public function showReviewEvidence(Request $request, string $id)
     {
-        $activity = FeedingActivity::with(['user', 'spot', 'evidence', 'ruleResults'])
+        $activity = FeedingActivity::with([
+            'user:id,name,user_type',
+            'spot:id,code,name,latitude,longitude,status',
+            'evidence',
+            'ruleResults',
+        ])
             ->where('id', $id)
             ->orWhere('feeding_record_ref', $id)
             ->first();
@@ -466,8 +293,50 @@ class AdminFeedingSpotController extends Controller
             return ApiResponse::error('Aktivitas pemberian pakan tidak ditemukan.', 404, 'ACTIVITY_NOT_FOUND');
         }
 
+        if ($request->user() && $activity->user_id === $request->user()->id) {
+            return ApiResponse::error(
+                'Reviewer tidak diperbolehkan memeriksa pengajuan pemberian pakan miliknya sendiri.',
+                403,
+                'SELF_REVIEW_FORBIDDEN'
+            );
+        }
+
         return view('feeding-spot::filament.review-evidence', [
             'activity' => $activity,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/admin/feeding/evidence/{mediaId}/file
+     * Stream foto bukti pakan hanya melalui URL bertanda tangan (berlaku 10 menit) (CORE-05, MEOW-22).
+     * Menolak akses langsung tanpa tanda tangan yang valid dengan 403.
+     */
+    public function streamEvidenceMedia(Request $request, string $mediaId)
+    {
+        if (!$request->hasValidSignature()) {
+            return ApiResponse::error(
+                'Akses ditolak. Foto bukti hanya dapat dibuka melalui URL bertanda tangan yang valid (berlaku 10 menit).',
+                403,
+                'INVALID_SIGNATURE'
+            );
+        }
+
+        $media = DB::table('media_files')->where('id', $mediaId)->first();
+        if (!$media) {
+            return ApiResponse::error('Berkas media bukti pakan tidak ditemukan.', 404, 'MEDIA_NOT_FOUND');
+        }
+
+        $disk = Storage::disk($media->disk ?? 'local');
+        if (!empty($media->path) && $disk->exists($media->path)) {
+            return response($disk->get($media->path), 200, [
+                'Content-Type' => $media->mime ?? 'image/jpeg',
+                'Cache-Control' => 'private, max-age=600',
+            ]);
+        }
+
+        return response('FEEDING_EVIDENCE_BINARY_STREAM:' . $media->id, 200, [
+            'Content-Type' => $media->mime ?? 'image/jpeg',
+            'Cache-Control' => 'private, max-age=600',
         ]);
     }
 }

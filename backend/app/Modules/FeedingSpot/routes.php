@@ -30,6 +30,10 @@ Route::prefix('feeding')->group(function () {
     });
 });
 
+// Signed URL endpoint (10 menit) untuk foto bukti pakan privat (CORE-05, MEOW-22)
+Route::get('/admin/feeding/evidence/{mediaId}/file', [AdminFeedingSpotController::class, 'streamEvidenceMedia'])
+    ->name('admin.feeding.evidence.file');
+
 // Admin Endpoints — /api/v1/admin/feeding/*
 Route::prefix('admin/feeding')->middleware('auth:sanctum')->group(function () {
     // Kelola Spot & QR (Permission: spot.manage) (MEOW-7, MEOW-21, MEOW-23)

@@ -44,6 +44,7 @@
         .badge-warning { background: #FEF3C7; color: #92400E; }
         .badge-success { background: #DCFCE7; color: #166534; }
         .badge-danger { background: #FEE2E2; color: #991B1B; }
+        .badge-info { background: #E0F2FE; color: #075985; }
         .grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -76,6 +77,12 @@
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+        .flags-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
         }
         .rule-list {
             list-style: none;
@@ -118,8 +125,17 @@
             display: flex;
             gap: 12px;
             justify-content: flex-end;
+            align-items: center;
             border-top: 1px solid #E2E8F0;
             padding-top: 20px;
+            flex-wrap: wrap;
+        }
+        .reason-input {
+            padding: 9px 12px;
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 240px;
         }
         .btn {
             padding: 10px 20px;
@@ -142,13 +158,13 @@
                 <div class="title">Review Aktivitas Pakan Kampus</div>
                 <div style="font-size: 13px; color: #64748B; margin-top: 4px;">Referensi: <code>{{ $activity->feeding_record_ref }}</code></div>
             </div>
-            <div class="badge badge-warning">MENUNGGU REVIEW (UNDER_REVIEW)</div>
+            <div class="badge badge-warning">MENUNGGU REVIEW ({{ $activity->status }})</div>
         </div>
 
         <div class="grid">
             <div class="info-card">
                 <div class="info-label">Relawan / Feeder</div>
-                <div class="info-value">{{ $activity->user->name ?? 'Mahasiswa' }} ({{ $activity->user->email ?? '-' }})</div>
+                <div class="info-value">{{ $activity->user->name ?? 'Mahasiswa' }} ({{ $activity->user->user_type ?? 'MAHASISWA' }})</div>
             </div>
             <div class="info-card">
                 <div class="info-label">Spot Pakan</div>
@@ -160,11 +176,20 @@
             </div>
             <div class="info-card">
                 <div class="info-label">Detail Pakan</div>
-                <div class="info-value">{{ ucfirst(str_replace('_', ' ', $activity->food_type)) }} &bull; {{ $activity->food_amount ?? 'Porsi standar' }}</div>
+                <div class="info-value">{{ ucfirst(str_replace('_', ' ', (string) $activity->food_type)) }} &bull; {{ $activity->food_amount ?? 'Porsi standar' }}</div>
             </div>
         </div>
 
-        <div class="section-title">Hasil Pemeriksaan Mesin Aturan (Rule Engine R1-R8)</div>
+        <div class="section-title">Flags Sistem (Deteksi Anomali &amp; Sampling)</div>
+        <div class="flags-wrap">
+            @forelse(($activity->flags ?? []) as $flag)
+                <span class="badge badge-warning">{{ $flag }}</span>
+            @empty
+                <span class="badge badge-info">TANPA FLAG KHUSUS</span>
+            @endforelse
+        </div>
+
+        <div class="section-title">Hasil Pemeriksaan Mesin Aturan (feeding_rule_results)</div>
         <ul class="rule-list">
             @forelse($activity->ruleResults as $rule)
                 <li class="rule-item">
@@ -180,13 +205,13 @@
             @endforelse
         </ul>
 
-        <div class="section-title">Foto Bukti Pemberian Makan ({{ $activity->evidence->count() }} Foto)</div>
+        <div class="section-title">Foto Bukti Pemberian Makan ({{ $activity->evidence->count() }} Foto &bull; URL Bertanda Tangan 10 Menit)</div>
         <div class="photos-grid">
             @forelse($activity->evidence as $idx => $ev)
                 <div class="photo-card">
-                    <img src="{{ $ev->media_url ?? 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22240%22 height=%22200%22><rect width=%22240%22 height=%22200%22 fill=%22%23e2e8f0%22/><text x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 fill=%22%2364748b%22>Foto Bukti</text></svg>' }}" alt="Bukti Pakan">
+                    <img src="{{ $ev->signed_url }}" alt="Bukti Pakan">
                     <div class="photo-meta">
-                        Foto #{{ $idx + 1 }} &bull; Diambil: {{ $ev->captured_at }}
+                        Foto #{{ $idx + 1 }} &bull; Diambil: {{ $ev->captured_at }} &bull; Signed URL (10m)
                     </div>
                 </div>
             @empty
@@ -196,13 +221,14 @@
 
         <div class="actions-bar">
             <button onclick="window.history.back()" class="btn btn-secondary">Kembali</button>
-            <form method="POST" action="/api/v1/admin/feeding/activities/{{ $activity->id }}/review" style="display:inline;">
+            <form method="POST" action="/api/v1/admin/feeding/activities/{{ $activity->id }}/review" style="display:inline-flex; gap:8px; align-items:center;">
                 <input type="hidden" name="decision" value="REJECTED">
-                <input type="hidden" name="reason" value="Foto bukti tidak memenuhi kriteria verifikasi">
+                <input type="text" name="reason" class="reason-input" placeholder="Alasan penolakan (wajib)" required>
                 <button type="submit" class="btn btn-danger" onclick="return confirm('Tolak pengajuan pakan ini?')">Tolak (REJECTED)</button>
             </form>
-            <form method="POST" action="/api/v1/admin/feeding/activities/{{ $activity->id }}/review" style="display:inline;">
+            <form method="POST" action="/api/v1/admin/feeding/activities/{{ $activity->id }}/review" style="display:inline-flex; gap:8px; align-items:center;">
                 <input type="hidden" name="decision" value="VERIFIED">
+                <input type="text" name="reason" class="reason-input" placeholder="Alasan persetujuan (wajib)" required>
                 <button type="submit" class="btn btn-success" onclick="return confirm('Setujui pengajuan pakan ini dan kreditkan poin?')">Setujui (VERIFIED)</button>
             </form>
         </div>

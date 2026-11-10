@@ -412,14 +412,43 @@ paths:
                 decision:
                   type: string
                   enum: [VERIFIED, REJECTED]
+                reason:
+                  type: string
+                  description: Alasan wajib keputusan review (disimpan ke feeding_reviews)
                 notes:
                   type: string
                   nullable: true
       responses:
         "200":
-          description: Keputusan review disimpan (dan poin dikreditkan via PointService::award jika VERIFIED, atau di-reverse jika sebelumnya CREDITED)
+          description: Keputusan review disimpan (dan poin dikreditkan via PointService::award jika VERIFIED, atau di-reverse jika sebelumnya CREDITED; idempotent bila dikirim dua kali)
         "403":
           description: Pelanggaran SELF_REVIEW_FORBIDDEN atau tidak memiliki permission feeding.review
+
+  /admin/feeding/evidence/{mediaId}/file:
+    get:
+      summary: Stream berkas foto bukti pakan melalui URL bertanda tangan yang berlaku 10 menit (CORE-05, MEOW-22)
+      tags: [FeedingSpot - Admin]
+      parameters:
+        - in: path
+          name: mediaId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: expires
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: signature
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Berkas gambar bukti pakan
+        "403":
+          description: Tanda tangan tidak valid atau telah kedaluwarsa (INVALID_SIGNATURE)
 
   /admin/feeding/spots/{id}/qr-sheet:
     get:

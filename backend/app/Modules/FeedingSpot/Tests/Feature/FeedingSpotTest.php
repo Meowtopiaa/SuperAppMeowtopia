@@ -1015,6 +1015,16 @@ class FeedingSpotTest extends TestCase
 
     public function test_meow_22_filament_review_queue_resource_and_evidence_view(): void
     {
+        $this->student->update([
+            'phone' => '081234567890',
+            'identity_number' => '1301234567',
+        ]);
+
+        DB::table('point_balances')->updateOrInsert(
+            ['user_id' => $this->student->id],
+            ['total_points' => 0, 'updated_at' => now()]
+        );
+
         $mediaId = $this->createMediaRecord($this->student, hash('sha256', 'm22-photo'));
         $activity = FeedingActivity::create([
             'id' => (string) Str::ulid(),
@@ -1024,14 +1034,33 @@ class FeedingSpotTest extends TestCase
             'location_lat' => (float) $this->activeSpot->latitude,
             'location_lng' => (float) $this->activeSpot->longitude,
             'status' => 'UNDER_REVIEW',
+            'flags' => ['PHOTO_REUSED', 'TIME_MISMATCH', 'FIRST_TWO_SUBMISSIONS', 'RANDOM_SAMPLE'],
             'scanned_at' => now(),
             'finalized_at' => now(),
             'food_type' => 'wet_food',
             'food_amount' => '1 sachet',
+            'potential_points' => 10,
             'reward_status' => 'PENDING',
         ]);
 
-        FeedingEvidence::create([
+        $adminOwnActivity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-M22-ADMIN-SELF',
+            'user_id' => $this->spotAdmin->id,
+            'spot_id' => $this->activeSpot->id,
+            'location_lat' => (float) $this->activeSpot->latitude,
+            'location_lng' => (float) $this->activeSpot->longitude,
+            'status' => 'UNDER_REVIEW',
+            'flags' => ['RANDOM_SAMPLE'],
+            'scanned_at' => now(),
+            'finalized_at' => now(),
+            'food_type' => 'dry_food',
+            'food_amount' => '1 mangkuk',
+            'potential_points' => 10,
+            'reward_status' => 'PENDING',
+        ]);
+
+        $evidence = FeedingEvidence::create([
             'activity_id' => $activity->id,
             'media_id' => $mediaId,
             'captured_at' => now(),
@@ -1045,28 +1074,115 @@ class FeedingSpotTest extends TestCase
             'detail' => 'Dua pengajuan pertama relawan baru diarahkan ke verifikasi manual',
         ]);
 
-        // 1. Reviewer dengan feeding.review dapat mengakses halaman inspeksi bukti foto
+        // 1. Reviewer dengan feeding.review dapat mengakses halaman inspeksi bukti foto,
+        //    lengkap dengan flags, feeding_rule_results, dan signed URL 10 menit,
+        //    serta TIDAK menampilkan nomor telepon / email / data pribadi pengguna.
+        $this->assertTrue(\App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::canViewAny($this->spotAdmin));
+        $this->assertFalse(\App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::canViewAny($this->student));
+
         $reviewPageResp = $this->actingAs($this->spotAdmin, 'sanctum')
             ->get("/api/v1/admin/feeding/reviews/{$activity->id}");
 
         $reviewPageResp->assertStatus(200)
             ->assertSee('REF-M22-REVIEW')
             ->assertSee($this->student->name)
+            ->assertSee('PHOTO_REUSED')
+            ->assertSee('TIME_MISMATCH')
+            ->assertSee('FIRST_TWO_SUBMISSIONS')
+            ->assertSee('RANDOM_SAMPLE')
             ->assertSee('R2_NEW_USER')
-            ->assertSee('Foto Bukti Pemberian Makan');
+            ->assertSee('Foto Bukti Pemberian Makan')
+            ->assertDontSee('081234567890')
+            ->assertDontSee('1301234567')
+            ->assertDontSee($this->student->email);
 
-        // 2. Mahasiswa tanpa feeding.review ditolak 403
+        // 2. Reviewer tanpa permission feeding.review mendapat 403
         $forbiddenResp = $this->actingAs($this->student, 'sanctum')
             ->get("/api/v1/admin/feeding/reviews/{$activity->id}");
         $forbiddenResp->assertStatus(403);
 
-        // 3. Verifikasi Resource query dan badge
-        $badge = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getNavigationBadge();
-        $this->assertNotNull($badge);
-        $this->assertGreaterThanOrEqual(1, (int) $badge);
+        // 3. Pengajuan milik reviewer sendiri disembunyikan dari antrean Filament
+        //    dan ditolak 403 bila dipaksa dibuka atau direview.
+        $query = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getEloquentQuery($this->spotAdmin);
+        $this->assertTrue((clone $query)->where('id', $activity->id)->exists());
+        $this->assertFalse((clone $query)->where('id', $adminOwnActivity->id)->exists());
+        $this->assertFalse(\App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::canView($adminOwnActivity, $this->spotAdmin));
 
-        $query = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getEloquentQuery();
-        $this->assertTrue($query->where('id', $activity->id)->exists());
+        $badge = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getNavigationBadge($this->spotAdmin);
+        $this->assertEquals('1', $badge);
+
+        $selfInspectResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->get("/api/v1/admin/feeding/reviews/{$adminOwnActivity->id}");
+        $selfInspectResp->assertStatus(403)
+            ->assertJsonPath('code', 'SELF_REVIEW_FORBIDDEN');
+
+        // 4. Foto bukti hanya bisa dibuka lewat URL bertanda tangan (berlaku 10 menit);
+        //    URL langsung tanpa tanda tangan ditolak 403, dan lewat 10 menit ditolak 403.
+        $signedUrl = $evidence->signed_url;
+        $this->assertStringContainsString('signature=', $signedUrl);
+        $this->assertStringContainsString('expires=', $signedUrl);
+
+        $directUrlResp = $this->getJson("/api/v1/admin/feeding/evidence/{$mediaId}/file");
+        $directUrlResp->assertStatus(403)
+            ->assertJsonPath('code', 'INVALID_SIGNATURE');
+
+        $validSignedResp = $this->get($signedUrl);
+        $validSignedResp->assertStatus(200);
+
+        $this->travel(11)->minutes();
+        $expiredSignedResp = $this->getJson($signedUrl);
+        $expiredSignedResp->assertStatus(403)
+            ->assertJsonPath('code', 'INVALID_SIGNATURE');
+        $this->travelBack();
+
+        // 5. Keputusan VERIFIED/REJECTED lewat Resource memakai FeedingReviewService yang sama dengan MEOW-12,
+        //    wajib menyertakan alasan, dan bila dikirim dua kali tidak memberi poin dua kali.
+        $missingReasonResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/activities/{$activity->id}/review", [
+                'decision' => 'VERIFIED',
+                'reason' => '',
+            ]);
+        $missingReasonResp->assertStatus(422);
+
+        $firstDecision = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::submitDecision(
+            $activity->fresh(),
+            $this->spotAdmin,
+            'VERIFIED',
+            'Foto bukti pakan sesuai dan mangkuk terisi penuh'
+        );
+        $this->assertEquals('VERIFIED', $firstDecision['status']);
+        $this->assertEquals('CREDITED', $firstDecision['reward_status']);
+        $this->assertFalse($firstDecision['is_replay']);
+
+        $balanceAfterFirst = (int) DB::table('point_balances')->where('user_id', $this->student->id)->value('total_points');
+        $txCountAfterFirst = DB::table('point_transactions')
+            ->where('user_id', $this->student->id)
+            ->where('source_ref_id', $activity->id)
+            ->count();
+        $reviewCountAfterFirst = DB::table('feeding_reviews')->where('activity_id', $activity->id)->count();
+        $this->assertGreaterThan(0, $balanceAfterFirst);
+        $this->assertEquals(1, $txCountAfterFirst);
+        $this->assertEquals(1, $reviewCountAfterFirst);
+
+        // Kirim keputusan yang sama untuk kedua kalinya -> tidak memberi poin dua kali
+        $secondDecision = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::submitDecision(
+            $activity->fresh(),
+            $this->spotAdmin,
+            'VERIFIED',
+            'Foto bukti pakan sesuai dan mangkuk terisi penuh'
+        );
+        $this->assertEquals('VERIFIED', $secondDecision['status']);
+        $this->assertTrue($secondDecision['is_replay']);
+
+        $balanceAfterSecond = (int) DB::table('point_balances')->where('user_id', $this->student->id)->value('total_points');
+        $txCountAfterSecond = DB::table('point_transactions')
+            ->where('user_id', $this->student->id)
+            ->where('source_ref_id', $activity->id)
+            ->count();
+        $reviewCountAfterSecond = DB::table('feeding_reviews')->where('activity_id', $activity->id)->count();
+        $this->assertEquals($balanceAfterFirst, $balanceAfterSecond);
+        $this->assertEquals(1, $txCountAfterSecond);
+        $this->assertEquals(1, $reviewCountAfterSecond);
     }
 
     public function test_meow_19_it_06_reward_status_separation_and_daily_cap_and_idempotency(): void
