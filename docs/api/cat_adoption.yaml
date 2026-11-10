@@ -1,0 +1,1291 @@
+openapi: 3.0.3
+info:
+  title: Meowtopia Adoption API
+  version: 0.1.0-draft
+  description: Draft EN-7 berdasarkan PRD v1.1 §8.6 dan §6.5. Nama field, nilai enum keputusan, pemetaan permission
+    admin, dan bentuk data yang tidak dirinci PRD adalah usulan untuk review. Kontrak target, implementasi branch
+    bisa berbeda.
+servers:
+- url: /api/v1
+security:
+- sanctumBearer: []
+paths:
+  /adoption/cats:
+    get:
+      operationId: listReadyCats
+      summary: Lihat katalog kucing READY tanpa adopsi aktif.
+      description: Mahasiswa dengan email terverifikasi. Lihat katalog kucing READY tanpa adopsi aktif.
+      tags:
+      - Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                        name:
+                          type: string
+                        adoption_status:
+                          type: string
+                          enum:
+                          - READY
+                      required:
+                      - id
+                      - adoption_status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /adoption/applications:
+    post:
+      operationId: createApplicationDraft
+      summary: Buat draf kelayakan tanpa memilih kucing.
+      description: Mahasiswa dengan email terverifikasi. Buat draf kelayakan tanpa memilih kucing.
+      tags:
+      - Adopsi
+      responses:
+        '201':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      status:
+                        type: string
+                      precheck_passed:
+                        type: boolean
+                        nullable: true
+                      admin_note:
+                        type: string
+                        nullable: true
+                    required:
+                    - id
+                    - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                answers:
+                  type: object
+                  additionalProperties: true
+                housing_media_id:
+                  type: string
+                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                commitment_version:
+                  type: string
+                commitment_accepted:
+                  type: boolean
+  /adoption/applications/{id}:
+    put:
+      operationId: saveApplicationDraft
+      summary: Simpan draf kelayakan milik pengguna.
+      description: Mahasiswa dengan email terverifikasi. Hanya pemilik pengajuan. Simpan draf kelayakan milik
+        pengguna.
+      tags:
+      - Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      status:
+                        type: string
+                      precheck_passed:
+                        type: boolean
+                        nullable: true
+                      admin_note:
+                        type: string
+                        nullable: true
+                    required:
+                    - id
+                    - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                answers:
+                  type: object
+                  additionalProperties: true
+                housing_media_id:
+                  type: string
+                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                commitment_version:
+                  type: string
+                commitment_accepted:
+                  type: boolean
+  /adoption/applications/{id}/submit:
+    post:
+      operationId: submitApplication
+      summary: Ajukan kelayakan dan jalankan precheck
+      description: Mahasiswa dengan email terverifikasi. Hanya pemilik pengajuan. Ajukan kelayakan dan jalankan
+        precheck. Draf harus punya jawaban wajib, foto tempat tinggal dari kamera aplikasi, dan persetujuan komitmen
+        versi berlaku. Hasil precheck terpisah dari keputusan admin.
+      tags:
+      - Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      status:
+                        type: string
+                      precheck_passed:
+                        type: boolean
+                        nullable: true
+                      admin_note:
+                        type: string
+                        nullable: true
+                    required:
+                    - id
+                    - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      - $ref: '#/components/parameters/IdempotencyKey'
+  /adoption/applications/mine:
+    get:
+      operationId: getMyApplications
+      summary: Lihat status pengajuan kelayakan dan catatan admin
+      description: Mahasiswa dengan email terverifikasi. Lihat status pengajuan kelayakan dan catatan admin. Bentuk
+        daftar adalah usulan.
+      tags:
+      - Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                        status:
+                          type: string
+                        precheck_passed:
+                          type: boolean
+                          nullable: true
+                        admin_note:
+                          type: string
+                          nullable: true
+                      required:
+                      - id
+                      - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /adoption/pickups/start:
+    post:
+      operationId: startPickup
+      summary: Mulai pengambilan lewat QR kalung
+      description: Mahasiswa dengan email terverifikasi. Kelayakan APPROVED dan masih berlaku. Mulai pengambilan
+        lewat QR kalung. Server memeriksa kelayakan, status READY, dan kuota aktif. Lock default 48 jam. Detail
+        mutasi status saat start perlu dikonfirmasi karena §8.6 menyebut pengaturan adoption_status dan §5 menyimpan
+        reservasi di adoption_pickup_locks.
+      tags:
+      - Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      pickup_lock_id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      cat_id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      expires_at:
+                        type: string
+                        format: date-time
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cat_code:
+                  type: string
+              required:
+              - cat_code
+  /adoption/pickups/confirm:
+    post:
+      operationId: confirmPickup
+      summary: Konfirmasi pickup secara atomik
+      description: Mahasiswa dengan email terverifikasi. Pemilik lock dengan kelayakan APPROVED yang masih berlaku.
+        Konfirmasi pickup secara atomik. Foto kucing berkalung berasal dari kamera aplikasi. Server memeriksa
+        ulang syarat dan menjamin satu adopsi aktif per kucing dan per adopter. pickup_lock_id dan lokasi opsional
+        adalah usulan kontrak.
+      tags:
+      - Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      cat_id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      status:
+                        type: string
+                      followup_schedule:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                    required:
+                    - id
+                    - cat_id
+                    - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pickup_lock_id:
+                  type: string
+                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                pickup_media_id:
+                  type: string
+                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                location:
+                  type: object
+                  properties:
+                    latitude:
+                      type: number
+                      minimum: -90
+                      maximum: 90
+                    longitude:
+                      type: number
+                      minimum: -180
+                      maximum: 180
+                  required:
+                  - latitude
+                  - longitude
+                responsibility_confirmed:
+                  type: boolean
+                  enum:
+                  - true
+              required:
+              - pickup_lock_id
+              - pickup_media_id
+              - responsibility_confirmed
+  /adoption/mine:
+    get:
+      operationId: getMyAdoption
+      summary: Lihat Kucing Saya dan jadwal follow-up
+      description: Mahasiswa dengan email terverifikasi. Lihat Kucing Saya dan jadwal follow-up. Hanya adopsi
+        ACTIVE. Daftar kosong berarti tidak ada adopsi aktif, sebagai usulan respons.
+      tags:
+      - Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                        cat_id:
+                          type: string
+                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                        status:
+                          type: string
+                        followup_schedule:
+                          type: array
+                          items:
+                            type: object
+                            additionalProperties: true
+                      required:
+                      - id
+                      - cat_id
+                      - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /adoption/{id}/followups:
+    post:
+      operationId: submitFollowup
+      summary: Kirim follow-up dengan foto dari kamera aplikasi
+      description: Mahasiswa dengan email terverifikasi. Hanya adopter pemilik adopsi. Kirim follow-up dengan
+        foto dari kamera aplikasi. Jadwal tiap 14 hari selama tiga bulan kalender pertama. Pengiriman terlambat
+        diterima dan periode tidak diduplikasi. Cara memilih periode terlambat perlu disepakati.
+      tags:
+      - Adopsi
+      responses:
+        '201':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: true
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                media_id:
+                  type: string
+                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                condition:
+                  type: string
+                notes:
+                  type: string
+              required:
+              - media_id
+              - condition
+  /adoption/{id}/returns:
+    post:
+      operationId: requestReturn
+      summary: Ajukan pengembalian
+      description: Mahasiswa dengan email terverifikasi. Hanya adopter pemilik adopsi. Ajukan pengembalian. Default
+        adoption.return_enabled=false. Pengembalian biasa setelah tiga bulan kalender, lebih awal lewat jalur
+        darurat. Bukti diunggah setelah persetujuan, tetapi §8.6 belum memberi operasi khusus untuk mengaitkan
+        bukti dengan pengembalian. Mekanisme tersebut perlu disepakati.
+      tags:
+      - Adopsi
+      responses:
+        '201':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: true
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                emergency:
+                  type: boolean
+              required:
+              - reason
+  /adoption/{id}/issues:
+    post:
+      operationId: reportIssue
+      summary: Laporkan kendala adopsi
+      description: Mahasiswa dengan email terverifikasi. Hanya adopter pemilik adopsi. Laporkan kendala adopsi.
+        Foto opsional dan laporan tidak otomatis menutup adopsi.
+      tags:
+      - Adopsi
+      responses:
+        '201':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: true
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                description:
+                  type: string
+                media_id:
+                  type: string
+                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+              required:
+              - category
+              - description
+  /admin/adoption/applications:
+    get:
+      operationId: listAdoptionApplications
+      summary: Lihat antrean pengajuan kelayakan.
+      description: Admin dengan permission adoption.review. Pemetaan izin per operasi di bawah adalah usulan.
+        Lihat antrean pengajuan kelayakan.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                        status:
+                          type: string
+                        precheck_passed:
+                          type: boolean
+                          nullable: true
+                        admin_note:
+                          type: string
+                          nullable: true
+                      required:
+                      - id
+                      - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /admin/adoption/applications/{id}/decision:
+    post:
+      operationId: decideAdoptionApplication
+      summary: Catat keputusan dan alasan, aktor serta waktu
+      description: Admin dengan permission adoption.review atau adoption.approve sesuai keputusan. Pemetaan izin
+        per operasi di bawah adalah usulan. Catat keputusan dan alasan, aktor serta waktu. Persetujuan tidak membuat
+        adopsi aktif.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      status:
+                        type: string
+                      precheck_passed:
+                        type: boolean
+                        nullable: true
+                      admin_note:
+                        type: string
+                        nullable: true
+                    required:
+                    - id
+                    - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - APPROVE
+                  - REQUEST_CHANGES
+                  - REJECT
+                reason:
+                  type: string
+              required:
+              - decision
+              - reason
+  /admin/adoption/cats/{cat_id}/set-ready:
+    post:
+      operationId: setCatReadyForAdoption
+      summary: Tetapkan status READY lewat CatStatusService dengan alasan dan riwayat.
+      description: Admin dengan permission adoption.set_ready. Pemetaan izin per operasi di bawah adalah usulan.
+        Tetapkan status READY lewat CatStatusService dengan alasan dan riwayat.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                      name:
+                        type: string
+                      adoption_status:
+                        type: string
+                        enum:
+                        - READY
+                    required:
+                    - id
+                    - adoption_status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: cat_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+              - reason
+  /admin/adoption/adoptions:
+    get:
+      operationId: listAdoptions
+      summary: Lihat daftar adopsi.
+      description: Admin dengan permission adoption.review. Pemetaan izin per operasi di bawah adalah usulan.
+        Lihat daftar adopsi.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                        cat_id:
+                          type: string
+                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+                        status:
+                          type: string
+                        followup_schedule:
+                          type: array
+                          items:
+                            type: object
+                            additionalProperties: true
+                      required:
+                      - id
+                      - cat_id
+                      - status
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /admin/adoption/returns/{id}/decision:
+    post:
+      operationId: decideAdoptionReturn
+      summary: Catat keputusan atas permohonan pengembalian
+      description: Admin dengan permission adoption.verify_return. Pemetaan izin per operasi di bawah adalah usulan.
+        Catat keputusan atas permohonan pengembalian. Persetujuan tidak menutup adopsi.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: true
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - APPROVE
+                  - REQUEST_CHANGES
+                  - REJECT
+                reason:
+                  type: string
+              required:
+              - decision
+              - reason
+  /admin/adoption/returns/{id}/verify:
+    post:
+      operationId: verifyAdoptionReturn
+      summary: Verifikasi bukti QR, foto kamera, waktu server, dan lokasi bila tersedia
+      description: Admin dengan permission adoption.verify_return. Pemetaan izin per operasi di bawah adalah usulan.
+        Verifikasi bukti QR, foto kamera, waktu server, dan lokasi bila tersedia. Setelah valid, tutup adopsi
+        dan mulai cooldown 30 hari. Kucing tidak otomatis READY.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: true
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+  /admin/adoption/issues:
+    get:
+      operationId: listAdoptionIssues
+      summary: Lihat daftar kendala adopsi.
+      description: Admin dengan permission adoption.review. Pemetaan izin per operasi di bawah adalah usulan.
+        Lihat daftar kendala adopsi.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /admin/adoption/issues/{id}/handle:
+    post:
+      operationId: handleAdoptionIssue
+      summary: Catat penanganan kendala tanpa otomatis menutup adopsi
+      description: Admin dengan permission adoption.review. Pemetaan izin per operasi di bawah adalah usulan.
+        Catat penanganan kendala tanpa otomatis menutup adopsi. Daftar aksi dan bentuk respons perlu disepakati.
+      tags:
+      - Admin Adopsi
+      responses:
+        '200':
+          description: Permintaan berhasil diproses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: true
+                  meta:
+                    type: object
+                    additionalProperties: true
+                required:
+                - success
+                - message
+                - data
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                notes:
+                  type: string
+              required:
+              - action
+components:
+  securitySchemes:
+    sanctumBearer:
+      type: http
+      scheme: bearer
+      description: Token Laravel Sanctum
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Gunakan key yang sama saat mengulang permintaan yang sama.
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum:
+          - false
+        code:
+          type: string
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties: true
+        request_id:
+          type: string
+      required:
+      - success
+      - code
+      - message
+      - request_id
+  responses:
+    Error401:
+      description: Token login diperlukan atau tidak valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error403:
+      description: Akses ditolak, misalnya NOT_STUDENT, email belum terverifikasi, bukan pemilik, atau permission
+        kurang.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error404:
+      description: Resource tidak ditemukan.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error409:
+      description: Konflik status, kuota, atau permintaan berulang.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error422:
+      description: Input atau prasyarat bisnis tidak valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
