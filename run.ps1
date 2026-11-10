@@ -43,15 +43,25 @@ Write-Host ""
 Write-Host "[1/2] Menjalankan Server Backend (Laravel API di http://127.0.0.1:8000)..." -ForegroundColor Green
 Start-Process cmd -ArgumentList "/k title Meowtopia Backend (Port 8000) && color 0A && cd /d `"$rootDir\backend`" && php artisan serve --host=127.0.0.1 --port=8000"
 
-Write-Host "[2/2] Menjalankan Aplikasi Frontend (Flutter)..." -ForegroundColor Cyan
-Start-Process cmd -ArgumentList "/k title Meowtopia Frontend (Flutter) && color 0B && cd /d `"$rootDir\frontend`" && flutter run"
+# 4. Verifikasi Flutter
+if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
+    Write-Host ""
+    Write-Host "[PERINGATAN] Perintah 'flutter' belum terdeteksi di PATH sistem Anda!" -ForegroundColor Yellow
+    Write-Host "Backend (Laravel API) tetap berjalan normal di http://127.0.0.1:8000."
+    Write-Host ""
+    Write-Host "Solusi:" -ForegroundColor Cyan
+    Write-Host "1. Jika Flutter SDK sudah ada di komputer Anda, tambahkan folder 'flutter\bin' ke Environment Variables PATH."
+    Write-Host "2. Jika belum terinstal, pasang melalui: winget install Google.Flutter"
+    Write-Host "   atau unduh dari https://docs.flutter.dev/get-started/install/windows"
+    Write-Host ""
+} else {
+    Write-Host "[2/2] Menjalankan Aplikasi Frontend (Flutter)..." -ForegroundColor Cyan
+    Start-Process cmd -ArgumentList "/k title Meowtopia Frontend (Flutter) && color 0B && cd /d `"$rootDir\frontend`" && flutter run"
+}
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Green
-Write-Host "[SUKSES] Backend dan Frontend sedang berjalan di jendela terpisah!" -ForegroundColor Green
-Write-Host ""
+Write-Host "[INFO] Status Layanan:" -ForegroundColor Green
 Write-Host "  - Backend API : http://127.0.0.1:8000/api/v1"
 Write-Host "  - Admin Panel : http://127.0.0.1:8000/admin"
-Write-Host "  - Frontend UI : Ikuti jendela terminal Flutter (Hot Reload: 'r')"
-Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Green
