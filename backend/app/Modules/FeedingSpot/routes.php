@@ -17,6 +17,12 @@ Route::prefix('feeding')->group(function () {
     Route::get('/spots/{id}', [FeedingSpotController::class, 'showSpot']);
     Route::get('/heatmap', [FeedingSpotController::class, 'heatmap']);
 
+    // Panel Admin Filament Browser Preview (MEOW-21 & MEOW-22)
+    Route::get('/admin-preview', [AdminFeedingSpotController::class, 'adminPreviewPanel']);
+    Route::get('/admin-preview/reviews/{id}', [AdminFeedingSpotController::class, 'adminPreviewReview']);
+    Route::post('/admin-preview/activities/{id}/review', [AdminFeedingSpotController::class, 'adminPreviewSubmitReview']);
+    Route::get('/admin-preview/spots/{id}/qr-sheet', [AdminFeedingSpotController::class, 'adminPreviewQrSheet']);
+
     // Authenticated User Endpoints
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/activities/mine', [FeedingSpotController::class, 'myActivities']);
@@ -67,6 +73,7 @@ if (app()->runningInConsole()) {
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\ExpireFeedingSessionsCommand::class);
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\RefreshFeedingAggregatesCommand::class);
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\CleanupFeedingMediaRetentionCommand::class);
+        $artisan->resolve(\App\Modules\FeedingSpot\Commands\SetupLocalFeedingEnvironmentCommand::class);
     });
 }
 

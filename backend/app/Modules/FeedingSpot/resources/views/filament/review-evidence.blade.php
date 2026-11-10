@@ -220,13 +220,13 @@
         </div>
 
         <div class="actions-bar">
-            <button onclick="window.history.back()" class="btn btn-secondary">Kembali</button>
-            <form method="POST" action="/api/v1/admin/feeding/activities/{{ $activity->id }}/review" style="display:inline-flex; gap:8px; align-items:center;">
+            <a href="{{ $backUrl ?? 'javascript:window.history.back()' }}" class="btn btn-secondary">Kembali ke Antrean</a>
+            <form method="POST" action="{{ $reviewActionUrl ?? ('/api/v1/admin/feeding/activities/' . $activity->id . '/review') }}" style="display:inline-flex; gap:8px; align-items:center;">
                 <input type="hidden" name="decision" value="REJECTED">
                 <input type="text" name="reason" class="reason-input" placeholder="Alasan penolakan (wajib)" required>
                 <button type="submit" class="btn btn-danger" onclick="return confirm('Tolak pengajuan pakan ini?')">Tolak (REJECTED)</button>
             </form>
-            <form method="POST" action="/api/v1/admin/feeding/activities/{{ $activity->id }}/review" style="display:inline-flex; gap:8px; align-items:center;">
+            <form method="POST" action="{{ $reviewActionUrl ?? ('/api/v1/admin/feeding/activities/' . $activity->id . '/review') }}" style="display:inline-flex; gap:8px; align-items:center;">
                 <input type="hidden" name="decision" value="VERIFIED">
                 <input type="text" name="reason" class="reason-input" placeholder="Alasan persetujuan (wajib)" required>
                 <button type="submit" class="btn btn-success" onclick="return confirm('Setujui pengajuan pakan ini dan kreditkan poin?')">Setujui (VERIFIED)</button>

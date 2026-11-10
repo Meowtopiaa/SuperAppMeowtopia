@@ -334,9 +334,89 @@ class AdminFeedingSpotController extends Controller
             ]);
         }
 
-        return response('FEEDING_EVIDENCE_BINARY_STREAM:' . $media->id, 200, [
-            'Content-Type' => $media->mime ?? 'image/jpeg',
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320">'
+            . '<rect width="480" height="320" fill="#1E293B"/>'
+            . '<circle cx="240" cy="145" r="70" fill="#F59E0B" opacity="0.2"/>'
+            . '<text x="240" y="135" text-anchor="middle" fill="#F8FAFC" font-family="sans-serif" font-size="18" font-weight="bold">Foto Bukti Pakan (Signed 10m)</text>'
+            . '<text x="240" y="165" text-anchor="middle" fill="#94A3B8" font-family="monospace" font-size="12">Media ID: ' . htmlspecialchars((string) $media->id) . '</text>'
+            . '<text x="240" y="190" text-anchor="middle" fill="#38BDF8" font-family="monospace" font-size="11">SHA-256: ' . substr((string) ($media->sha256 ?? ''), 0, 24) . '...</text>'
+            . '</svg>';
+
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml',
             'Cache-Control' => 'private, max-age=600',
         ]);
+    }
+
+    /**
+     * GET /api/v1/feeding/admin-preview
+     * Halaman web Panel Admin Filament (MEOW-21 & MEOW-22) untuk inspeksi langsung di browser.
+     */
+    public function adminPreviewPanel()
+    {
+        $reviewer = \App\Models\User::where('email', 'spotadmin@telkomuniversity.ac.id')->first();
+        $pendingActivities = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getEloquentQuery($reviewer)
+            ->orderByDesc('finalized_at')
+            ->get();
+        $spots = FeedingSpot::orderBy('code')->get();
+
+        return view('feeding-spot::filament.admin-panel', [
+            'pendingActivities' => $pendingActivities,
+            'spots' => $spots,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/feeding/admin-preview/reviews/{id}
+     * Halaman web inspeksi bukti foto dari Panel Admin browser.
+     */
+    public function adminPreviewReview(string $id)
+    {
+        $activity = FeedingActivity::with([
+            'user:id,name,user_type',
+            'spot:id,code,name,latitude,longitude,status',
+            'evidence',
+            'ruleResults',
+        ])
+            ->where('id', $id)
+            ->orWhere('feeding_record_ref', $id)
+            ->firstOrFail();
+
+        return view('feeding-spot::filament.review-evidence', [
+            'activity' => $activity,
+            'backUrl' => '/api/v1/feeding/admin-preview',
+            'reviewActionUrl' => "/api/v1/feeding/admin-preview/activities/{$activity->id}/review",
+        ]);
+    }
+
+    /**
+     * POST /api/v1/feeding/admin-preview/activities/{id}/review
+     * Submit keputusan VERIFIED / REJECTED dari Panel Admin browser.
+     */
+    public function adminPreviewSubmitReview(Request $request, string $id)
+    {
+        $activity = FeedingActivity::with(['user', 'spot'])->findOrFail($id);
+        $reviewer = \App\Models\User::where('email', 'spotadmin@telkomuniversity.ac.id')->firstOrFail();
+
+        $decision = (string) $request->input('decision', 'VERIFIED');
+        $reason = (string) ($request->input('reason') ?: $request->input('notes') ?: 'Diverifikasi melalui Panel Admin Filament');
+
+        \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::submitDecision(
+            $activity,
+            $reviewer,
+            $decision,
+            $reason
+        );
+
+        return redirect('/api/v1/feeding/admin-preview');
+    }
+
+    /**
+     * GET /api/v1/feeding/admin-preview/spots/{id}/qr-sheet
+     * Lembar cetak QR dari Panel Admin browser.
+     */
+    public function adminPreviewQrSheet(string $id)
+    {
+        return $this->printQrSheet($id);
     }
 }
