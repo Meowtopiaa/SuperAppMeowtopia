@@ -1,38 +1,197 @@
-import '../../../core/network/api_client.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../cat/data/cat_model.dart';
+import 'adoption_enums.dart';
 import 'adoption_model.dart';
+import 'adoption_repository.dart';
+import 'mock_adoption_repository.dart';
 
+/// Layanan integrasi data Adopsi Kucing Meowtopia
+/// Mengadopsi pola repository dengan fallback Mock data tiruan pada mode demo.
 class AdoptionService {
-  final ApiClient _client = ApiClient();
+  final AdoptionRepository _repository;
+  final bool isDemo;
 
-  Future<List<CatModel>> getReadyCats() async {
-    final response = await _client.get('/adoption/catalog');
-    final list = response.data['data'] as List;
-    return list.map((e) => CatModel.fromJson(e)).toList();
-  }
+  AdoptionService({
+    AdoptionRepository? repository,
+    this.isDemo = AppConstants.demoMode,
+  }) : _repository = repository ?? MockAdoptionRepository();
 
-  Future<List<AdoptionApplicationModel>> getMyCats() async {
-    final response = await _client.get('/adoption/my-cats');
-    final list = response.data['data'] as List;
-    return list.map((e) => AdoptionApplicationModel.fromJson(e)).toList();
-  }
+  AdoptionRepository get repository => _repository;
 
-  Future<void> submitApplication({
-    required int catId,
+  Future<List<CatModel>> getReadyCats() => _repository.getReadyCats();
+
+  Future<CatModel?> getCatById(int catId) => _repository.getCatById(catId);
+
+  Future<AdoptionExtraCat?> getCatExtra(int catId) =>
+      _repository.getCatExtra(catId);
+
+  Future<List<AdoptionApplicationModel>> getMyApplications() =>
+      _repository.getMyApplications();
+
+  Future<AdoptionApplicationModel?> getApplicationById(int id) =>
+      _repository.getApplicationById(id);
+
+  Future<AdoptionApplicationModel> saveDraft({
+    int? applicationId,
+    int? catId,
+    String? catName,
+    required String applicantName,
+    required String applicantEmail,
+    required String applicantUserType,
     required String housingType,
     required bool financialReadiness,
     required bool familyPermission,
-    Map<String, dynamic>? commitmentAnswers,
-  }) async {
-    await _client.post(
-      '/adoption/apply',
-      data: {
-        'cat_id': catId,
-        'housing_type': housingType,
-        'financial_readiness': financialReadiness,
-        'family_permission': familyPermission,
-        'commitment_answers': commitmentAnswers,
-      },
+    String? longTermPlan,
+    String? homePhotoPath,
+    bool commitmentAccepted = false,
+  }) {
+    return _repository.saveDraft(
+      applicationId: applicationId,
+      catId: catId,
+      catName: catName,
+      applicantName: applicantName,
+      applicantEmail: applicantEmail,
+      applicantUserType: applicantUserType,
+      housingType: housingType,
+      financialReadiness: financialReadiness,
+      familyPermission: familyPermission,
+      longTermPlan: longTermPlan,
+      homePhotoPath: homePhotoPath,
+      commitmentAccepted: commitmentAccepted,
+    );
+  }
+
+  Future<AdoptionApplicationModel> submitApplication({
+    int? applicationId,
+    int? catId,
+    String? catName,
+    required String applicantName,
+    required String applicantEmail,
+    required String applicantUserType,
+    required String housingType,
+    required bool financialReadiness,
+    required bool familyPermission,
+    required String longTermPlan,
+    required String homePhotoPath,
+    required bool commitmentAccepted,
+  }) {
+    return _repository.submitApplication(
+      applicationId: applicationId,
+      catId: catId,
+      catName: catName,
+      applicantName: applicantName,
+      applicantEmail: applicantEmail,
+      applicantUserType: applicantUserType,
+      housingType: housingType,
+      financialReadiness: financialReadiness,
+      familyPermission: familyPermission,
+      longTermPlan: longTermPlan,
+      homePhotoPath: homePhotoPath,
+      commitmentAccepted: commitmentAccepted,
+    );
+  }
+
+  Future<AdoptionApplicationModel> resubmitApplication({
+    required int applicationId,
+    required String housingType,
+    required bool financialReadiness,
+    required bool familyPermission,
+    required String longTermPlan,
+    required String homePhotoPath,
+    required bool commitmentAccepted,
+  }) {
+    return _repository.resubmitApplication(
+      applicationId: applicationId,
+      housingType: housingType,
+      financialReadiness: financialReadiness,
+      familyPermission: familyPermission,
+      longTermPlan: longTermPlan,
+      homePhotoPath: homePhotoPath,
+      commitmentAccepted: commitmentAccepted,
+    );
+  }
+
+  Future<AdoptionPickupLockModel> getPickupLock(int applicationId, int catId) =>
+      _repository.getPickupLock(applicationId, catId);
+
+  Future<ActiveAdoptionModel> completePickup({
+    required int applicationId,
+    required int catId,
+    required String scannedQrToken,
+    required String collarPhotoPath,
+    required bool confirmedResponsibility,
+  }) {
+    return _repository.completePickup(
+      applicationId: applicationId,
+      catId: catId,
+      scannedQrToken: scannedQrToken,
+      collarPhotoPath: collarPhotoPath,
+      confirmedResponsibility: confirmedResponsibility,
+    );
+  }
+
+  Future<List<ActiveAdoptionModel>> getMyActiveAdoptions() =>
+      _repository.getMyActiveAdoptions();
+
+  Future<ActiveAdoptionModel?> getActiveAdoptionById(int id) =>
+      _repository.getActiveAdoptionById(id);
+
+  Future<List<AdoptionFollowupModel>> getFollowups(int adoptionId) =>
+      _repository.getFollowups(adoptionId);
+
+  Future<AdoptionFollowupModel> submitFollowup({
+    required int adoptionId,
+    required int cycleNumber,
+    required String photoPath,
+    required String condition,
+    String? notes,
+    String? issues,
+  }) {
+    return _repository.submitFollowup(
+      adoptionId: adoptionId,
+      cycleNumber: cycleNumber,
+      photoPath: photoPath,
+      condition: condition,
+      notes: notes,
+      issues: issues,
+    );
+  }
+
+  Future<ActiveAdoptionModel> requestReturn({
+    required int adoptionId,
+    required ReturnReasonType reasonType,
+    required String reason,
+  }) {
+    return _repository.requestReturn(
+      adoptionId: adoptionId,
+      reasonType: reasonType,
+      reason: reason,
+    );
+  }
+
+  Future<ActiveAdoptionModel> submitReturnEvidence({
+    required int adoptionId,
+    required String returnEvidencePath,
+  }) {
+    return _repository.submitReturnEvidence(
+      adoptionId: adoptionId,
+      returnEvidencePath: returnEvidencePath,
+    );
+  }
+
+  Future<AdoptionIssueReportModel> reportIssue({
+    required int adoptionId,
+    required int catId,
+    required AdoptionIssueCategory category,
+    required String description,
+    String? photoPath,
+  }) {
+    return _repository.reportIssue(
+      adoptionId: adoptionId,
+      catId: catId,
+      category: category,
+      description: description,
+      photoPath: photoPath,
     );
   }
 }
