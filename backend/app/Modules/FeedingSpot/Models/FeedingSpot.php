@@ -28,6 +28,7 @@ class FeedingSpot extends Model
         'territory_id',
         'qr_token',
         'status',
+        'status_reason',
     ];
 
     protected $casts = [

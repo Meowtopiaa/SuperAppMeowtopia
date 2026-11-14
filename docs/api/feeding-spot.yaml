@@ -313,8 +313,41 @@ paths:
           description: Riwayat aktivitas berhasil diambil
 
   /admin/feeding/spots:
+    get:
+      summary: Daftar seluruh titik feeding spot untuk admin (termasuk INACTIVE), dengan filter status, pencarian nama, dan paginasi (Permission spot.manage) (AFS-01, Bagian 8.4)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
+          description: Filter berdasarkan status operasional spot (termasuk INACTIVE).
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Pencarian berdasarkan nama, kode, atau deskripsi spot.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            default: 15
+            maximum: 100
+      responses:
+        "200":
+          description: Daftar spot admin berhasil diambil beserta metadata paginasi
+        "403":
+          description: Pengguna tidak memiliki permission spot.manage
     post:
-      summary: Buat titik feeding spot baru (Permission spot.manage) (AFS-01)
+      summary: Buat titik feeding spot baru (Permission spot.manage) (AFS-01, Bagian 8.4)
       tags: [FeedingSpot - Admin]
       security:
         - bearerAuth: []
@@ -328,6 +361,7 @@ paths:
               properties:
                 code:
                   type: string
+                  description: Kode unik spot (otomatis dinormalisasi ke huruf kapital).
                 name:
                   type: string
                 description:
@@ -335,21 +369,33 @@ paths:
                   nullable: true
                 latitude:
                   type: number
+                  minimum: -90
+                  maximum: 90
                 longitude:
                   type: number
+                  minimum: -180
+                  maximum: 180
                 territory_id:
                   type: string
                   nullable: true
                 status:
                   type: string
                   enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
+                status_reason:
+                  type: string
+                  nullable: true
+                  description: Wajib diisi apabila status adalah TEMPORARILY_UNAVAILABLE.
       responses:
         "201":
-          description: Spot baru berhasil dibuat beserta qr_token
+          description: Spot baru berhasil dibuat beserta qr_token dan dicatat di audit_logs
+        "403":
+          description: Pengguna tidak memiliki permission spot.manage
+        "422":
+          description: Validasi gagal (koordinat di luar rentang -90..90 / -180..180, code duplikat, atau status_reason kosong saat TEMPORARILY_UNAVAILABLE)
 
   /admin/feeding/spots/{id}:
-    patch:
-      summary: Perbarui titik feeding spot atau ubah statusnya (Permission spot.manage) (AFS-01)
+    get:
+      summary: Detail lengkap titik feeding spot untuk admin, termasuk status_reason, token QR aktif, kucing terkait, dan audit_logs (Permission spot.manage) (AFS-01, Bagian 8.4)
       tags: [FeedingSpot - Admin]
       security:
         - bearerAuth: []
@@ -361,7 +407,61 @@ paths:
             type: string
       responses:
         "200":
-          description: Spot berhasil diperbarui
+          description: Detail lengkap spot berhasil diambil
+        "403":
+          description: Pengguna tidak memiliki permission spot.manage
+        "404":
+          description: Spot tidak ditemukan (SPOT_NOT_FOUND)
+    patch:
+      summary: Perbarui titik feeding spot atau ubah statusnya (Nonaktifkan = PATCH status menjadi INACTIVE; tidak ada DELETE) (Permission spot.manage) (AFS-01, Bagian 8.4)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                latitude:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                longitude:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+                territory_id:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
+                status_reason:
+                  type: string
+                  nullable: true
+                  description: Wajib diisi apabila status diubah menjadi TEMPORARILY_UNAVAILABLE.
+      responses:
+        "200":
+          description: Spot berhasil diperbarui dan perubahan dicatat di audit_logs
+        "403":
+          description: Pengguna tidak memiliki permission spot.manage
+        "422":
+          description: Validasi gagal (koordinat di luar rentang atau status_reason kosong saat TEMPORARILY_UNAVAILABLE)
 
   /admin/feeding/spots/{id}/qr:
     post:

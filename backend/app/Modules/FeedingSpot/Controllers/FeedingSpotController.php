@@ -744,6 +744,7 @@ class FeedingSpotController extends Controller
             'territory_id' => $spot->territory_id,
             'territory' => $territory,
             'status' => $spot->status,
+            'status_reason' => $spot->status_reason,
             'last_fed_at' => $lastFedIso,
             'has_pending_review' => $hasPendingReview,
             'aggregate' => [

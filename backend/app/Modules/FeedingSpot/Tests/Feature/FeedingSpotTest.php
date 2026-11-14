@@ -1385,4 +1385,324 @@ class FeedingSpotTest extends TestCase
         $this->assertStringNotContainsString($this->student->name, $heatmapContent);
         $this->assertStringNotContainsString($this->student->email, $heatmapContent);
     }
+
+    public function test_complete_admin_spot_crud_list_detail_validation_audit_log_and_deactivate_without_delete(): void
+    {
+        // 1. Pengguna tanpa permission spot.manage mendapat 403 pada semua endpoint admin spot
+        $this->actingAs($this->student, 'sanctum')
+            ->getJson('/api/v1/admin/feeding/spots')
+            ->assertStatus(403);
+
+        $this->actingAs($this->student, 'sanctum')
+            ->getJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}")
+            ->assertStatus(403);
+
+        $this->actingAs($this->student, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'code' => 'SPOT-FORBID-01',
+                'name' => 'Spot Terlarang',
+                'latitude' => -6.974,
+                'longitude' => 107.630,
+            ])
+            ->assertStatus(403);
+
+        $this->actingAs($this->student, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}", [
+                'status' => 'INACTIVE',
+            ])
+            ->assertStatus(403);
+
+        $this->actingAs($this->student, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}/qr")
+            ->assertStatus(403);
+
+        // 2. GET /api/v1/admin/feeding/spots memuat spot INACTIVE, sedangkan GET /api/v1/feeding/spots publik tidak
+        $adminListResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->getJson('/api/v1/admin/feeding/spots?per_page=10');
+
+        $adminListResp->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    '*' => ['id', 'code', 'name', 'latitude', 'longitude', 'status', 'status_reason', 'qr_token', 'qr_payload'],
+                ],
+                'meta' => ['current_page', 'per_page', 'total', 'last_page', 'has_more'],
+            ]);
+
+        $adminSpotStatuses = collect($adminListResp->json('data'))->pluck('status')->all();
+        $this->assertContains('INACTIVE', $adminSpotStatuses);
+        $this->assertContains('ACTIVE', $adminSpotStatuses);
+
+        // Filter status=INACTIVE dan pencarian nama pada daftar admin
+        $filteredAdminList = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->getJson('/api/v1/admin/feeding/spots?status=INACTIVE&search=Nonaktif');
+        $filteredAdminList->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $this->inactiveSpot->id);
+
+        // Publik GET /api/v1/feeding/spots tidak memuat INACTIVE
+        $publicListResp = $this->getJson('/api/v1/feeding/spots');
+        $publicListResp->assertStatus(200);
+        $publicIds = collect($publicListResp->json('data'))->pluck('id')->all();
+        $this->assertContains($this->activeSpot->id, $publicIds);
+        $this->assertNotContains($this->inactiveSpot->id, $publicIds);
+
+        // 3. Validasi koordinat di luar rentang (-90..90, -180..180) menghasilkan 422
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'code' => 'SPOT-INVALID-LAT',
+                'name' => 'Spot Koordinat Salah',
+                'latitude' => -95.5,
+                'longitude' => 107.630,
+            ])
+            ->assertStatus(422);
+
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'code' => 'SPOT-INVALID-LNG',
+                'name' => 'Spot Koordinat Salah Lng',
+                'latitude' => -6.974,
+                'longitude' => 185.0,
+            ])
+            ->assertStatus(422);
+
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}", [
+                'latitude' => 91.0,
+                'longitude' => -181.0,
+            ])
+            ->assertStatus(422);
+
+        // 4. Validasi status_reason wajib bila status TEMPORARILY_UNAVAILABLE (422 jika kosong)
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}", [
+                'status' => 'TEMPORARILY_UNAVAILABLE',
+                'status_reason' => '',
+            ])
+            ->assertStatus(422);
+
+        // Sukses PATCH ke TEMPORARILY_UNAVAILABLE dengan status_reason dan tercatat di audit_logs
+        $tempPatchResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}", [
+                'latitude' => -6.9742000,
+                'longitude' => 107.6302000,
+                'status' => 'TEMPORARILY_UNAVAILABLE',
+                'status_reason' => 'Wadah pakan sedang dibersihkan dan dicat ulang',
+            ]);
+        $tempPatchResp->assertStatus(200)
+            ->assertJsonPath('data.status', 'TEMPORARILY_UNAVAILABLE')
+            ->assertJsonPath('data.status_reason', 'Wadah pakan sedang dibersihkan dan dicat ulang');
+
+        // 5. GET /api/v1/admin/feeding/spots/{id}: detail lengkap termasuk status_reason, qr_token aktif, dan audit_logs
+        $detailAdminResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->getJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}");
+
+        $detailAdminResp->assertStatus(200)
+            ->assertJsonPath('data.id', $this->activeSpot->id)
+            ->assertJsonPath('data.status', 'TEMPORARILY_UNAVAILABLE')
+            ->assertJsonPath('data.status_reason', 'Wadah pakan sedang dibersihkan dan dicat ulang')
+            ->assertJsonPath('data.qr_token', $this->activeSpot->qr_token)
+            ->assertJsonStructure([
+                'data' => [
+                    'id',
+                    'code',
+                    'name',
+                    'latitude',
+                    'longitude',
+                    'status',
+                    'status_reason',
+                    'qr_token',
+                    'qr_payload',
+                    'cats',
+                    'recent_activities',
+                    'audit_logs',
+                ],
+            ]);
+
+        // Pastikan audit_logs mencatat perubahan dengan actor_id, nilai lama, dan nilai baru
+        $auditRow = DB::table('audit_logs')
+            ->where('subject_type', 'feeding_spot')
+            ->where('subject_id', $this->activeSpot->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($auditRow);
+        $this->assertEquals($this->spotAdmin->id, $auditRow->actor_id);
+        $auditReason = json_decode($auditRow->reason, true);
+        $this->assertEquals('ACTIVE', $auditReason['old']['status']);
+        $this->assertEquals('TEMPORARILY_UNAVAILABLE', $auditReason['new']['status']);
+        $this->assertEquals('Wadah pakan sedang dibersihkan dan dicat ulang', $auditReason['new']['status_reason']);
+
+        // 6. Tidak ada DELETE endpoint: menonaktifkan spot berarti PATCH status menjadi INACTIVE,
+        //    spot INACTIVE tidak bisa membuka sesi baru, tetapi riwayat aktivitasnya tetap tersimpan.
+        $historicalActivity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'VERIFIED',
+            'reward_status' => 'CREDITED',
+            'potential_points' => 10,
+            'scanned_at' => now()->subDays(2),
+            'finalized_at' => now()->subDays(2),
+        ]);
+
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$this->activeSpot->id}", [
+                'status' => 'INACTIVE',
+                'status_reason' => 'Spot dipindahkan ke gedung baru',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'INACTIVE');
+
+        // Spot INACTIVE tidak bisa membuka sesi baru (422 SPOT_UNAVAILABLE)
+        $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-inactive-spot-open-01')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => "MTP1.S.{$this->activeSpot->qr_token}",
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'SPOT_UNAVAILABLE');
+
+        // Riwayat aktivitas pada spot yang sudah INACTIVE tetap ada
+        $this->assertDatabaseHas('feeding_activities', [
+            'id' => $historicalActivity->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'VERIFIED',
+        ]);
+
+        // Dashboard Admin Web (/api/v1/feeding/admin-preview) merender sidebar, logo Meowtopia, toggle panah "<"
+        // yang menempel langsung pada sisi sidebar (sidebar-edge-toggle), statistic cards, tombol submit Tambah Feeding Spot,
+        // tabel antrean review sederhana tanpa kolom Indikator Pemeriksaan, serta tab Riwayat Audit.
+        $logoResp = $this->get('/api/v1/feeding/assets/logo.jpg');
+        $logoResp->assertStatus(200);
+
+        $webDashboardResp = $this->get('/api/v1/feeding/admin-preview');
+        $webDashboardResp->assertStatus(200)
+            ->assertSee('Meowtopia')
+            ->assertSee('/api/v1/feeding/assets/logo.jpg')
+            ->assertSee('#1B365D')
+            ->assertSee('Lokasi Feeding Spot')
+            ->assertSee('sidebar-edge-toggle')
+            ->assertSee('sidebarToggleBtn')
+            ->assertSee('stats-grid')
+            ->assertSee('spotSubmitBtn')
+            ->assertSee('Tambah Feeding Spot')
+            ->assertSee('cat-dropdown')
+            ->assertSee('inputCatId')
+            ->assertSee('identifyCampusArea')
+            ->assertSee('Area Gedung TULT')
+            ->assertSee('Area Asrama Putri')
+            ->assertDontSee('Referensi Endpoint')
+            ->assertDontSee('API Spot Publik')
+            ->assertDontSee('API Heatmap')
+            ->assertDontSee('Geo-Fence Aktif')
+            ->assertDontSee('Tampilkan Menu')
+            ->assertDontSee('Sembunyikan Menu')
+            ->assertSee('spotPickerMap')
+            ->assertSee($this->activeSpot->code)
+            ->assertSee($this->inactiveSpot->code);
+
+        // 7. Uji Geofence Poligon Kampus Telkom University pada Form Web Admin:
+        //    a) Titik di luar wilayah kampus Telkom University ditolak
+        $outsideResp = $this->post('/api/v1/feeding/admin-preview/spots', [
+            'code' => 'SPOT-OUTSIDE-01',
+            'name' => 'Spot Luar Kampus',
+            'latitude' => -6.9600000,
+            'longitude' => 107.6100000,
+            'status' => 'ACTIVE',
+        ]);
+        $outsideResp->assertRedirect();
+        $this->assertDatabaseMissing('feeding_spots', ['code' => 'SPOT-OUTSIDE-01']);
+
+        //    b) Titik di dalam wilayah kampus Telkom University berhasil disimpan
+        $insideResp = $this->post('/api/v1/feeding/admin-preview/spots', [
+            'code' => 'SPOT-INSIDE-01',
+            'name' => 'Spot Dalam Kampus Tel-U',
+            'description' => 'Dekat Danau Galau',
+            'latitude' => -6.9732000,
+            'longitude' => 107.6304000,
+            'status' => 'ACTIVE',
+        ]);
+        $insideResp->assertRedirect();
+        $this->assertDatabaseHas('feeding_spots', [
+            'code' => 'SPOT-INSIDE-01',
+            'name' => 'Spot Dalam Kampus Tel-U',
+            'status' => 'ACTIVE',
+        ]);
+
+        // 8. Uji Alur Detail Antrean, Penolakan (REJECTED), Hilang dari Antrean Aktif, & Masuk ke Riwayat Audit:
+        $pendingReviewActivity = FeedingActivity::create([
+            'id' => (string) Str::ulid(),
+            'feeding_record_ref' => 'REF-TEST-REJECT-001',
+            'user_id' => $this->student->id,
+            'spot_id' => $this->activeSpot->id,
+            'status' => 'UNDER_REVIEW',
+            'reward_status' => 'PENDING',
+            'potential_points' => 15,
+            'food_type' => 'wet_food',
+            'food_amount' => '1 sachet',
+            'flags' => ['PHOTO_REUSED', 'FIRST_TWO_SUBMISSIONS'],
+            'scanned_at' => now()->subMinutes(12),
+            'finalized_at' => now()->subMinutes(8),
+        ]);
+        FeedingRuleResult::create([
+            'activity_id' => $pendingReviewActivity->id,
+            'rule' => 'R4_PHOTO_UNIQUE',
+            'result' => 'REVIEW',
+            'detail' => 'Hash foto identik dengan sesi sebelumnya.',
+        ]);
+
+        // Halaman detail antrean menampilkan indikator pemeriksaan lengkap (flags & feeding_rule_results)
+        $detailPageResp = $this->get("/api/v1/feeding/admin-preview/reviews/{$pendingReviewActivity->id}");
+        $detailPageResp->assertStatus(200)
+            ->assertSee('REF-TEST-REJECT-001')
+            ->assertSee('PHOTO_REUSED')
+            ->assertSee('FIRST_TWO_SUBMISSIONS')
+            ->assertSee('R4_PHOTO_UNIQUE')
+            ->assertSee('Panel Keputusan Reviewer');
+
+        // Admin menolak (REJECTED) pengajuan dari halaman detail antrean
+        $rejectReason = 'Ditolak karena foto bukti terindikasi duplikat dari sesi sebelumnya.';
+        $rejectResp = $this->post("/api/v1/feeding/admin-preview/activities/{$pendingReviewActivity->id}/review", [
+            'decision' => 'REJECTED',
+            'reason' => $rejectReason,
+        ]);
+        $rejectResp->assertRedirect();
+
+        // Status di database berubah menjadi REJECTED dan tercatat di feeding_reviews + audit_logs
+        $this->assertDatabaseHas('feeding_activities', [
+            'id' => $pendingReviewActivity->id,
+            'status' => 'REJECTED',
+            'reward_status' => 'NOT_ELIGIBLE',
+        ]);
+        $this->assertDatabaseHas('feeding_reviews', [
+            'activity_id' => $pendingReviewActivity->id,
+            'reviewer_id' => $this->spotAdmin->id,
+            'decision' => 'REJECTED',
+            'reason' => $rejectReason,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'subject_type' => 'feeding_activity',
+            'subject_id' => $pendingReviewActivity->id,
+            'action' => 'FEEDING_REVIEW_REJECTED',
+            'actor_id' => $this->spotAdmin->id,
+        ]);
+
+        // Pastikan item yang ditolak tidak lagi ada di query antrean aktif (UNDER_REVIEW),
+        // tetapi tampil lengkap beserta alasan penolakannya di Riwayat Audit pada dashboard!
+        $activeQueueIds = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getEloquentQuery($this->spotAdmin)
+            ->pluck('id')
+            ->all();
+        $this->assertNotContains($pendingReviewActivity->id, $activeQueueIds);
+
+        $afterRejectDashboard = $this->get('/api/v1/feeding/admin-preview?tab=audit');
+        $afterRejectDashboard->assertStatus(200)
+            ->assertSee('REF-TEST-REJECT-001')
+            ->assertSee('DITOLAK (REJECTED)')
+            ->assertSee('FEEDING_REVIEW_REJECTED')
+            ->assertSee($rejectReason);
+    }
 }

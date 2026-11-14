@@ -2,7 +2,10 @@
 
 namespace App\Modules\FeedingSpot\Filament\Resources;
 
+use App\Models\User;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
+use App\Modules\FeedingSpot\Services\FeedingSpotManagementService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
@@ -123,6 +126,38 @@ class FeedingSpotResource extends BaseFeedingSpotResource
                 'color' => 'warning',
                 'requiresConfirmation' => true,
             ],
+            'deactivate_spot' => [
+                'label' => 'Nonaktifkan (INACTIVE)',
+                'icon' => 'heroicon-o-no-symbol',
+                'color' => 'danger',
+                'requiresConfirmation' => true,
+            ],
         ];
+    }
+
+    public static function canViewAny(?User $user = null): bool
+    {
+        $user ??= auth()->user();
+        return $user !== null && $user->can('spot.manage');
+    }
+
+    public static function paginateRecords(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    {
+        return app(FeedingSpotManagementService::class)->paginateAdminSpots($filters, $perPage);
+    }
+
+    public static function createRecord(array $data, ?User $actor = null): FeedingSpot
+    {
+        return app(FeedingSpotManagementService::class)->createSpot($data, $actor ?? auth()->user());
+    }
+
+    public static function updateRecord(FeedingSpot $spot, array $data, ?User $actor = null): FeedingSpot
+    {
+        return app(FeedingSpotManagementService::class)->updateSpot($spot, $data, $actor ?? auth()->user());
+    }
+
+    public static function regenerateQrToken(FeedingSpot $spot, ?User $actor = null): FeedingSpot
+    {
+        return app(FeedingSpotManagementService::class)->regenerateQr($spot, $actor ?? auth()->user());
     }
 }

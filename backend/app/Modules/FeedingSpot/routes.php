@@ -5,6 +5,13 @@ use App\Modules\FeedingSpot\Controllers\AdminFeedingSpotController;
 use App\Modules\FeedingSpot\Controllers\FeedingSpotController;
 use Illuminate\Support\Facades\Route;
 
+if (empty(config('permission.column_names.role_pivot_key'))) {
+    config([
+        'permission.column_names.role_pivot_key' => 'role_id',
+        'permission.column_names.permission_pivot_key' => 'permission_id',
+    ]);
+}
+
 /*
 |--------------------------------------------------------------------------
 | Adopt Feeding Spot (AFS) Routes — /api/v1/feeding/* & /api/v1/admin/feeding/*
@@ -17,8 +24,14 @@ Route::prefix('feeding')->group(function () {
     Route::get('/spots/{id}', [FeedingSpotController::class, 'showSpot']);
     Route::get('/heatmap', [FeedingSpotController::class, 'heatmap']);
 
-    // Panel Admin Filament Browser Preview (MEOW-21 & MEOW-22)
+    // Panel Admin Filament Browser Preview & CRUD (MEOW-21 & MEOW-22)
+    Route::get('/assets/logo.jpg', [AdminFeedingSpotController::class, 'serveLogoAsset']);
     Route::get('/admin-preview', [AdminFeedingSpotController::class, 'adminPreviewPanel']);
+    Route::post('/admin-preview/spots', [AdminFeedingSpotController::class, 'adminPreviewStoreSpot']);
+    Route::post('/admin-preview/spots/{id}/update', [AdminFeedingSpotController::class, 'adminPreviewUpdateSpot']);
+    Route::post('/admin-preview/spots/{id}/qr', [AdminFeedingSpotController::class, 'adminPreviewRegenerateQr']);
+    Route::post('/admin-preview/spots/{id}/cats', [AdminFeedingSpotController::class, 'adminPreviewAttachCat']);
+    Route::post('/admin-preview/spots/{id}/cats/{catId}/detach', [AdminFeedingSpotController::class, 'adminPreviewDetachCat']);
     Route::get('/admin-preview/reviews/{id}', [AdminFeedingSpotController::class, 'adminPreviewReview']);
     Route::post('/admin-preview/activities/{id}/review', [AdminFeedingSpotController::class, 'adminPreviewSubmitReview']);
     Route::get('/admin-preview/spots/{id}/qr-sheet', [AdminFeedingSpotController::class, 'adminPreviewQrSheet']);
@@ -41,12 +54,17 @@ Route::get('/admin/feeding/evidence/{mediaId}/file', [AdminFeedingSpotController
     ->name('admin.feeding.evidence.file');
 
 // Admin Endpoints — /api/v1/admin/feeding/*
+// Memakai permission spot.manage dan feeding.review (bukan pengecekan string role).
+// Tidak ada DELETE spot: menonaktifkan spot dilakukan dengan PATCH status menjadi INACTIVE.
 Route::prefix('admin/feeding')->middleware('auth:sanctum')->group(function () {
-    // Kelola Spot & QR (Permission: spot.manage) (MEOW-7, MEOW-21, MEOW-23)
+    // Kelola Spot & QR (Permission: spot.manage) (AFS-01, Bagian 8.4, MEOW-7, MEOW-21, MEOW-23)
     Route::middleware('can:spot.manage')->group(function () {
+        Route::get('/spots', [AdminFeedingSpotController::class, 'indexSpots']);
+        Route::get('/spots/{id}', [AdminFeedingSpotController::class, 'showSpot']);
         Route::post('/spots', [AdminFeedingSpotController::class, 'storeSpot']);
         Route::patch('/spots/{id}', [AdminFeedingSpotController::class, 'updateSpot']);
         Route::post('/spots/{id}/qr', [AdminFeedingSpotController::class, 'regenerateQr']);
+        Route::post('/spots/{id}/qr/regenerate', [AdminFeedingSpotController::class, 'regenerateQr']);
         Route::get('/spots/{id}/qr-sheet', [AdminFeedingSpotController::class, 'printQrSheet'])->name('admin.feeding.spots.qr-sheet');
         Route::get('/spots/{id}/cats', [AdminFeedingSpotController::class, 'getSpotCats']);
         Route::post('/spots/{id}/cats', [AdminFeedingSpotController::class, 'attachCats']);

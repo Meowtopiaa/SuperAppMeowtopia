@@ -12,6 +12,7 @@ use App\Modules\FeedingSpot\Models\FeedingReview;
 use App\Modules\FeedingSpot\Models\FeedingRuleResult;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -120,6 +121,13 @@ class FeedingReviewService
         string $decision,
         ?string $reason
     ): array {
+        if (empty(config('permission.column_names.role_pivot_key'))) {
+            config([
+                'permission.column_names.role_pivot_key' => 'role_id',
+                'permission.column_names.permission_pivot_key' => 'permission_id',
+            ]);
+        }
+
         if (!$reviewer->can('feeding.review')) {
             throw new HttpException(403, 'Anda tidak memiliki izin feeding.review.');
         }
@@ -174,6 +182,9 @@ class FeedingReviewService
         }
 
         return DB::transaction(function () use ($activity, $reviewer, $decision, $trimmedReason) {
+            $oldStatus = $activity->status;
+            $oldRewardStatus = $activity->reward_status;
+
             FeedingReview::create([
                 'activity_id' => $activity->id,
                 'reviewer_id' => $reviewer->id,
@@ -195,10 +206,11 @@ class FeedingReviewService
                 $rewardCapped = (bool) ($award['reward_capped'] ?? false) || ($formulaSnapshot['reward_capped'] ?? false);
                 $pointsAwarded = $rewardCapped ? 0 : (int) ($award['points'] ?? 0);
                 $snapshot = $activity->reward_snapshot ?? [];
+                $newRewardStatus = $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE';
 
                 $activity->update([
                     'status' => 'VERIFIED',
-                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
+                    'reward_status' => $newRewardStatus,
                     'potential_points' => $pointsAwarded,
                     'reward_snapshot' => array_merge($snapshot, $formulaSnapshot, [
                         'points_awarded' => $pointsAwarded,
@@ -208,6 +220,18 @@ class FeedingReviewService
                     ]),
                 ]);
 
+                $this->recordReviewAuditLog(
+                    activity: $activity,
+                    reviewer: $reviewer,
+                    action: 'FEEDING_REVIEW_APPROVED',
+                    oldStatus: $oldStatus,
+                    oldRewardStatus: $oldRewardStatus,
+                    newStatus: 'VERIFIED',
+                    newRewardStatus: $newRewardStatus,
+                    pointsAwarded: $pointsAwarded,
+                    reason: $trimmedReason
+                );
+
                 $this->refreshSpotAggregate($activity->spot_id);
                 event(new FeedingVerified($activity->fresh()));
 
@@ -215,7 +239,7 @@ class FeedingReviewService
                     'activity_id' => $activity->id,
                     'decision' => 'VERIFIED',
                     'status' => 'VERIFIED',
-                    'reward_status' => $pointsAwarded > 0 ? 'CREDITED' : 'NOT_ELIGIBLE',
+                    'reward_status' => $newRewardStatus,
                     'points_awarded' => $pointsAwarded,
                     'credited_points' => $pointsAwarded,
                     'reward_capped' => $rewardCapped,
@@ -233,6 +257,19 @@ class FeedingReviewService
                     $reviewer->id
                 );
                 $activity->update(['status' => 'REJECTED']);
+
+                $this->recordReviewAuditLog(
+                    activity: $activity,
+                    reviewer: $reviewer,
+                    action: 'FEEDING_REVIEW_REJECTED',
+                    oldStatus: $oldStatus,
+                    oldRewardStatus: $oldRewardStatus,
+                    newStatus: 'REJECTED',
+                    newRewardStatus: 'REVERSED',
+                    pointsAwarded: 0,
+                    reason: $trimmedReason
+                );
+
                 $this->refreshSpotAggregate($activity->spot_id);
 
                 return [
@@ -260,6 +297,18 @@ class FeedingReviewService
                 ]),
             ]);
 
+            $this->recordReviewAuditLog(
+                activity: $activity,
+                reviewer: $reviewer,
+                action: 'FEEDING_REVIEW_REJECTED',
+                oldStatus: $oldStatus,
+                oldRewardStatus: $oldRewardStatus,
+                newStatus: 'REJECTED',
+                newRewardStatus: 'NOT_ELIGIBLE',
+                pointsAwarded: 0,
+                reason: $trimmedReason
+            );
+
             $this->refreshSpotAggregate($activity->spot_id);
 
             return [
@@ -274,6 +323,55 @@ class FeedingReviewService
                 'reviewed_at' => now()->toIso8601String(),
             ];
         });
+    }
+
+    /**
+     * Catat keputusan review (VERIFIED / REJECTED) ke dalam tabel audit_logs.
+     */
+    private function recordReviewAuditLog(
+        FeedingActivity $activity,
+        User $reviewer,
+        string $action,
+        string $oldStatus,
+        string $oldRewardStatus,
+        string $newStatus,
+        string $newRewardStatus,
+        int $pointsAwarded,
+        string $reason
+    ): void {
+        $spot = $activity->relationLoaded('spot') ? $activity->spot : $activity->spot()->first();
+        $feeder = $activity->relationLoaded('user') ? $activity->user : $activity->user()->first();
+
+        DB::table('audit_logs')->insert([
+            'id' => (string) Str::ulid(),
+            'actor_id' => $reviewer->id,
+            'action' => $action,
+            'subject_type' => 'feeding_activity',
+            'subject_id' => $activity->id,
+            'result' => 'SUCCESS',
+            'reason' => json_encode([
+                'old' => [
+                    'status' => $oldStatus,
+                    'reward_status' => $oldRewardStatus,
+                ],
+                'new' => [
+                    'status' => $newStatus,
+                    'reward_status' => $newRewardStatus,
+                    'points_awarded' => $pointsAwarded,
+                    'review_reason' => $reason,
+                    'feeding_record_ref' => $activity->feeding_record_ref,
+                    'spot_id' => $spot?->id,
+                    'spot_code' => $spot?->code,
+                    'spot_name' => $spot?->name,
+                    'feeder_name' => $feeder?->name ?? 'Relawan Kampus',
+                    'food_type' => $activity->food_type,
+                    'food_amount' => $activity->food_amount,
+                ],
+                'changed_fields' => ['status', 'reward_status', 'review_reason'],
+            ], JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     /**
