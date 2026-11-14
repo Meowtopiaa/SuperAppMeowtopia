@@ -138,51 +138,29 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                     TextButton.icon(
                       onPressed: () => showDialog<void>(
                         context: context,
-                        builder: (dialog) => Dialog(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Expanded(
-                                      child: Text(
-                                        'Peta spot kampus',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Tutup peta',
-                                      onPressed: () => Navigator.pop(dialog),
-                                      icon: const Icon(Icons.close_rounded),
-                                    ),
-                                  ],
-                                ),
-                                InteractiveViewer(
-                                  minScale: 1,
-                                  maxScale: 3,
-                                  child: CampusSpotMap(
-                                    spots: provider.spots,
-                                    selectedId: spot.id,
-                                    isDemo: provider.isDemo,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Cubit untuk memperbesar skema lokasi.',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
+                        useSafeArea: false,
+                        builder: (dialog) => Scaffold(
+                          backgroundColor: Colors.black,
+                          appBar: AppBar(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            title: const Text('Peta Spot Telkom University'),
+                            leading: IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => Navigator.pop(dialog),
                             ),
+                          ),
+                          body: CampusSpotMap(
+                            spots: provider.spots,
+                            selectedId: spot.id,
+                            isDemo: provider.isDemo,
+                            isFullScreen: true,
                           ),
                         ),
                       ),
-                      icon: const Icon(Icons.open_in_full_rounded, size: 13),
+                      icon: const Icon(Icons.fullscreen_rounded, size: 16),
                       label: const Text(
-                        'Perbesar',
+                        'Layar Penuh',
                         style: TextStyle(fontSize: 11),
                       ),
                     ),

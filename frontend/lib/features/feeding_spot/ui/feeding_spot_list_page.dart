@@ -183,11 +183,47 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(4, 2, 4, 12),
-                      child: SectionTitle(
-                        'Peta spot kampus',
-                        icon: Icons.layers_outlined,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 2, 4, 12),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: SectionTitle(
+                              'Peta spot kampus',
+                              icon: Icons.layers_outlined,
+                            ),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => showDialog<void>(
+                              context: context,
+                              useSafeArea: false,
+                              builder: (dialog) => Scaffold(
+                                backgroundColor: Colors.black,
+                                appBar: AppBar(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: Colors.white,
+                                  title: const Text('Peta Spot Telkom University'),
+                                  leading: IconButton(
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () => Navigator.pop(dialog),
+                                  ),
+                                ),
+                                body: CampusSpotMap(
+                                  spots: provider.spots,
+                                  isDemo: provider.isDemo,
+                                  isFullScreen: true,
+                                ),
+                              ),
+                            ),
+                            icon: const Icon(Icons.fullscreen_rounded, size: 16),
+                            label: const Text('Layar Penuh', style: TextStyle(fontSize: 11)),
+                          ),
+                        ],
                       ),
                     ),
                     CampusSpotMap(
