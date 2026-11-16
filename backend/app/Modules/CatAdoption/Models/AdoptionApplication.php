@@ -2,18 +2,49 @@
 
 namespace App\Modules\CatAdoption\Models;
 
+use App\Models\User;
+use App\Modules\Cat\Models\Cat;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\User;
-use App\Modules\Cat\Models\Cat;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * Aplikasi kelayakan adopter (PRD 5.2). Terpisah dari transaksi adopsi (FIX-06):
+ * cat_id boleh kosong dan APPROVED bukan adopsi aktif.
+ */
 class AdoptionApplication extends Model
 {
     use HasFactory, HasUlids;
 
+    public const STATUS_DRAFT = 'DRAFT';
+    public const STATUS_SUBMITTED = 'SUBMITTED';
+    public const STATUS_REVISION_REQUESTED = 'REVISION_REQUESTED';
+    public const STATUS_APPROVED = 'APPROVED';
+    public const STATUS_REJECTED = 'REJECTED';
+
+    public const STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_SUBMITTED,
+        self::STATUS_REVISION_REQUESTED,
+        self::STATUS_APPROVED,
+        self::STATUS_REJECTED,
+    ];
+
+    /** Status yang masih bisa diubah oleh pemohon. */
+    public const EDITABLE_STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_REVISION_REQUESTED,
+    ];
+
     protected $keyType = 'string';
     public $incrementing = false;
+
+    protected $attributes = [
+        'status' => self::STATUS_DRAFT,
+    ];
 
     protected $fillable = [
         'applicant_id',
@@ -26,7 +57,7 @@ class AdoptionApplication extends Model
         'commitment_version',
         'commitment_accepted_at',
         'precheck_passed',
-        'status',             // DRAFT, SUBMITTED, REVISION_REQUESTED, APPROVED, REJECTED
+        'status',
         'submitted_at',
         'reviewed_by',
         'reviewed_at',
@@ -43,13 +74,34 @@ class AdoptionApplication extends Model
         'reviewed_at' => 'datetime',
     ];
 
-    public function applicant()
+    public function applicant(): BelongsTo
     {
         return $this->belongsTo(User::class, 'applicant_id');
     }
 
-    public function cat()
+    public function cat(): BelongsTo
     {
-        return $this->belongsTo(Cat::class);
+        return $this->belongsTo(Cat::class, 'cat_id');
+    }
+
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /** Foto tempat tinggal (privat: hanya pemilik dan adoption_admin). */
+    public function media(): HasMany
+    {
+        return $this->hasMany(AdoptionApplicationMedia::class, 'application_id');
+    }
+
+    public function adoption(): HasOne
+    {
+        return $this->hasOne(Adoption::class, 'application_id');
+    }
+
+    public function isEditable(): bool
+    {
+        return in_array($this->status, self::EDITABLE_STATUSES, true);
     }
 }
