@@ -24,9 +24,7 @@ class AdoptionApplicationController extends Controller
             // Kunci baris user agar dua permintaan bersamaan tidak membuat dua aplikasi.
             User::whereKey($user->id)->lockForUpdate()->first();
 
-            $hasOpen = AdoptionApplication::where('applicant_id', $user->id)
-                ->where('status', '<>', AdoptionApplication::STATUS_REJECTED)
-                ->exists();
+            $hasOpen = AdoptionApplication::where('applicant_id', $user->id)->blocking()->exists();
 
             if ($hasOpen) {
                 return null;

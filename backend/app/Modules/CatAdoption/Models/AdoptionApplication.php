@@ -4,6 +4,7 @@ namespace App\Modules\CatAdoption\Models;
 
 use App\Models\User;
 use App\Modules\Cat\Models\Cat;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +39,9 @@ class AdoptionApplication extends Model
         self::STATUS_DRAFT,
         self::STATUS_REVISION_REQUESTED,
     ];
+
+    /** Masa berlaku kelayakan APPROVED (PRD OQ-09). shortcut: konstanta, pindah ke pengaturan adopsi bila tabelnya ada. */
+    public const ELIGIBILITY_VALID_DAYS = 30;
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -98,6 +102,17 @@ class AdoptionApplication extends Model
     public function adoption(): HasOne
     {
         return $this->hasOne(Adoption::class, 'application_id');
+    }
+
+    /** Aplikasi yang masih berjalan atau kelayakan APPROVED yang belum kedaluwarsa. */
+    public function scopeBlocking(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereIn('status', [self::STATUS_DRAFT, self::STATUS_SUBMITTED, self::STATUS_REVISION_REQUESTED])
+                ->orWhere(fn (Builder $approved) => $approved
+                    ->where('status', self::STATUS_APPROVED)
+                    ->where('reviewed_at', '>', now()->subDays(self::ELIGIBILITY_VALID_DAYS)));
+        });
     }
 
     public function isEditable(): bool

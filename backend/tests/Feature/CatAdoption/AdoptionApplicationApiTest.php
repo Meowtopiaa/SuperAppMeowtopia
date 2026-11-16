@@ -78,6 +78,34 @@ class AdoptionApplicationApiTest extends TestCase
         $this->assertSame(2, AdoptionApplication::count());
     }
 
+    public function test_valid_approval_blocks_new_draft(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        AdoptionApplication::create([
+            'applicant_id' => $user->id,
+            'status' => AdoptionApplication::STATUS_APPROVED,
+            'reviewed_at' => now()->subDays(AdoptionApplication::ELIGIBILITY_VALID_DAYS - 1),
+        ]);
+
+        $this->postDraft()->assertStatus(409)->assertJsonPath('code', 'CONFLICT');
+    }
+
+    public function test_new_draft_allowed_after_approval_expires(): void
+    {
+        // OQ-09: kelayakan APPROVED berlaku 30 hari.
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        AdoptionApplication::create([
+            'applicant_id' => $user->id,
+            'status' => AdoptionApplication::STATUS_APPROVED,
+            'reviewed_at' => now()->subDays(AdoptionApplication::ELIGIBILITY_VALID_DAYS + 1),
+        ]);
+
+        $this->postDraft()->assertCreated();
+        $this->assertSame(2, AdoptionApplication::count());
+    }
+
     public function test_draft_rejects_cat_id_and_invalid_fields(): void
     {
         Sanctum::actingAs(User::factory()->create());
