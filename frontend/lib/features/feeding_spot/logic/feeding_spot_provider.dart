@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/scanner/qr_parser.dart';
 import '../data/demo_feeding_data.dart';
 import '../data/feeding_session.dart';
 import '../data/feeding_spot_model.dart';
@@ -225,18 +226,32 @@ class FeedingSpotProvider extends ChangeNotifier {
       }
     }
 
+    final parsed = parseQr(token);
+    if (parsed.kind == QrKind.cat || token.toUpperCase().startsWith('CAT')) {
+      throw StateError(
+        'QR_WRONG_TYPE: Kode QR yang dipindai adalah QR kalung kucing, bukan QR feeding spot. Pindai QR spot resmi (MTP1.S.*).',
+      );
+    }
+    if (token.startsWith('MTP1.') && parsed.kind == QrKind.unknown) {
+      throw StateError(
+        'QR_INVALID: Format QR tidak dikenali. Gunakan QR resmi titik pakan (MTP1.S.*) atau kode manual spot.',
+      );
+    }
+
     FeedingSpotModel? match;
     for (final spot in spots) {
       if (spot.qrToken == token ||
-          'SPOT:${spot.code}' == token ||
-          'MTP1.S.${spot.code}' == token ||
-          spot.code == token) {
+          spot.qrToken == 'MTP1.S.${parsed.value}' ||
+          'SPOT:${spot.code}' == token.toUpperCase() ||
+          'MTP1.S.${spot.code}' == token.toUpperCase() ||
+          spot.code.toUpperCase() == token.toUpperCase() ||
+          spot.code.toUpperCase() == parsed.value.toUpperCase()) {
         match = spot;
       }
     }
     if (match == null) {
       throw StateError(
-        'QR tidak dikenali sebagai QR spot. Gunakan QR resmi di lokasi.',
+        'QR_INVALID: Kode QR atau kode manual spot tidak terdaftar. Gunakan QR resmi di lokasi atau periksa kembali kode manual spot.',
       );
     }
     if (expectedSpotId != null &&
@@ -391,10 +406,14 @@ class FeedingSpotProvider extends ChangeNotifier {
         case 'SESSION_EXPIRED':
           return 'Sesi pemberian makan telah kedaluwarsa. Silakan pindai ulang QR di spot.';
         case 'QR_WRONG_TYPE':
-          return 'Kode QR tidak sesuai. Pastikan Anda memindai kode QR resmi titik pakan (MTP1.S.*).';
+          return 'QR_WRONG_TYPE: Kode QR yang dipindai adalah QR kalung kucing, bukan QR titik pakan. Pastikan Anda memindai kode QR resmi titik pakan (MTP1.S.*).';
+        case 'QR_REVOKED':
+          return 'QR_REVOKED: Kode QR spot ini sudah dicabut atau diganti oleh admin. Silakan pindai stiker QR terbaru di lokasi atau masukkan kode manual spot.';
+        case 'QR_INVALID':
+          return 'QR_INVALID: Kode QR atau kode manual spot tidak valid. Pastikan Anda memindai QR resmi Meowtopia atau periksa kode manual spot.';
         case 'SPOT_UNAVAILABLE':
         case 'SPOT_NOT_FOUND':
-          return 'Spot pakan ini sedang dalam perawatan atau sementara tidak tersedia.';
+          return 'SPOT_UNAVAILABLE: Spot pakan ini sedang dalam perawatan atau sementara tidak tersedia.';
         case 'DAILY_CAP_REACHED':
           return 'Batas reward harian Anda telah tercapai. Anda tetap dapat memberi makan, namun poin tidak bertambah hari ini.';
         case 'IDEMPOTENCY_CONFLICT':
