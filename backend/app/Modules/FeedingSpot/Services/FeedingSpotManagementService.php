@@ -5,9 +5,12 @@ namespace App\Modules\FeedingSpot\Services;
 use App\Models\User;
 use App\Modules\FeedingSpot\Models\FeedingActivity;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
+use App\Modules\FeedingSpot\Models\FeedingSpotHistory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class FeedingSpotManagementService
@@ -407,6 +410,56 @@ class FeedingSpotManagementService
     }
 
     /**
+     * Hasilkan kode spot unik secara otomatis berdasarkan lokasi denah kampus (MEOW-29).
+     * Format: <CODE_PREFIX>-<NN> (contoh: SPOT-TULT-01, SPOT-GKU-02, SPOT-MSU-01).
+     * Aman terhadap kondisi paralel/konkurensi dengan pemeriksaan keunikan di database.
+     */
+    public function generateUniqueSpotCode(
+        float $latitude,
+        float $longitude,
+        ?string $preferredPrefix = null
+    ): string {
+        if ($preferredPrefix !== null && trim($preferredPrefix) !== '') {
+            $prefix = strtoupper(trim($preferredPrefix));
+            $prefix = rtrim($prefix, '-');
+        } else {
+            $campusLoc = self::resolveCampusLocation($latitude, $longitude);
+            $prefix = strtoupper((string) ($campusLoc['code_prefix'] ?? 'SPOT-TELU'));
+        }
+
+        if (!str_starts_with($prefix, 'SPOT-') && !str_starts_with($prefix, 'FS-')) {
+            $prefix = 'SPOT-' . $prefix;
+        }
+
+        $existingCodes = FeedingSpot::query()
+            ->where('code', 'like', $prefix . '-%')
+            ->lockForUpdate()
+            ->pluck('code')
+            ->all();
+
+        $maxSeq = 0;
+        $pattern = '/^' . preg_quote($prefix, '/') . '-(\d+)$/i';
+        foreach ($existingCodes as $existing) {
+            if (preg_match($pattern, (string) $existing, $matches)) {
+                $num = (int) $matches[1];
+                if ($num > $maxSeq) {
+                    $maxSeq = $num;
+                }
+            }
+        }
+
+        $nextSeq = $maxSeq + 1;
+        while (true) {
+            $suffix = str_pad((string) $nextSeq, 2, '0', STR_PAD_LEFT);
+            $candidate = "{$prefix}-{$suffix}";
+            if (!FeedingSpot::query()->where('code', $candidate)->exists()) {
+                return $candidate;
+            }
+            $nextSeq++;
+        }
+    }
+
+    /**
      * Polygon Perimeter Resmi Wilayah Kampus Telkom University Bandung
      * (76 titik presisi OSM Way 557649490 + Kantin Teknik, sinkron dengan Flutter CampusSpotMap).
      */
@@ -658,50 +711,112 @@ class FeedingSpotManagementService
             ->all();
 
         $detail['audit_logs'] = $this->getSpotAuditLogs($spot->id, 15);
+        $detail['histories'] = Schema::hasTable('feeding_spot_histories')
+            ? FeedingSpotHistory::query()
+                ->where('spot_id', $spot->id)
+                ->with('actor:id,name')
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get()
+                ->map(fn (FeedingSpotHistory $h) => [
+                    'id' => $h->id,
+                    'spot_id' => $h->spot_id,
+                    'actor_id' => $h->actor_id,
+                    'actor_name' => $h->actor?->name ?? 'Sistem / Admin',
+                    'action' => $h->action,
+                    'changes' => $h->changes,
+                    'reason' => $h->reason,
+                    'created_at' => $h->created_at?->toIso8601String(),
+                ])
+                ->values()
+                ->all()
+            : [];
 
         return $detail;
     }
 
     /**
-     * Buat titik feeding spot baru dan catat di audit_logs.
+     * Buat titik feeding spot baru, hasilkan kode spot unik otomatis bila tidak ditentukan,
+     * serta catat di feeding_spot_histories & audit_logs dalam transaksi yang sama (MEOW-29).
      */
     public function createSpot(array $data, ?User $actor = null): FeedingSpot
     {
-        return DB::transaction(function () use ($data, $actor) {
-            $status = strtoupper(trim((string) ($data['status'] ?? 'ACTIVE')));
-            $statusReason = isset($data['status_reason']) && trim((string) $data['status_reason']) !== ''
-                ? trim((string) $data['status_reason'])
-                : null;
+        $attempts = 0;
+        $rawInputCode = isset($data['code']) ? strtoupper(trim((string) $data['code'])) : '';
+        $forceAutoCode = !empty($data['auto_code']) || $rawInputCode === '';
 
-            $spot = FeedingSpot::create([
-                'code' => strtoupper(trim((string) $data['code'])),
-                'name' => trim((string) $data['name']),
-                'description' => isset($data['description']) && trim((string) $data['description']) !== ''
-                    ? trim((string) $data['description'])
-                    : null,
-                'latitude' => (float) $data['latitude'],
-                'longitude' => (float) $data['longitude'],
-                'territory_id' => !empty($data['territory_id']) ? (string) $data['territory_id'] : null,
-                'qr_token' => Str::random(32),
-                'status' => $status,
-                'status_reason' => $status === 'ACTIVE' ? null : $statusReason,
-            ]);
+        while (true) {
+            $attempts++;
+            try {
+                return DB::transaction(function () use ($data, $actor, $rawInputCode, $forceAutoCode) {
+                    $lat = (float) $data['latitude'];
+                    $lng = (float) $data['longitude'];
 
-            $this->recordAuditLog(
-                actor: $actor,
-                action: 'SPOT_CREATED',
-                spotId: $spot->id,
-                oldValues: null,
-                newValues: $this->extractSnapshot($spot)
-            );
+                    $code = $forceAutoCode
+                        ? $this->generateUniqueSpotCode($lat, $lng)
+                        : $rawInputCode;
 
-            return $spot;
-        });
+                    $status = strtoupper(trim((string) ($data['status'] ?? 'ACTIVE')));
+                    $statusReason = isset($data['status_reason']) && trim((string) $data['status_reason']) !== ''
+                        ? trim((string) $data['status_reason'])
+                        : null;
+
+                    $territoryId = !empty($data['territory_id']) ? (string) $data['territory_id'] : null;
+                    if ($territoryId === null) {
+                        $campusLoc = self::resolveCampusLocation($lat, $lng, $code);
+                        $tCode = $campusLoc['territory_code'] ?? null;
+                        if ($tCode) {
+                            $territoryId = DB::table('territories')->where('code', $tCode)->value('id');
+                        }
+                    }
+
+                    $spot = FeedingSpot::create([
+                        'code' => $code,
+                        'name' => trim((string) $data['name']),
+                        'description' => isset($data['description']) && trim((string) $data['description']) !== ''
+                            ? trim((string) $data['description'])
+                            : null,
+                        'latitude' => $lat,
+                        'longitude' => $lng,
+                        'territory_id' => $territoryId,
+                        'qr_token' => Str::random(32),
+                        'status' => $status,
+                        'status_reason' => $status === 'ACTIVE' ? null : $statusReason,
+                    ]);
+
+                    $snapshot = $this->extractSnapshot($spot);
+
+                    $this->recordSpotHistory(
+                        spotId: $spot->id,
+                        actor: $actor,
+                        action: 'CREATED',
+                        oldValues: null,
+                        newValues: $snapshot,
+                        reason: $spot->status_reason
+                    );
+
+                    $this->recordAuditLog(
+                        actor: $actor,
+                        action: 'SPOT_CREATED',
+                        spotId: $spot->id,
+                        oldValues: null,
+                        newValues: $snapshot
+                    );
+
+                    return $spot;
+                });
+            } catch (UniqueConstraintViolationException $e) {
+                if (!$forceAutoCode || $attempts >= 3) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     /**
      * Perbarui lokasi, informasi, atau status spot (termasuk nonaktifkan ke INACTIVE tanpa hapus)
-     * serta catat perubahan (aktor, waktu, nilai lama dan baru) di audit_logs.
+     * serta catat perubahan (aktor, waktu, nilai lama dan baru) di feeding_spot_histories & audit_logs.
+     * Kode spot dipertahankan tetap sama ketika spot diedit.
      */
     public function updateSpot(FeedingSpot $spot, array $data, ?User $actor = null): FeedingSpot
     {
@@ -710,9 +825,6 @@ class FeedingSpotManagementService
 
             $updates = [];
 
-            if (array_key_exists('code', $data)) {
-                $updates['code'] = strtoupper(trim((string) $data['code']));
-            }
             if (array_key_exists('name', $data)) {
                 $updates['name'] = trim((string) $data['name']);
             }
@@ -751,16 +863,32 @@ class FeedingSpotManagementService
             $locationChanged = (float) $oldValues['latitude'] !== (float) $newValues['latitude']
                 || (float) $oldValues['longitude'] !== (float) $newValues['longitude'];
 
-            $action = match (true) {
+            $auditAction = match (true) {
                 $statusChanged && $locationChanged => 'SPOT_LOCATION_AND_STATUS_CHANGED',
                 $statusChanged => 'SPOT_STATUS_CHANGED',
                 $locationChanged => 'SPOT_LOCATION_CHANGED',
                 default => 'SPOT_UPDATED',
             };
 
+            $historyAction = match (true) {
+                $statusChanged && $newValues['status'] === 'INACTIVE' => 'DEACTIVATED',
+                $statusChanged && $oldValues['status'] === 'INACTIVE' && $newValues['status'] === 'ACTIVE' => 'REACTIVATED',
+                $statusChanged && $newValues['status'] === 'TEMPORARILY_UNAVAILABLE' => 'MARKED_UNAVAILABLE',
+                default => 'UPDATED',
+            };
+
+            $this->recordSpotHistory(
+                spotId: $spot->id,
+                actor: $actor,
+                action: $historyAction,
+                oldValues: $oldValues,
+                newValues: $newValues,
+                reason: $newValues['status_reason'] ?? null
+            );
+
             $this->recordAuditLog(
                 actor: $actor,
-                action: $action,
+                action: $auditAction,
                 spotId: $spot->id,
                 oldValues: $oldValues,
                 newValues: $newValues
@@ -771,7 +899,7 @@ class FeedingSpotManagementService
     }
 
     /**
-     * Regenerasi token QR spot dan catat di audit_logs.
+     * Regenerasi token QR spot dan catat di feeding_spot_histories & audit_logs.
      */
     public function regenerateQr(FeedingSpot $spot, ?User $actor = null): FeedingSpot
     {
@@ -781,6 +909,20 @@ class FeedingSpotManagementService
 
             $spot->update(['qr_token' => $newToken]);
             $spot->refresh();
+
+            // MEOW-29: Token QR tidak disimpan di kolom changes pada feeding_spot_histories; cukup tercatat bahwa QR diganti.
+            if (Schema::hasTable('feeding_spot_histories')) {
+                FeedingSpotHistory::create([
+                    'spot_id' => $spot->id,
+                    'actor_id' => $actor?->id,
+                    'action' => 'QR_REGENERATED',
+                    'changes' => [
+                        'qr_regenerated' => true,
+                        'changed_fields' => ['qr_token'],
+                    ],
+                    'reason' => 'Token QR digenerate ulang oleh admin.',
+                ]);
+            }
 
             $this->recordAuditLog(
                 actor: $actor,
@@ -915,6 +1057,49 @@ class FeedingSpotManagementService
             'status' => $spot->status,
             'status_reason' => $spot->status_reason,
         ];
+    }
+
+    private function recordSpotHistory(
+        string $spotId,
+        ?User $actor,
+        string $action,
+        ?array $oldValues,
+        array $newValues,
+        ?string $reason = null
+    ): void {
+        if (!Schema::hasTable('feeding_spot_histories')) {
+            return;
+        }
+
+        $changedFields = [];
+        $oldDiff = [];
+        $newDiff = [];
+
+        if ($oldValues !== null) {
+            foreach ($newValues as $key => $val) {
+                if (($oldValues[$key] ?? null) !== $val) {
+                    $changedFields[] = $key;
+                    $oldDiff[$key] = $oldValues[$key] ?? null;
+                    $newDiff[$key] = $val;
+                }
+            }
+        } else {
+            $changedFields = array_keys($newValues);
+            $oldDiff = null;
+            $newDiff = $newValues;
+        }
+
+        FeedingSpotHistory::create([
+            'spot_id' => $spotId,
+            'actor_id' => $actor?->id,
+            'action' => $action,
+            'changes' => [
+                'old' => $oldDiff,
+                'new' => $newDiff,
+                'changed_fields' => $changedFields,
+            ],
+            'reason' => $reason,
+        ]);
     }
 
     private function recordAuditLog(

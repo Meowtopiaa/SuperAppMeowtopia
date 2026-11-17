@@ -72,7 +72,7 @@ class AdminFeedingSpotController extends Controller
     public function storeSpot(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:64', 'unique:feeding_spots,code'],
+            'code' => ['nullable', 'string', 'max:64', 'unique:feeding_spots,code'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -424,6 +424,7 @@ class AdminFeedingSpotController extends Controller
 
         $allSpotsCount = array_sum($statusCounts);
         $auditLogs = $this->spotService->getSpotAuditLogs(null, 40);
+        $existingSpotCodes = FeedingSpot::query()->pluck('code')->all();
         $availableCats = DB::table('cats')
             ->select(['id', 'unique_code', 'name', 'presence_status', 'health_status'])
             ->orderBy('name')
@@ -437,6 +438,7 @@ class AdminFeedingSpotController extends Controller
             'statusCounts' => $statusCounts,
             'allSpotsCount' => $allSpotsCount,
             'auditLogs' => $auditLogs,
+            'existingSpotCodes' => $existingSpotCodes,
             'availableCats' => $availableCats,
             'telkomBoundary' => FeedingSpotManagementService::TELKOM_BOUNDARY,
             'campusLocations' => FeedingSpotManagementService::CAMPUS_LOCATIONS,
@@ -472,7 +474,7 @@ class AdminFeedingSpotController extends Controller
 
         try {
             $validated = $request->validate([
-                'code' => ['required', 'string', 'max:64', 'unique:feeding_spots,code'],
+                'code' => ['nullable', 'string', 'max:64'],
                 'name' => ['required', 'string', 'max:255'],
                 'description' => ['nullable', 'string', 'max:1000'],
                 'latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -492,6 +494,15 @@ class AdminFeedingSpotController extends Controller
 
         if (!FeedingSpotManagementService::isPointInsideTelkomCampus((float) $validated['latitude'], (float) $validated['longitude'])) {
             return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode('Titik lokasi ditolak: Koordinat berada di luar batas wilayah Kampus Telkom University.'));
+        }
+
+        // Jika kode tidak diisi atau sudah terpakai, hasilkan otomatis di backend (MEOW-29)
+        $submittedCode = isset($validated['code']) ? strtoupper(trim((string) $validated['code'])) : '';
+        if ($submittedCode === '' || FeedingSpot::query()->where('code', $submittedCode)->exists()) {
+            $validated['auto_code'] = true;
+            unset($validated['code']);
+        } else {
+            $validated['code'] = $submittedCode;
         }
 
         if ($request->filled('territory_code')) {

@@ -1747,4 +1747,94 @@ class FeedingSpotTest extends TestCase
             ->assertJsonPath('data.location_number', 1)
             ->assertJsonPath('data.location_name', 'Telkom University Landmark Tower (TULT)');
     }
+
+    public function test_meow_29_automatic_unique_spot_code_and_spot_histories(): void
+    {
+        // 1. Buat spot baru di area TULT tanpa mengirim field code -> otomatis menghasilkan SPOT-TULT-02 (karena SPOT-TULT-01 sudah ada)
+        $tultResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot Pakan TULT Timur',
+                'description' => 'Dekat pintu timur TULT',
+                'latitude' => -6.9693500,
+                'longitude' => 107.6282000,
+                'status' => 'ACTIVE',
+            ]);
+
+        $tultResp->assertStatus(201)
+            ->assertJsonPath('data.code', 'SPOT-TULT-02');
+
+        $spotId = $tultResp->json('data.id');
+
+        // 2. Buat dua spot berurutan di area GKU tanpa code -> menghasilkan SPOT-GKU-01 dan SPOT-GKU-02 secara unik
+        $gku1 = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot GKU Utara',
+                'latitude' => -6.9719500,
+                'longitude' => 107.6295500,
+            ]);
+        $gku1->assertStatus(201)
+            ->assertJsonPath('data.code', 'SPOT-GKU-01');
+
+        $gku2 = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot GKU Selatan',
+                'latitude' => -6.9719800,
+                'longitude' => 107.6295800,
+            ]);
+        $gku2->assertStatus(201)
+            ->assertJsonPath('data.code', 'SPOT-GKU-02');
+
+        // 3. Saat spot diedit (nama, deskripsi, koordinat, status), kode spot tetap sama (SPOT-TULT-02)
+        $patchResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$spotId}", [
+                'name' => 'Spot Pakan TULT Timur Baru',
+                'status' => 'TEMPORARILY_UNAVAILABLE',
+                'status_reason' => 'Pembersihan berkala',
+            ]);
+        $patchResp->assertStatus(200)
+            ->assertJsonPath('data.code', 'SPOT-TULT-02')
+            ->assertJsonPath('data.name', 'Spot Pakan TULT Timur Baru');
+
+        // 4. Nonaktifkan, aktifkan kembali, dan ganti QR -> semua tercatat di feeding_spot_histories tanpa membocorkan token QR
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$spotId}", [
+                'status' => 'INACTIVE',
+                'status_reason' => 'Relokasi sementara',
+            ])->assertStatus(200);
+
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$spotId}", [
+                'status' => 'ACTIVE',
+            ])->assertStatus(200);
+
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/spots/{$spotId}/qr/regenerate")
+            ->assertStatus(200);
+
+        $histories = \App\Modules\FeedingSpot\Models\FeedingSpotHistory::query()
+            ->where('spot_id', $spotId)
+            ->orderBy('created_at')
+            ->pluck('action')
+            ->all();
+
+        $this->assertEquals([
+            'CREATED',
+            'MARKED_UNAVAILABLE',
+            'DEACTIVATED',
+            'REACTIVATED',
+            'QR_REGENERATED',
+        ], $histories);
+
+        $qrHistory = \App\Modules\FeedingSpot\Models\FeedingSpotHistory::query()
+            ->where('spot_id', $spotId)
+            ->where('action', 'QR_REGENERATED')
+            ->first();
+        $this->assertNotNull($qrHistory);
+        $this->assertStringNotContainsString($tultResp->json('data.qr_token'), json_encode($qrHistory->changes));
+
+        // 5. Kode otomatis dapat dipakai di ScanResolver dan tampil di QR sheet
+        $resolved = app(\App\Modules\Core\Services\ScanResolver::class)->resolve('SPOT-TULT-02');
+        $this->assertEquals('spot', $resolved['type']);
+        $this->assertEquals($spotId, $resolved['id']);
+    }
 }

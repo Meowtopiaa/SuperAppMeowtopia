@@ -71,6 +71,11 @@ class FeedingSpot extends Model
         return $this->hasOne(FeedingAggregate::class, 'spot_id')->latestOfMany('computed_at');
     }
 
+    public function histories(): HasMany
+    {
+        return $this->hasMany(FeedingSpotHistory::class, 'spot_id')->orderByDesc('created_at');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->whereIn('status', ['ACTIVE', 'MAINTENANCE', 'TEMPORARILY_UNAVAILABLE']);
