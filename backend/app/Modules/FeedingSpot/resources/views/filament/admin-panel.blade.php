@@ -22,13 +22,14 @@
             --text-secondary: #475569;
             --text-muted: #64748B;
 
-            /* Professional Navy Blue Sidebar (Point 1) */
-            --sidebar-navy: #1B365D;
-            --sidebar-navy-hover: #244675;
-            --sidebar-navy-border: #2B4F82;
-            --sidebar-text: #DCE6F4;
-            --sidebar-text-muted: #93B0D6;
-            --sidebar-w: 244px;
+            /* Dark Navy Blue Collapsible Sidebar */
+            --sidebar-navy: #0B192C;
+            --sidebar-navy-hover: #152B4A;
+            --sidebar-navy-border: #1C3559;
+            --sidebar-text: #D5E2F2;
+            --sidebar-text-muted: #8AA4C8;
+            --sidebar-w: 248px;
+            --sidebar-collapsed-w: 76px;
 
             /* Functional Action Colors */
             --primary: #EA580C;
@@ -64,7 +65,7 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* ================= NAVY SIDEBAR & EDGE TOGGLE ================= */
+        /* ================= NAVY COLLAPSIBLE SIDEBAR & EDGE TOGGLE ================= */
         .sidebar {
             width: var(--sidebar-w);
             background: var(--sidebar-navy);
@@ -77,20 +78,17 @@
             bottom: 0;
             z-index: 60;
             border-right: 1px solid var(--sidebar-navy-border);
-            transition: transform 0.22s ease;
-        }
-
-        body.sidebar-collapsed .sidebar {
-            transform: translateX(-100%);
+            overflow: visible;
+            transition: width 0.26s cubic-bezier(0.4, 0, 0.2, 1), transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .sidebar-edge-toggle {
             position: fixed;
-            top: 18px;
+            top: 21px;
             left: var(--sidebar-w);
             z-index: 65;
-            width: 24px;
-            height: 40px;
+            width: 22px;
+            height: 34px;
             background: var(--sidebar-navy);
             color: #FFFFFF;
             border: 1px solid var(--sidebar-navy-border);
@@ -103,7 +101,7 @@
             font-size: 13px;
             font-weight: 700;
             line-height: 1;
-            transition: left 0.22s ease, background 0.15s ease;
+            transition: left 0.26s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease;
             user-select: none;
         }
 
@@ -111,30 +109,40 @@
             background: var(--sidebar-navy-hover);
         }
 
-        body.sidebar-collapsed .sidebar-edge-toggle {
-            left: 0;
-        }
-
         .sidebar-brand {
-            padding: 18px 18px;
+            position: relative;
+            padding: 18px 19px;
             border-bottom: 1px solid var(--sidebar-navy-border);
             display: flex;
             align-items: center;
             gap: 12px;
+            min-height: 75px;
+            transition: gap 0.26s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .sidebar-logo {
-            width: 36px;
-            height: 36px;
+            width: 38px;
+            height: 38px;
             border-radius: 8px;
             object-fit: cover;
             flex-shrink: 0;
             background: #FFFFFF;
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+            transition: border-radius 0.26s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.26s ease, box-shadow 0.26s ease;
+        }
+
+        .sidebar-brand-text {
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 170px;
+            opacity: 1;
+            transition: max-width 0.26s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
         }
 
         .sidebar-brand-title {
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 800;
+            letter-spacing: 0.04em;
             color: #FFFFFF;
             line-height: 1.2;
         }
@@ -142,23 +150,24 @@
         .sidebar-brand-sub {
             font-size: 12px;
             color: var(--sidebar-text-muted);
-            margin-top: 1px;
+            margin-top: 2px;
         }
 
         .sidebar-nav {
-            padding: 14px 10px;
+            padding: 14px 12px;
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
         }
 
         .nav-item {
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 9px 12px;
-            border-radius: 6px;
+            padding: 10px 14px;
+            border-radius: 8px;
             color: var(--sidebar-text);
             text-decoration: none;
             font-size: 13.5px;
@@ -169,21 +178,31 @@
             text-align: left;
             cursor: pointer;
             font-family: inherit;
-            transition: background 0.15s ease, color 0.15s ease;
+            transition: background 0.18s ease, color 0.18s ease, padding 0.26s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.18s ease;
         }
 
         .nav-item-label {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
+            gap: 11px;
+            min-width: 0;
+            transition: gap 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-item-text {
+            white-space: nowrap;
+            overflow: hidden;
+            max-width: 150px;
+            opacity: 1;
+            transition: max-width 0.26s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
         }
 
         .nav-icon {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             flex-shrink: 0;
             stroke: currentColor;
-            opacity: 0.9;
+            opacity: 0.92;
         }
 
         .nav-item:hover {
@@ -195,6 +214,7 @@
             background: var(--primary);
             color: #FFFFFF;
             font-weight: 600;
+            box-shadow: 0 4px 12px rgba(234, 88, 12, 0.28);
         }
 
         .nav-count {
@@ -204,10 +224,16 @@
             border-radius: 4px;
             background: rgba(255, 255, 255, 0.14);
             color: #FFFFFF;
+            white-space: nowrap;
+            overflow: hidden;
+            max-width: 48px;
+            opacity: 1;
+            flex-shrink: 0;
+            transition: max-width 0.26s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease, padding 0.26s ease;
         }
 
         .nav-item.active .nav-count {
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.22);
         }
 
         /* ================= MAIN WRAPPER & TOPBAR ================= */
@@ -217,11 +243,95 @@
             min-width: 0;
             display: flex;
             flex-direction: column;
-            transition: margin-left 0.22s ease;
+            transition: margin-left 0.26s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        body.sidebar-collapsed .main-wrapper {
-            margin-left: 0;
+        @media (min-width: 1025px) {
+            body.sidebar-collapsed .sidebar {
+                width: var(--sidebar-collapsed-w);
+            }
+
+            body.sidebar-collapsed .sidebar-edge-toggle {
+                left: var(--sidebar-collapsed-w);
+            }
+
+            body.sidebar-collapsed .main-wrapper {
+                margin-left: var(--sidebar-collapsed-w);
+            }
+
+            body.sidebar-collapsed .sidebar-brand {
+                gap: 0;
+            }
+
+            body.sidebar-collapsed .sidebar-logo {
+                border-radius: 50%;
+                border-color: rgba(255, 255, 255, 0.35);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+            }
+
+            body.sidebar-collapsed .sidebar-brand-text {
+                max-width: 0;
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            body.sidebar-collapsed .nav-item {
+                padding: 10px 17px;
+            }
+
+            body.sidebar-collapsed .nav-item-label {
+                gap: 0;
+            }
+
+            body.sidebar-collapsed .nav-item-text {
+                max-width: 0;
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            body.sidebar-collapsed .nav-count {
+                max-width: 0;
+                opacity: 0;
+                padding: 0;
+                margin: 0;
+                pointer-events: none;
+            }
+
+            /* Custom Tooltip on Collapsed Icons */
+            body.sidebar-collapsed .sidebar .nav-item[data-tooltip]::after,
+            body.sidebar-collapsed .sidebar .sidebar-brand[data-tooltip]::after {
+                content: attr(data-tooltip);
+                position: absolute;
+                left: calc(100% + 12px);
+                top: 50%;
+                transform: translateY(-50%) translateX(-4px);
+                background: #0F172A;
+                color: #F8FAFC;
+                border: 1px solid #334155;
+                padding: 6px 11px;
+                border-radius: 6px;
+                font-size: 12.5px;
+                font-weight: 600;
+                white-space: nowrap;
+                box-shadow: 0 10px 25px -5px rgba(2, 6, 23, 0.45);
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+                z-index: 120;
+                transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+            }
+
+            body.sidebar-collapsed .sidebar .sidebar-brand[data-tooltip]::after {
+                left: calc(100% + 30px);
+            }
+
+            body.sidebar-collapsed .sidebar .nav-item[data-tooltip]:hover::after,
+            body.sidebar-collapsed .sidebar .nav-item[data-tooltip]:focus-visible::after,
+            body.sidebar-collapsed .sidebar .sidebar-brand[data-tooltip]:hover::after {
+                opacity: 1;
+                visibility: visible;
+                transform: translateY(-50%) translateX(0);
+            }
         }
 
         .topbar {
@@ -636,6 +746,32 @@
             border-color: var(--text-muted);
         }
 
+        .btn-icon-only {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 1px solid var(--border-strong);
+            background: var(--surface);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+        }
+
+        .btn-icon-only:hover {
+            background: var(--surface-subtle);
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-icon-only:active {
+            transform: scale(0.96);
+        }
+
         .modal-body {
             padding: 18px 20px;
             overflow-y: auto;
@@ -776,48 +912,48 @@
     ];
 @endphp
 
-    <!-- NAVY BLUE SIDEBAR (POINT 1 & POINT 3: NO ENDPOINT REFERENCES) -->
+    <!-- DARK NAVY COLLAPSIBLE SIDEBAR (ICON-ONLY WHEN COLLAPSED) -->
     <aside class="sidebar" id="appSidebar">
-        <div class="sidebar-brand">
+        <div class="sidebar-brand" data-tooltip="MEOWTOPIA — Feeding Spot">
             <img src="/api/v1/feeding/assets/logo.jpg" alt="Meowtopia" class="sidebar-logo">
-            <div>
-                <div class="sidebar-brand-title">Meowtopia</div>
+            <div class="sidebar-brand-text">
+                <div class="sidebar-brand-title">MEOWTOPIA</div>
                 <div class="sidebar-brand-sub">Feeding Spot</div>
             </div>
         </div>
 
         <nav class="sidebar-nav">
-            <button type="button" class="nav-item {{ $activeTab === 'spots' ? 'active' : '' }}" id="navBtn-spots" onclick="switchTab('spots')">
+            <button type="button" class="nav-item {{ $activeTab === 'spots' ? 'active' : '' }}" id="navBtn-spots" onclick="switchTab('spots')" data-tooltip="Lokasi Feeding Spot ({{ $allSpotsCount }})" aria-label="Lokasi Feeding Spot">
                 <span class="nav-item-label">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
                         <circle cx="12" cy="10" r="3"/>
                     </svg>
-                    <span>Lokasi Feeding Spot</span>
+                    <span class="nav-item-text">Lokasi Feeding Spot</span>
                 </span>
                 <span class="nav-count">{{ $allSpotsCount }}</span>
             </button>
 
-            <button type="button" class="nav-item {{ $activeTab === 'reviews' ? 'active' : '' }}" id="navBtn-reviews" onclick="switchTab('reviews')">
+            <button type="button" class="nav-item {{ $activeTab === 'reviews' ? 'active' : '' }}" id="navBtn-reviews" onclick="switchTab('reviews')" data-tooltip="Antrean Review ({{ $pendingCount }})" aria-label="Antrean Review">
                 <span class="nav-item-label">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
                         <path d="m9 14 2 2 4-4"/>
                     </svg>
-                    <span>Antrean Review</span>
+                    <span class="nav-item-text">Antrean Review</span>
                 </span>
                 <span class="nav-count">{{ $pendingCount }}</span>
             </button>
 
-            <button type="button" class="nav-item {{ $activeTab === 'audit' ? 'active' : '' }}" id="navBtn-audit" onclick="switchTab('audit')">
+            <button type="button" class="nav-item {{ $activeTab === 'audit' ? 'active' : '' }}" id="navBtn-audit" onclick="switchTab('audit')" data-tooltip="Riwayat Audit ({{ count($auditLogs) }})" aria-label="Riwayat Audit">
                 <span class="nav-item-label">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                         <path d="M3 3v5h5"/>
                         <path d="M12 7v5l4 2"/>
                     </svg>
-                    <span>Riwayat Audit</span>
+                    <span class="nav-item-text">Riwayat Audit</span>
                 </span>
                 <span class="nav-count">{{ count($auditLogs) }}</span>
             </button>
@@ -1337,7 +1473,16 @@
                         <div class="form-group full">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <label class="form-label">Pilih Titik Lokasi pada Peta *</label>
-                                <button type="button" class="btn btn-neutral btn-sm" onclick="resetMapToCampusCenter()">Pusatkan Peta</button>
+                                <button type="button" class="btn-icon-only" id="btnCenterMap" onclick="resetMapToCampusCenter()" title="Pusatkan Peta" aria-label="Pusatkan Peta">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <line x1="2" x2="5" y1="12" y2="12"/>
+                                        <line x1="19" x2="22" y1="12" y2="12"/>
+                                        <line x1="12" x2="12" y1="2" y2="5"/>
+                                        <line x1="12" x2="12" y1="19" y2="22"/>
+                                        <circle cx="12" cy="12" r="7"/>
+                                        <circle cx="12" cy="12" r="2.5"/>
+                                    </svg>
+                                </button>
                             </div>
                             <div id="spotPickerMap"></div>
                             <div class="map-info-bar">
@@ -1482,9 +1627,11 @@
             if (window.innerWidth <= 1024) {
                 const isOpen = sidebar.classList.contains('mobile-open');
                 btn.innerHTML = isOpen ? '&lt;' : '&gt;';
+                btn.title = isOpen ? 'Tutup Sidebar' : 'Buka Sidebar';
             } else {
                 const isCollapsed = document.body.classList.contains('sidebar-collapsed');
                 btn.innerHTML = isCollapsed ? '&gt;' : '&lt;';
+                btn.title = isCollapsed ? 'Perluas Sidebar' : 'Kecilkan Sidebar';
             }
         }
 
@@ -1498,7 +1645,7 @@
             }
             syncSidebarToggleSymbol();
             if (pickerMap) {
-                setTimeout(() => pickerMap.invalidateSize(), 240);
+                setTimeout(() => pickerMap.invalidateSize(), 280);
             }
         }
 

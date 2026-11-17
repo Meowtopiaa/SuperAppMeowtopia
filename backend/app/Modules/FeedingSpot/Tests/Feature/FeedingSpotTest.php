@@ -1582,8 +1582,14 @@ class FeedingSpotTest extends TestCase
         $webDashboardResp = $this->get('/api/v1/feeding/admin-preview');
         $webDashboardResp->assertStatus(200)
             ->assertSee('Meowtopia')
+            ->assertSee('MEOWTOPIA')
             ->assertSee('/api/v1/feeding/assets/logo.jpg')
-            ->assertSee('#1B365D')
+            ->assertSee('#0B192C')
+            ->assertSee('--sidebar-collapsed-w: 76px')
+            ->assertSee('border-radius: 50%')
+            ->assertSee('data-tooltip="Lokasi Feeding Spot', false)
+            ->assertSee('id="btnCenterMap"', false)
+            ->assertDontSee('>Pusatkan Peta</button>')
             ->assertSee('Lokasi Feeding Spot')
             ->assertSee('sidebar-edge-toggle')
             ->assertSee('sidebarToggleBtn')
@@ -1660,6 +1666,10 @@ class FeedingSpotTest extends TestCase
         // Halaman detail antrean menampilkan indikator pemeriksaan lengkap (flags & feeding_rule_results)
         $detailPageResp = $this->get("/api/v1/feeding/admin-preview/reviews/{$pendingReviewActivity->id}");
         $detailPageResp->assertStatus(200)
+            ->assertSee('#0B192C')
+            ->assertSee('MEOWTOPIA')
+            ->assertSee('--sidebar-collapsed-w: 76px')
+            ->assertSee('data-tooltip="Antrean Review"', false)
             ->assertSee('REF-TEST-REJECT-001')
             ->assertSee('PHOTO_REUSED')
             ->assertSee('FIRST_TWO_SUBMISSIONS')
@@ -2083,7 +2093,8 @@ class FeedingSpotTest extends TestCase
             ->assertSee($spot2Resp->json('data.qr_payload'));
 
         $this->artisan('feeding:sample-qr')->assertSuccessful();
-        \Illuminate\Support\Facades\Storage::disk('local')->assertExists('qr-spots/SPOT-KTULT-01.svg');
-        \Illuminate\Support\Facades\Storage::disk('local')->assertExists('qr-spots/SPOT-MSU-01.png');
+        $defaultDisk = config('filesystems.default', 'local');
+        \Illuminate\Support\Facades\Storage::disk($defaultDisk)->assertExists('qr-spots/SPOT-KTULT-01.svg');
+        \Illuminate\Support\Facades\Storage::disk($defaultDisk)->assertExists('qr-spots/SPOT-MSU-01.png');
     }
 }
