@@ -1929,4 +1929,161 @@ class FeedingSpotTest extends TestCase
             ->assertJsonPath('data.photo_media_id', null)
             ->assertJsonPath('data.image_url', null);
     }
+
+    public function test_meow_28_qr_code_generation_download_print_regenerate_revocation_and_e2e_scan_scenarios(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $qrService = app(\App\Modules\FeedingSpot\Services\FeedingSpotQrCodeService::class);
+
+        // SCENARIO A — Valid QR (Create Spot -> Auto Code -> Real QR Matrix -> Download SVG/PNG -> Scan E2E)
+        $createResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot Pakan Kantin TULT',
+                'description' => 'Dekat area duduk Kantin TULT',
+                'latitude' => -6.9698500,
+                'longitude' => 107.6281000,
+                'status' => 'ACTIVE',
+            ]);
+
+        $createResp->assertStatus(201);
+        $spotId = $createResp->json('data.id');
+        $spotCode = $createResp->json('data.code');
+        $tokenA = $createResp->json('data.qr_token');
+        $payloadA = "MTP1.S.{$tokenA}";
+
+        $this->assertEquals('SPOT-KTULT-01', $spotCode);
+        $this->assertEquals($payloadA, $createResp->json('data.qr_payload'));
+
+        // Verifikasi matematis: matriks QR yang dirender benar-benar mendekode kembali menjadi MTP1.S.<token>
+        $matrixA = $qrService->generateMatrix($payloadA);
+        $decodedPayloadA = $qrService->decodeMatrix($matrixA);
+        $this->assertEquals($payloadA, $decodedPayloadA);
+
+        // Verifikasi QR Sheet (cetak) & Download QR (PNG & SVG)
+        $sheetResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->get("/api/v1/admin/feeding/spots/{$spotId}/qr-sheet");
+        $sheetResp->assertStatus(200)
+            ->assertSee($spotCode)
+            ->assertSee('Spot Pakan Kantin TULT')
+            ->assertSee($payloadA)
+            ->assertSee('<svg', false)
+            ->assertSee('<path d="M', false);
+
+        $pngDownload = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->get("/api/v1/admin/feeding/spots/{$spotId}/qr-download?format=png");
+        $pngDownload->assertStatus(200)
+            ->assertHeader('Content-Type', 'image/png');
+        $this->assertStringStartsWith("\x89PNG\r\n\x1a\n", $pngDownload->getContent());
+
+        $svgDownload = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->get("/api/v1/admin/feeding/spots/{$spotId}/qr-download?format=svg");
+        $svgDownload->assertStatus(200);
+        $this->assertStringContainsString('<svg', $svgDownload->getContent());
+
+        // Scan QR A -> membuka sesi DRAFT untuk Spot yang tepat
+        $scanValidResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-e2e-scen-a')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => $payloadA,
+            ]);
+        $scanValidResp->assertStatus(201)
+            ->assertJsonPath('data.spot_id', $spotId)
+            ->assertJsonPath('data.spot.code', $spotCode)
+            ->assertJsonPath('data.status', 'DRAFT');
+
+        // SCENARIO B — Wrong QR Type (QR Kucing pada alur pakan -> ditolak QR_WRONG_TYPE)
+        $scanCatResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-e2e-scen-b')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => 'MTP1.C.TOKEN_KUCING_KALUNG_123456',
+            ]);
+        $scanCatResp->assertStatus(422)
+            ->assertJsonPath('code', 'QR_WRONG_TYPE');
+
+        // SCENARIO C — Regenerate QR (Token A dicabut -> QR_REVOKED; Token B valid pada Spot ID yang sama)
+        $regenResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson("/api/v1/admin/feeding/spots/{$spotId}/qr/regenerate");
+        $regenResp->assertStatus(200)
+            ->assertJsonPath('data.spot_id', $spotId)
+            ->assertJsonPath('data.code', $spotCode);
+
+        $tokenB = $regenResp->json('data.qr_token');
+        $payloadB = "MTP1.S.{$tokenB}";
+        $this->assertNotEquals($tokenA, $tokenB);
+
+        // Pastikan data spot tidak berubah akibat regenerate
+        $spotAfterRegen = FeedingSpot::find($spotId);
+        $this->assertEquals($spotCode, $spotAfterRegen->code);
+        $this->assertEquals('Spot Pakan Kantin TULT', $spotAfterRegen->name);
+        $this->assertEquals(-6.9698500, (float) $spotAfterRegen->latitude);
+
+        // Scan QR lama (Token A) -> WAJIB ditolak dengan QR_REVOKED
+        $scanRevokedResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-e2e-scen-c-old')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => $payloadA,
+            ]);
+        $scanRevokedResp->assertStatus(422)
+            ->assertJsonPath('code', 'QR_REVOKED');
+
+        // Scan QR baru (Token B) -> berhasil mengenali Spot ID yang sama
+        $scanNewResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-e2e-scen-c-new')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => $payloadB,
+            ]);
+        $scanNewResp->assertStatus(201)
+            ->assertJsonPath('data.spot_id', $spotId)
+            ->assertJsonPath('data.spot.code', $spotCode);
+
+        // SCENARIO D — Unknown QR Format -> ditolak dengan QR_INVALID
+        $scanUnknownResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-e2e-scen-d1')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => 'MTP1.X.UNKNOWN_TYPE_999',
+            ]);
+        $scanUnknownResp->assertStatus(422)
+            ->assertJsonPath('code', 'QR_INVALID');
+
+        $scanExternalResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-e2e-scen-d2')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => 'https://example.com/bukan-qr-meowtopia',
+            ]);
+        $scanExternalResp->assertStatus(422)
+            ->assertJsonPath('code', 'QR_INVALID');
+
+        // SCENARIO E — Manual Code Input (Saat stiker QR rusak/tidak terbaca)
+        $manualCodeResp = $this->actingAs($this->student, 'sanctum')
+            ->withHeader('Idempotency-Key', 'idem-e2e-scen-e')
+            ->postJson('/api/v1/feeding/activities', [
+                'qr_token' => $spotCode,
+            ]);
+        $manualCodeResp->assertStatus(201)
+            ->assertJsonPath('data.spot_id', $spotId)
+            ->assertJsonPath('data.spot.code', $spotCode);
+
+        // SCENARIO F — Multiple Spots Printable Sheet & Artisan Sample QR Command
+        $spot2Resp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot Pakan Masjid Syamsul Ulum',
+                'latitude' => -6.9752500,
+                'longitude' => 107.6316500,
+                'status' => 'ACTIVE',
+            ]);
+        $spot2Resp->assertStatus(201)
+            ->assertJsonPath('data.code', 'SPOT-MSU-01');
+
+        $multiSheetResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->get('/api/v1/admin/feeding/spots/qr-sheet');
+        $multiSheetResp->assertStatus(200)
+            ->assertSee('SPOT-KTULT-01')
+            ->assertSee('SPOT-MSU-01')
+            ->assertSee($payloadB)
+            ->assertSee($spot2Resp->json('data.qr_payload'));
+
+        $this->artisan('feeding:sample-qr')->assertSuccessful();
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists('qr-spots/SPOT-KTULT-01.svg');
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists('qr-spots/SPOT-MSU-01.png');
+    }
 }

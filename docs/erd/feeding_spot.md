@@ -12,21 +12,49 @@ erDiagram
     CATS ||--o{ FEEDING_SPOT_CATS : "berada di spot"
     CATS ||--o{ FEEDING_ACTIVITIES : "kucing yang diberi makan (opsional)"
     TERRITORIES ||--o{ FEEDING_SPOTS : "wilayah teritorial"
+    MEDIA_FILES ||--o| FEEDING_SPOTS : "foto dokumentasi spot (opsional)"
     FEEDING_SPOTS ||--o{ FEEDING_AGGREGATES : "agregat berkala"
+    FEEDING_SPOTS ||--o{ FEEDING_SPOT_HISTORIES : "riwayat lokasi & perubahan"
+    FEEDING_SPOTS ||--o{ FEEDING_SPOT_QR_TOKENS : "siklus hidup token QR"
     FEEDING_ACTIVITIES ||--o{ FEEDING_ACTIVITY_MEDIA : "bukti foto (1-3)"
     MEDIA_FILES ||--o{ FEEDING_ACTIVITY_MEDIA : "relasi media core"
     FEEDING_ACTIVITIES ||--o{ FEEDING_RULE_RESULTS : "hasil evaluasi rule"
 
     FEEDING_SPOTS {
         char(26) id PK "ULID"
-        string code UK "FS-TULT-01"
+        string code UK "SPOT-TULT-01 (Auto-generated & immutable)"
         string name "Nama Spot"
         text description "Keterangan titik lokasi"
         decimal latitude "Koordinat spot resmi"
         decimal longitude "Koordinat spot resmi"
         char(26) territory_id FK "Wilayah/zona kampus"
-        string qr_token UK "Token QR spot resmi"
+        char(26) photo_media_id FK "Media File Core (purpose: spot_photo, opsional)"
+        string photo_path "Path berkas foto dokumentasi spot"
+        string qr_token UK "Token QR spot resmi aktif"
         string status "ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE"
+        string status_reason "Alasan status non-aktif sementara"
+        timestamps created_at_updated_at
+    }
+
+    FEEDING_SPOT_HISTORIES {
+        char(26) id PK "ULID"
+        char(26) spot_id FK "ID Spot"
+        string action "CREATED, UPDATED, STATUS_CHANGED, QR_REGENERATED"
+        char(26) actor_user_id FK "Admin pelaksana"
+        json old_values "Snapshot nilai sebelum perubahan"
+        json new_values "Snapshot nilai sesudah perubahan"
+        timestamps created_at_updated_at
+    }
+
+    FEEDING_SPOT_QR_TOKENS {
+        char(26) id PK "ULID"
+        char(26) spot_id FK "ID Spot"
+        string token UK "Token QR (tanpa prefix MTP1.S.)"
+        string status "ACTIVE, REVOKED"
+        char(26) issued_by_user_id FK "Admin penerbit"
+        char(26) revoked_by_user_id FK "Admin pencabut (saat regenerate)"
+        timestamp issued_at "Waktu diterbitkan"
+        timestamp revoked_at "Waktu dicabut (saat regenerate)"
         timestamps created_at_updated_at
     }
 
@@ -106,3 +134,27 @@ erDiagram
    - `reward_status`: status perolehan poin relawan (`PENDING`, `CREDITED`, `NOT_ELIGIBLE`). Jika relawan telah melampaui kuota harian (`daily_cap_count`), aktivitas tetap berstatus `VERIFIED` namun `reward_status` berstatus `NOT_ELIGIBLE` (`reward_capped: true`).
 3. **Relasi Spot-Kucing (`feeding_spot_cats`):**
    - Mendukung hub kucing (`CatActionProviderInterface`) sehingga aksi tombol pakan pada profil kucing hanya muncul jika kucing terdaftar aktif pada spot di sekitar.
+4. **Kode Spot Otomatis & Riwayat Lokasi (`feeding_spot_histories`):**
+   - Saat admin menambahkan spot baru tanpa mengirimkan `code`, `FeedingSpotManagementService::generateUniqueSpotCode()` menghasilkan kode unik berformat `SPOT-<LOC>-<NN>` (contoh: `SPOT-TULT-01`, `SPOT-GKU-02`) secara *concurrency-safe* berdasarkan lokasi terdekat di Denah Telkom University (38 lokasi resmi).
+   - Kode spot bersifat *immutable* setelah dibuat dan tidak berubah ketika nama atau koordinat spot diedit.
+   - Setiap pembuatan, pembaruan lokasi/koordinat, perubahan status, atau regenerasi QR dicatat di `feeding_spot_histories` beserta `audit_logs`.
+5. **Penyimpanan Foto Dokumentasi Spot (`photo_media_id`, `photo_path`):**
+   - Admin dapat mengunggah foto dokumentasi spot (`JPG`, `PNG`, `WEBP` maks 5 MB) saat menambah atau mengedit spot.
+   - Berkas disimpan pada disk `public` (`feeding/spots/<spot_id>/<ulid>.<ext>`) dan dicatat ke tabel inti `media_files` dengan `purpose = 'spot_photo'` dan `visibility = 'public'`.
+   - Endpoint publik `GET /api/v1/feeding/spots/{id}/photo` menayangkan foto spot tersebut, dan payload spot menyertakan `photo_url` serta `image_url`.
+6. **Siklus Hidup QR Spot & Pencabutan Token (`feeding_spot_qr_tokens`):**
+   - Payload QR feeding spot resmi mengikuti standar PRD Bagian 5.6: `MTP1.S.<qr_token>`.
+   - `FeedingSpotQrCodeService` menghasilkan matriks QR Code standar ISO/IEC 18004 (Byte mode, Error Correction Level L, versi 1–4) dalam format SVG maupun PNG untuk dicetak (`GET /api/v1/admin/feeding/spots/{id}/qr-sheet`, `GET /api/v1/admin/feeding/spots/qr-sheet`) atau diunduh (`GET /api/v1/admin/feeding/spots/{id}/qr-download?format=png|svg`).
+   - Ketika admin melakukan **Regenerate QR** (`POST /api/v1/admin/feeding/spots/{id}/qr`), token lama ditandai `REVOKED` pada `feeding_spot_qr_tokens`, dan token baru diterbitkan sebagai `ACTIVE`. Pemindaian menggunakan QR cetakan lama akan ditolak dengan kode error `QR_REVOKED` (`422`).
+7. **Prosedur Generate QR Contoh & Uji Scan Ujung ke Ujung (MEOW-28):**
+   - Jalankan perintah Artisan berikut untuk mengekspor berkas SVG, PNG, dan lembar cetak HTML seluruh feeding spot aktif ke `storage/app/public/feeding/sample-qr`:
+     ```bash
+     php artisan feeding:sample-qr
+     ```
+   - Skenario pengujian ujung ke ujung (tercakup otomatis di `FeedingSpotTest::test_meow_28_qr_code_generation_download_print_regenerate_revocation_and_e2e_scan_scenarios` dan `frontend/test/feeding_spot_test.dart`):
+     - **Skenario A (QR Spot Valid):** Scan `MTP1.S.<qr_token>` pada spot `ACTIVE` membuka sesi `DRAFT` (`201`) -> konfirmasi intent (`200`) -> unggah foto bukti & finalisasi (`200`).
+     - **Skenario B (QR Salah Tipe):** Scan QR kalung kucing (`MTP1.C.<token>`) ditolak dengan `422 QR_WRONG_TYPE`.
+     - **Skenario C (QR Tidak Dikenal / Rusak):** Scan payload acak ditolak dengan `422 QR_INVALID`.
+     - **Skenario D (Spot Tidak Tersedia):** Scan QR pada spot `MAINTENANCE`, `TEMPORARILY_UNAVAILABLE`, atau `INACTIVE` ditolak dengan `422 SPOT_UNAVAILABLE` disertai `status_reason`.
+     - **Skenario E (Regenerate QR & Pencabutan Token Lama):** Setelah `POST /api/v1/admin/feeding/spots/{id}/qr`, scan QR lama ditolak dengan `422 QR_REVOKED`, sedangkan scan QR baru berhasil membuka sesi (`201`).
+     - **Skenario F (Input Kode Spot Manual):** Input kode spot (`SPOT-TULT-01`) pada halaman scan tanpa kamera berhasil membuka sesi pemberian pakan (`201`).

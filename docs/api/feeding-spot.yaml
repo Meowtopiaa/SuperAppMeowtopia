@@ -57,6 +57,31 @@ components:
           type: string
           nullable: true
           example: "01JAFS00000000000000000010"
+        location_number:
+          type: integer
+          nullable: true
+          example: 1
+          description: Nomor lokasi resmi pada Denah Telkom University (1-38).
+        location_name:
+          type: string
+          nullable: true
+          example: "Telkom University Landmark Tower (TULT)"
+          description: Nama lokasi resmi berdasarkan Denah Telkom University (1-38).
+        photo_media_id:
+          type: string
+          nullable: true
+          example: "01JAFS00000000000000000501"
+          description: ID berkas di media_files (purpose spot_photo) jika spot memiliki foto dokumentasi.
+        photo_url:
+          type: string
+          nullable: true
+          example: "/api/v1/feeding/spots/01JAFS00000000000000000101/photo"
+          description: URL publik foto dokumentasi feeding spot.
+        image_url:
+          type: string
+          nullable: true
+          example: "/api/v1/feeding/spots/01JAFS00000000000000000101/photo"
+          description: Alias URL foto dokumentasi feeding spot untuk kompatibilitas klien.
         status:
           type: string
           enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
@@ -194,6 +219,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /feeding/spots/{id}/photo:
+    get:
+      summary: Tayangkan berkas foto dokumentasi feeding spot publik (MEOW-21)
+      tags: [FeedingSpot - Public]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Berkas gambar foto feeding spot (image/jpeg, image/png, atau image/webp)
+        "404":
+          description: Spot tidak ditemukan atau belum memiliki foto dokumentasi (SPOT_PHOTO_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /feeding/heatmap:
     get:
       summary: Agregat heatmap pemberian pakan 14 hari terakhir per spot (AFS-09)
@@ -231,7 +276,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "422":
-          description: QR tidak valid (QR_INVALID), salah tipe (QR_WRONG_TYPE), spot sementara tidak tersedia (SPOT_UNAVAILABLE), atau masih dalam cooldown 6 jam (COOLDOWN_ACTIVE)
+          description: QR tidak valid (QR_INVALID), QR telah dicabut karena regenerate (QR_REVOKED), salah tipe seperti QR kalung kucing (QR_WRONG_TYPE), spot sementara tidak tersedia (SPOT_UNAVAILABLE), atau masih dalam cooldown 6 jam (COOLDOWN_ACTIVE)
           content:
             application/json:
               schema:
@@ -347,7 +392,7 @@ paths:
         "403":
           description: Pengguna tidak memiliki permission spot.manage
     post:
-      summary: Buat titik feeding spot baru (Permission spot.manage) (AFS-01, Bagian 8.4)
+      summary: Buat titik feeding spot baru dengan kode unik otomatis dan opsional foto dokumentasi (Permission spot.manage) (AFS-01, MEOW-21, MEOW-29, Bagian 8.4)
       tags: [FeedingSpot - Admin]
       security:
         - bearerAuth: []
@@ -357,11 +402,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [code, name, latitude, longitude]
+              required: [name, latitude, longitude]
               properties:
                 code:
                   type: string
-                  description: Kode unik spot (otomatis dinormalisasi ke huruf kapital).
+                  nullable: true
+                  description: Opsional. Jika dikosongkan, sistem menghasilkan kode unik otomatis berformat SPOT-<LOC>-<NN> (contoh SPOT-TULT-01).
                 name:
                   type: string
                 description:
@@ -385,9 +431,39 @@ paths:
                   type: string
                   nullable: true
                   description: Wajib diisi apabila status adalah TEMPORARILY_UNAVAILABLE.
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, latitude, longitude]
+              properties:
+                code:
+                  type: string
+                  nullable: true
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                territory_id:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
+                status_reason:
+                  type: string
+                  nullable: true
+                photo:
+                  type: string
+                  format: binary
+                  description: Berkas foto dokumentasi spot (JPG, PNG, WEBP, maks 5 MB; disimpan di media_files dengan purpose spot_photo).
       responses:
         "201":
-          description: Spot baru berhasil dibuat beserta qr_token dan dicatat di audit_logs
+          description: Spot baru berhasil dibuat beserta code unik otomatis, qr_token aktif, riwayat feeding_spot_histories, dan audit_logs
         "403":
           description: Pengguna tidak memiliki permission spot.manage
         "422":
@@ -455,9 +531,40 @@ paths:
                   type: string
                   nullable: true
                   description: Wajib diisi apabila status diubah menjadi TEMPORARILY_UNAVAILABLE.
+                remove_photo:
+                  type: boolean
+                  description: Hapus foto dokumentasi spot yang sudah ada tanpa menggantinya.
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                territory_id:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  enum: [ACTIVE, MAINTENANCE, TEMPORARILY_UNAVAILABLE, INACTIVE]
+                status_reason:
+                  type: string
+                  nullable: true
+                photo:
+                  type: string
+                  format: binary
+                  description: Ganti atau unggah foto dokumentasi spot (JPG, PNG, WEBP, maks 5 MB).
+                remove_photo:
+                  type: boolean
       responses:
         "200":
-          description: Spot berhasil diperbarui dan perubahan dicatat di audit_logs
+          description: Spot berhasil diperbarui dan perubahan dicatat di feeding_spot_histories serta audit_logs
         "403":
           description: Pengguna tidak memiliki permission spot.manage
         "422":
@@ -550,9 +657,29 @@ paths:
         "403":
           description: Tanda tangan tidak valid atau telah kedaluwarsa (INVALID_SIGNATURE)
 
+  /admin/feeding/spots/qr-sheet:
+    get:
+      summary: Cetak lembar QR multi-spot sekaligus untuk seluruh spot aktif (atau daftar spot_ids tertentu) (Permission spot.manage) (MEOW-21)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: spot_ids
+          schema:
+            type: string
+          description: Daftar ID spot dipisahkan koma (opsional). Jika kosong, mencetak seluruh spot non-INACTIVE.
+      responses:
+        "200":
+          description: Halaman HTML lembar cetak QR code multi-spot siap cetak (A4 grid)
+          content:
+            text/html:
+              schema:
+                type: string
+
   /admin/feeding/spots/{id}/qr-sheet:
     get:
-      summary: Cetak lembar QR feeding spot siap tempel (Permission spot.manage) (MEOW-21)
+      summary: Cetak lembar QR feeding spot tunggal siap tempel beserta tombol unduh PNG/SVG (Permission spot.manage) (MEOW-21)
       tags: [FeedingSpot - Admin]
       security:
         - bearerAuth: []
@@ -564,11 +691,34 @@ paths:
             type: string
       responses:
         "200":
-          description: Halaman HTML lembar cetak QR code dengan instruksi relawan dan branding Meowtopia
+          description: Halaman HTML lembar cetak QR code dengan matriks QR standar ISO/IEC 18004 (MTP1.S.<token>), instruksi relawan, dan branding Meowtopia
           content:
             text/html:
               schema:
                 type: string
+
+  /admin/feeding/spots/{id}/qr-download:
+    get:
+      summary: Unduh berkas gambar QR feeding spot dalam format PNG atau SVG (Permission spot.manage) (MEOW-21)
+      tags: [FeedingSpot - Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [png, svg]
+            default: png
+          description: Format berkas QR yang diunduh (png atau svg).
+      responses:
+        "200":
+          description: Berkas gambar QR feeding spot dengan Content-Disposition attachment (contoh QR-SPOT-TULT-01.png)
 
   /admin/feeding/reviews/{id}:
     get:
