@@ -875,6 +875,19 @@ class FeedingSpotManagementService
                         'photo_path' => $photoPath,
                     ]);
 
+                    if (Schema::hasTable('feeding_spot_qr_tokens')) {
+                        DB::table('feeding_spot_qr_tokens')->insert([
+                            'id' => (string) Str::ulid(),
+                            'spot_id' => $spot->id,
+                            'token' => $spot->qr_token,
+                            'status' => 'ACTIVE',
+                            'issued_by' => $actor?->id,
+                            'issued_at' => now(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+
                     $snapshot = $this->extractSnapshot($spot);
 
                     $this->recordSpotHistory(
@@ -1019,6 +1032,50 @@ class FeedingSpotManagementService
         return DB::transaction(function () use ($spot, $actor) {
             $oldToken = $spot->qr_token;
             $newToken = Str::random(32);
+            while ($newToken === $oldToken || FeedingSpot::query()->where('qr_token', $newToken)->exists()) {
+                $newToken = Str::random(32);
+            }
+
+            if (Schema::hasTable('feeding_spot_qr_tokens')) {
+                $existingOld = DB::table('feeding_spot_qr_tokens')
+                    ->where('token', $oldToken)
+                    ->first();
+
+                if ($existingOld) {
+                    DB::table('feeding_spot_qr_tokens')
+                        ->where('id', $existingOld->id)
+                        ->update([
+                            'status' => 'REVOKED',
+                            'revoked_at' => now(),
+                            'revoked_reason' => 'Dicabut melalui aksi Ganti QR oleh admin.',
+                            'updated_at' => now(),
+                        ]);
+                } else {
+                    DB::table('feeding_spot_qr_tokens')->insert([
+                        'id' => (string) Str::ulid(),
+                        'spot_id' => $spot->id,
+                        'token' => $oldToken,
+                        'status' => 'REVOKED',
+                        'issued_by' => $actor?->id,
+                        'issued_at' => $spot->created_at ?? now(),
+                        'revoked_at' => now(),
+                        'revoked_reason' => 'Dicabut melalui aksi Ganti QR oleh admin.',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                DB::table('feeding_spot_qr_tokens')->insert([
+                    'id' => (string) Str::ulid(),
+                    'spot_id' => $spot->id,
+                    'token' => $newToken,
+                    'status' => 'ACTIVE',
+                    'issued_by' => $actor?->id,
+                    'issued_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             $spot->update(['qr_token' => $newToken]);
             $spot->refresh();
@@ -1047,6 +1104,49 @@ class FeedingSpotManagementService
 
             return $spot;
         });
+    }
+
+    /**
+     * Periksa apakah sebuah token QR spot merupakan token lama yang sudah dicabut (QR_REVOKED).
+     */
+    public function isRevokedSpotQrToken(string $token): bool
+    {
+        $clean = trim($token);
+        if (str_starts_with($clean, 'MTP1.S.')) {
+            $clean = substr($clean, 7);
+        } elseif (str_starts_with($clean, 'SPOT:')) {
+            $clean = substr($clean, 5);
+        }
+
+        if ($clean === '') {
+            return false;
+        }
+
+        if (Schema::hasTable('feeding_spot_qr_tokens')) {
+            $revoked = DB::table('feeding_spot_qr_tokens')
+                ->where('token', $clean)
+                ->where('status', 'REVOKED')
+                ->exists();
+            if ($revoked) {
+                return true;
+            }
+        }
+
+        if (Schema::hasTable('audit_logs')) {
+            $logs = DB::table('audit_logs')
+                ->where('subject_type', 'feeding_spot')
+                ->where('action', 'SPOT_QR_REGENERATED')
+                ->pluck('reason');
+
+            foreach ($logs as $reasonJson) {
+                $decoded = is_string($reasonJson) ? json_decode($reasonJson, true) : null;
+                if (is_array($decoded) && (($decoded['old']['qr_token'] ?? null) === $clean)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

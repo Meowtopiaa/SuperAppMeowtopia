@@ -10,6 +10,7 @@ use App\Modules\FeedingSpot\Models\FeedingActivity;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
 use App\Modules\FeedingSpot\Services\FeedingReviewService;
 use App\Modules\FeedingSpot\Services\FeedingSpotManagementService;
+use App\Modules\FeedingSpot\Services\FeedingSpotQrCodeService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class AdminFeedingSpotController extends Controller
     public function __construct(
         private readonly FeedingReviewService $reviewService,
         private readonly FeedingSpotManagementService $spotService,
+        private readonly FeedingSpotQrCodeService $qrService,
     ) {}
 
     /**
@@ -308,7 +310,7 @@ class AdminFeedingSpotController extends Controller
 
     /**
      * GET /api/v1/admin/feeding/spots/{id}/qr-sheet
-     * Tampilkan lembar cetak QR resmi untuk spot pakan (MEOW-21).
+     * Tampilkan lembar cetak QR resmi untuk satu spot pakan (MEOW-21, MEOW-28).
      */
     public function printQrSheet(string $id)
     {
@@ -317,8 +319,114 @@ class AdminFeedingSpotController extends Controller
             return ApiResponse::error('Titik feeding spot tidak ditemukan.', 404, 'SPOT_NOT_FOUND');
         }
 
+        $payload = $this->qrService->formatSpotPayload($spot->qr_token);
+        $campusLoc = FeedingSpotManagementService::resolveCampusLocation(
+            (float) $spot->latitude,
+            (float) $spot->longitude,
+            $spot->code,
+            $spot->name
+        );
+
+        $spotItem = [
+            'spot' => $spot,
+            'payload' => $payload,
+            'qr_svg' => $this->qrService->renderSvg($payload, 240, 4),
+            'location_name' => $campusLoc['name'],
+            'location_number' => $campusLoc['number'],
+        ];
+
         return view('feeding-spot::filament.qr-sheet', [
             'spot' => $spot,
+            'spotItems' => [$spotItem],
+            'qrSvg' => $spotItem['qr_svg'],
+            'qrPayload' => $payload,
+            'locationName' => $campusLoc['name'],
+            'isMulti' => false,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/admin/feeding/spots/qr-sheet
+     * Tampilkan lembar cetak QR resmi untuk beberapa/seluruh spot pakan aktif (MEOW-7, MEOW-21).
+     */
+    public function printAllQrSheets(Request $request)
+    {
+        $query = FeedingSpot::query()->orderBy('code');
+
+        if ($request->filled('ids')) {
+            $ids = array_filter(array_map('trim', explode(',', (string) $request->query('ids'))));
+            if (!empty($ids)) {
+                $query->where(function ($q) use ($ids) {
+                    $q->whereIn('id', $ids)->orWhereIn('code', $ids);
+                });
+            }
+        } else {
+            $query->where('status', '!=', 'INACTIVE');
+        }
+
+        $spots = $query->get();
+        if ($spots->isEmpty()) {
+            $spots = FeedingSpot::query()->orderBy('code')->get();
+        }
+
+        $spotItems = $spots->map(function (FeedingSpot $s) {
+            $payload = $this->qrService->formatSpotPayload($s->qr_token);
+            $campusLoc = FeedingSpotManagementService::resolveCampusLocation(
+                (float) $s->latitude,
+                (float) $s->longitude,
+                $s->code,
+                $s->name
+            );
+
+            return [
+                'spot' => $s,
+                'payload' => $payload,
+                'qr_svg' => $this->qrService->renderSvg($payload, 220, 4),
+                'location_name' => $campusLoc['name'],
+                'location_number' => $campusLoc['number'],
+            ];
+        })->values()->all();
+
+        $firstSpot = $spots->first();
+
+        return view('feeding-spot::filament.qr-sheet', [
+            'spot' => $firstSpot,
+            'spotItems' => $spotItems,
+            'qrSvg' => $spotItems[0]['qr_svg'] ?? '',
+            'qrPayload' => $spotItems[0]['payload'] ?? '',
+            'locationName' => $spotItems[0]['location_name'] ?? 'Area Kampus Telkom University',
+            'isMulti' => count($spotItems) > 1,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/admin/feeding/spots/{id}/qr-download?format=png|svg
+     * GET /api/v1/feeding/admin-preview/spots/{id}/qr-download?format=png|svg
+     * Unduh berkas gambar QR Code spot dalam format PNG atau SVG siap cetak (MEOW-21, MEOW-28).
+     */
+    public function downloadSpotQr(Request $request, string $id)
+    {
+        $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->first();
+        if (!$spot) {
+            return ApiResponse::error('Titik feeding spot tidak ditemukan.', 404, 'SPOT_NOT_FOUND');
+        }
+
+        $payload = $this->qrService->formatSpotPayload($spot->qr_token);
+        $format = strtolower((string) $request->query('format', 'png'));
+        $safeCode = preg_replace('/[^A-Za-z0-9\-_]/', '_', $spot->code);
+
+        if ($format === 'svg') {
+            $svg = $this->qrService->renderSvg($payload, 512, 4);
+            return response($svg, 200, [
+                'Content-Type' => 'image/svg+xml; charset=utf-8',
+                'Content-Disposition' => "attachment; filename=\"QR-{$safeCode}.svg\"",
+            ]);
+        }
+
+        $png = $this->qrService->renderPng($payload, 12, 4);
+        return response($png, 200, [
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => "attachment; filename=\"QR-{$safeCode}.png\"",
         ]);
     }
 
@@ -673,7 +781,7 @@ class AdminFeedingSpotController extends Controller
 
         $updated = FeedingSpotResource::regenerateQrToken($spot, $actor);
 
-        return redirect('/api/v1/feeding/admin-preview?tab=spots&notice=' . urlencode("Token QR untuk {$updated->code} berhasil digenerate ulang."));
+        return redirect('/api/v1/feeding/admin-preview?tab=spots&regenerated_spot=' . urlencode($updated->id) . '&notice=' . urlencode("Token QR untuk {$updated->code} ({$updated->name}) berhasil diganti. QR Code sebelumnya telah dinonaktifkan."));
     }
 
     /**
@@ -766,5 +874,14 @@ class AdminFeedingSpotController extends Controller
     public function adminPreviewQrSheet(string $id)
     {
         return $this->printQrSheet($id);
+    }
+
+    /**
+     * GET /api/v1/feeding/admin-preview/qr-sheet
+     * Lembar cetak seluruh QR spot aktif dari Panel Admin browser.
+     */
+    public function adminPreviewAllQrSheets(Request $request)
+    {
+        return $this->printAllQrSheets($request);
     }
 }

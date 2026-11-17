@@ -35,7 +35,9 @@ Route::prefix('feeding')->group(function () {
     Route::post('/admin-preview/spots/{id}/cats/{catId}/detach', [AdminFeedingSpotController::class, 'adminPreviewDetachCat']);
     Route::get('/admin-preview/reviews/{id}', [AdminFeedingSpotController::class, 'adminPreviewReview']);
     Route::post('/admin-preview/activities/{id}/review', [AdminFeedingSpotController::class, 'adminPreviewSubmitReview']);
+    Route::get('/admin-preview/qr-sheet', [AdminFeedingSpotController::class, 'adminPreviewAllQrSheets']);
     Route::get('/admin-preview/spots/{id}/qr-sheet', [AdminFeedingSpotController::class, 'adminPreviewQrSheet']);
+    Route::get('/admin-preview/spots/{id}/qr-download', [AdminFeedingSpotController::class, 'downloadSpotQr']);
 
     // Authenticated User Endpoints
     Route::middleware('auth:sanctum')->group(function () {
@@ -61,12 +63,14 @@ Route::prefix('admin/feeding')->middleware('auth:sanctum')->group(function () {
     // Kelola Spot & QR (Permission: spot.manage) (AFS-01, Bagian 8.4, MEOW-7, MEOW-21, MEOW-23)
     Route::middleware('can:spot.manage')->group(function () {
         Route::get('/spots', [AdminFeedingSpotController::class, 'indexSpots']);
+        Route::get('/spots/qr-sheet', [AdminFeedingSpotController::class, 'printAllQrSheets'])->name('admin.feeding.spots.qr-sheet.all');
         Route::get('/spots/{id}', [AdminFeedingSpotController::class, 'showSpot']);
         Route::post('/spots', [AdminFeedingSpotController::class, 'storeSpot']);
         Route::patch('/spots/{id}', [AdminFeedingSpotController::class, 'updateSpot']);
         Route::post('/spots/{id}/qr', [AdminFeedingSpotController::class, 'regenerateQr']);
         Route::post('/spots/{id}/qr/regenerate', [AdminFeedingSpotController::class, 'regenerateQr']);
         Route::get('/spots/{id}/qr-sheet', [AdminFeedingSpotController::class, 'printQrSheet'])->name('admin.feeding.spots.qr-sheet');
+        Route::get('/spots/{id}/qr-download', [AdminFeedingSpotController::class, 'downloadSpotQr'])->name('admin.feeding.spots.qr-download');
         Route::get('/spots/{id}/cats', [AdminFeedingSpotController::class, 'getSpotCats']);
         Route::post('/spots/{id}/cats', [AdminFeedingSpotController::class, 'attachCats']);
         Route::delete('/spots/{id}/cats/{catId}', [AdminFeedingSpotController::class, 'detachCat']);
@@ -93,6 +97,7 @@ if (app()->runningInConsole()) {
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\RefreshFeedingAggregatesCommand::class);
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\CleanupFeedingMediaRetentionCommand::class);
         $artisan->resolve(\App\Modules\FeedingSpot\Commands\SetupLocalFeedingEnvironmentCommand::class);
+        $artisan->resolve(\App\Modules\FeedingSpot\Commands\GenerateSampleSpotQrCommand::class);
     });
 }
 

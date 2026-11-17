@@ -844,8 +844,18 @@
         <main class="page-content">
             @if(request()->filled('notice'))
                 <div class="alert alert-success" id="noticeBanner">
-                    <span>{{ request()->query('notice') }}</span>
-                    <button type="button" class="alert-close" onclick="this.closest('.alert').remove()">&times;</button>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span>{{ request()->query('notice') }}</span>
+                        @if(request()->filled('regenerated_spot'))
+                            <a href="/api/v1/feeding/admin-preview/spots/{{ request()->query('regenerated_spot') }}/qr-sheet" target="_blank" class="btn btn-neutral btn-sm">
+                                Lihat &amp; Cetak QR Baru
+                            </a>
+                            <a href="/api/v1/feeding/admin-preview/spots/{{ request()->query('regenerated_spot') }}/qr-download?format=png" class="btn btn-primary btn-sm">
+                                Unduh QR Baru (PNG)
+                            </a>
+                        @endif
+                    </div>
+                    <button type="button" class="alert-close" onclick="this.closest('.alert').remove()" title="Tutup" aria-label="Tutup">&times;</button>
                 </div>
             @endif
 
@@ -905,9 +915,14 @@
                             @endif
                         </form>
 
-                        <button type="button" class="btn btn-primary" onclick="openCreateSpotModal()">
-                            + Tambah Feeding Spot
-                        </button>
+                        <div class="row-actions">
+                            <a href="/api/v1/feeding/admin-preview/qr-sheet" target="_blank" class="btn btn-neutral">
+                                Cetak Semua QR
+                            </a>
+                            <button type="button" class="btn btn-primary" onclick="openCreateSpotModal()">
+                                + Tambah Feeding Spot
+                            </button>
+                        </div>
                     </div>
 
                     <div class="table-scroll">
@@ -980,7 +995,11 @@
                                             <div class="row-actions">
                                                 <button type="button" class="btn btn-neutral btn-sm" onclick='openDetailSpotModal(@json($spot))'>Detail</button>
                                                 <button type="button" class="btn btn-edit btn-sm" onclick='openEditSpotModal(@json($spot))'>Edit</button>
-                                                <a href="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/qr-sheet" target="_blank" class="btn btn-neutral btn-sm">QR</a>
+                                                <a href="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/qr-sheet" target="_blank" class="btn btn-neutral btn-sm">Cetak QR</a>
+                                                <form method="POST" action="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/qr" onsubmit="return confirm('Apakah Anda yakin ingin mengganti QR Code spot ini? QR Code sebelumnya akan dinonaktifkan dan tidak dapat digunakan lagi.');" style="display:inline;">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-neutral btn-sm">Ganti QR</button>
+                                                </form>
                                                 @if($spot['status'] !== 'INACTIVE')
                                                     <form method="POST" action="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/update" onsubmit="return confirm('Nonaktifkan spot {{ $spot['code'] }}?');" style="display:inline;">
                                                         @csrf
@@ -1359,13 +1378,14 @@
                 </div>
                 <dl class="detail-dl" id="detailSpotList"></dl>
 
-                <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+                <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                     <span style="font-size: 13px; color: var(--text-secondary); font-weight: 600;">Kode QR Spot</span>
                     <div class="row-actions">
+                        <a href="#" id="detailDownloadQrBtn" class="btn btn-neutral btn-sm">Unduh QR (PNG)</a>
                         <a href="#" id="detailPrintQrBtn" target="_blank" class="btn btn-neutral btn-sm">Cetak QR</a>
-                        <form method="POST" action="#" id="detailRegenQrForm" onsubmit="return confirm('Perbarui token QR untuk spot ini?');" style="display:inline;">
+                        <form method="POST" action="#" id="detailRegenQrForm" onsubmit="return confirm('Apakah Anda yakin ingin mengganti QR Code spot ini? QR Code sebelumnya akan dinonaktifkan dan tidak dapat digunakan lagi.');" style="display:inline;">
                             @csrf
-                            <button type="submit" class="btn btn-edit btn-sm">Perbarui Token QR</button>
+                            <button type="submit" class="btn btn-edit btn-sm">Ganti QR</button>
                         </form>
                     </div>
                 </div>
@@ -1903,6 +1923,7 @@
 
         function openDetailSpotModal(spot) {
             document.getElementById('detailModalTitle').textContent = `${spot.name} (${spot.code})`;
+            document.getElementById('detailDownloadQrBtn').href = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr-download?format=png`;
             document.getElementById('detailPrintQrBtn').href = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr-sheet`;
             document.getElementById('detailRegenQrForm').action = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr`;
 

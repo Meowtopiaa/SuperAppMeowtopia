@@ -215,6 +215,31 @@ class FeedingSpotController extends Controller
             );
         }
 
+        // Jika berprefiks MTP1. namun bukan MTP1.S.<token> yang sah, tolak dengan QR_INVALID
+        if (str_starts_with($rawToken, 'MTP1.')) {
+            $parts = explode('.', $rawToken);
+            if (count($parts) !== 3 || $parts[1] !== 'S' || trim($parts[2]) === '') {
+                return ApiResponse::error(
+                    'Format kode QR tidak dikenali. Gunakan QR resmi titik pakan Meowtopia (MTP1.S.*).',
+                    422,
+                    'QR_INVALID'
+                );
+            }
+        }
+
+        $cleanToken = str_starts_with($rawToken, 'SPOT:')
+            ? substr($rawToken, 5)
+            : (str_starts_with($rawToken, 'MTP1.S.') ? substr($rawToken, 7) : $rawToken);
+
+        // Cek terlebih dahulu apakah token tersebut merupakan token QR spot lama yang telah dicabut (QR_REVOKED)
+        if (app(\App\Modules\FeedingSpot\Services\FeedingSpotManagementService::class)->isRevokedSpotQrToken($cleanToken)) {
+            return ApiResponse::error(
+                'Kode QR spot ini sudah dicabut atau diganti oleh admin. Silakan pindai stiker QR terbaru di lokasi atau gunakan kode manual spot.',
+                422,
+                'QR_REVOKED'
+            );
+        }
+
         $spot = null;
 
         try {
@@ -231,17 +256,13 @@ class FeedingSpotController extends Controller
             }
         } catch (\Throwable) {
             // Fallback untuk raw qr_token atau format SPOT:<CODE>
-            $cleanToken = str_starts_with($rawToken, 'SPOT:')
-                ? substr($rawToken, 5)
-                : (str_starts_with($rawToken, 'MTP1.S.') ? substr($rawToken, 7) : $rawToken);
-
             $spot = FeedingSpot::where('qr_token', $cleanToken)
-                ->orWhere('code', $cleanToken)
+                ->orWhere('code', strtoupper($cleanToken))
                 ->first();
         }
 
         if (!$spot) {
-            return ApiResponse::error('Token QR spot tidak valid atau sudah diganti.', 422, 'QR_INVALID');
+            return ApiResponse::error('Token QR spot atau kode manual tidak valid.', 422, 'QR_INVALID');
         }
 
         if ($spot->status !== 'ACTIVE') {
