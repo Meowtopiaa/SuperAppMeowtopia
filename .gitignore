@@ -39,6 +39,10 @@ backend/storage/logs/*
 backend/.env
 backend/.env.backup
 backend/.env.production
+backend/database/*.sqlite
+backend/database/*.sqlite-journal
+backend/bootstrap/cache/*.php
+backend/storage/framework/testing/
 backend/.phpunit.result.cache
 backend/Homestead.json
 backend/Homestead.yaml
