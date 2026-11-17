@@ -22,6 +22,7 @@ Route::prefix('feeding')->group(function () {
     // Public / Read Endpoints (MEOW-6, MEOW-13)
     Route::get('/spots', [FeedingSpotController::class, 'listSpots']);
     Route::get('/spots/{id}', [FeedingSpotController::class, 'showSpot']);
+    Route::get('/spots/{id}/photo', [FeedingSpotController::class, 'serveSpotPhoto'])->name('feeding.spots.photo');
     Route::get('/heatmap', [FeedingSpotController::class, 'heatmap']);
 
     // Panel Admin Filament Browser Preview & CRUD (MEOW-21 & MEOW-22)

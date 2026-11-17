@@ -29,12 +29,23 @@ class FeedingSpot extends Model
         'qr_token',
         'status',
         'status_reason',
+        'photo_media_id',
+        'photo_path',
     ];
 
     protected $casts = [
         'latitude' => 'float',
         'longitude' => 'float',
     ];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (empty($this->photo_media_id) && empty($this->photo_path)) {
+            return null;
+        }
+
+        return url("/api/v1/feeding/spots/{$this->id}/photo");
+    }
 
     public function getTerritoryDataAttribute(): ?array
     {

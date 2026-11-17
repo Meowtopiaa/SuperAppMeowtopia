@@ -910,10 +910,17 @@
                                             <span class="spot-code">{{ $spot['code'] }}</span>
                                         </td>
                                         <td>
-                                            <div style="font-weight: 600; color: var(--text-primary);">{{ $spot['name'] }}</div>
-                                            @if(!empty($spot['description']))
-                                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 1px;">{{ $spot['description'] }}</div>
-                                            @endif
+                                            <div style="display: flex; align-items: center; gap: 10px;">
+                                                @if(!empty($spot['image_url']))
+                                                    <img src="{{ $spot['image_url'] }}" alt="Foto {{ $spot['name'] }}" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); flex-shrink: 0;">
+                                                @endif
+                                                <div>
+                                                    <div style="font-weight: 600; color: var(--text-primary);">{{ $spot['name'] }}</div>
+                                                    @if(!empty($spot['description']))
+                                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 1px;">{{ $spot['description'] }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </td>
                                         <td style="color: var(--text-secondary);">
                                             {{ $spot['location_name'] ?? $spot['territory']['name'] ?? 'Area Kampus Telkom University' }}
@@ -1183,11 +1190,12 @@
                 <button type="button" class="btn btn-neutral btn-sm" onclick="closeSpotModal()">Tutup</button>
             </div>
 
-            <form method="POST" action="/api/v1/feeding/admin-preview/spots" id="spotForm" class="modal-form-flex" onsubmit="return handleSpotFormSubmit(event);">
+            <form method="POST" action="/api/v1/feeding/admin-preview/spots" id="spotForm" enctype="multipart/form-data" class="modal-form-flex" onsubmit="return handleSpotFormSubmit(event);">
                 @csrf
                 <input type="hidden" id="inputLat" name="latitude" value="-6.9731000" required>
                 <input type="hidden" id="inputLng" name="longitude" value="107.6300000" required>
                 <input type="hidden" id="inputTerritoryCode" name="territory_code" value="GKU">
+                <input type="hidden" id="inputRemovePhoto" name="remove_photo" value="0">
 
                 <div class="modal-body">
                     <div class="alert alert-danger" id="modalValidationBanner" style="display: none; margin-bottom: 14px;">
@@ -1235,6 +1243,50 @@
                             <input type="text" id="inputDescription" name="description" class="input-control" placeholder="Patokan posisi tempat makan (opsional)" maxlength="1000">
                         </div>
 
+                        <!-- SPOT PHOTO UPLOAD WITH PREVIEW, REPLACE, REMOVE & VALIDATION (MEOW-21) -->
+                        <div class="form-group full">
+                            <label class="form-label" for="inputSpotPhoto">Foto Dokumentasi Lokasi Spot (Opsional)</label>
+                            <input
+                                type="file"
+                                id="inputSpotPhoto"
+                                name="photo"
+                                accept="image/jpeg,image/png,image/webp"
+                                style="display: none;"
+                                onchange="handleSpotPhotoChange(this)"
+                            >
+                            <div id="spotPhotoUploadCard" style="border: 1px dashed var(--border-strong); border-radius: 8px; padding: 12px 14px; background: var(--surface-subtle);">
+                                <div id="spotPhotoEmptyState" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                    <div>
+                                        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Unggah foto lokasi feeding spot</div>
+                                        <div style="font-size: 11.5px; color: var(--text-muted);">Format JPG, PNG, atau WEBP &bull; Maksimal 5 MB</div>
+                                    </div>
+                                    <button type="button" class="btn btn-neutral btn-sm" id="btnChooseSpotPhoto" onclick="triggerSpotPhotoPicker()">
+                                        Pilih Foto dari Perangkat
+                                    </button>
+                                </div>
+
+                                <div id="spotPhotoPreviewBox" style="display: none; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <img id="spotPhotoPreviewImg" src="" alt="Preview Foto Spot" style="width: 76px; height: 76px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border);">
+                                        <div>
+                                            <div id="spotPhotoFileName" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Foto terpilih</div>
+                                            <div id="spotPhotoFileSize" style="font-size: 11.5px; color: var(--text-muted);">Siap disimpan</div>
+                                        </div>
+                                    </div>
+                                    <div class="row-actions">
+                                        <button type="button" class="btn btn-edit btn-sm" id="btnReplaceSpotPhoto" onclick="triggerSpotPhotoPicker()">
+                                            Ganti Foto
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm" id="btnRemoveSpotPhoto" onclick="clearSpotPhotoSelection()">
+                                            Hapus Foto
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="spotPhotoErrorText" style="display: none; color: var(--danger); font-size: 12px; font-weight: 500; margin-top: 8px;"></div>
+                            </div>
+                        </div>
+
                         <!-- MAP PICKER WITH AUTOMATIC AREA IDENTIFICATION (POINT 5) -->
                         <div class="form-group full">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -1270,6 +1322,9 @@
                 <button type="button" class="btn btn-neutral btn-sm" onclick="closeDetailSpotModal()">Tutup</button>
             </div>
             <div class="modal-body">
+                <div id="detailSpotPhotoContainer" style="display: none; margin-bottom: 14px;">
+                    <img id="detailSpotPhotoImg" src="" alt="Foto Dokumentasi Spot" style="width: 100%; max-height: 210px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);">
+                </div>
                 <dl class="detail-dl" id="detailSpotList"></dl>
 
                 <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
@@ -1607,6 +1662,94 @@
             }
         }
 
+        let currentSpotPhotoObjectUrl = null;
+        let hasPhotoValidationError = false;
+
+        function triggerSpotPhotoPicker() {
+            const fileInput = document.getElementById('inputSpotPhoto');
+            if (fileInput) fileInput.click();
+        }
+
+        function revokeSpotPhotoObjectUrl() {
+            if (currentSpotPhotoObjectUrl) {
+                URL.revokeObjectURL(currentSpotPhotoObjectUrl);
+                currentSpotPhotoObjectUrl = null;
+            }
+        }
+
+        function handleSpotPhotoChange(fileInput) {
+            const errEl = document.getElementById('spotPhotoErrorText');
+            const emptyState = document.getElementById('spotPhotoEmptyState');
+            const previewBox = document.getElementById('spotPhotoPreviewBox');
+            const previewImg = document.getElementById('spotPhotoPreviewImg');
+            const nameEl = document.getElementById('spotPhotoFileName');
+            const sizeEl = document.getElementById('spotPhotoFileSize');
+            const removeFlag = document.getElementById('inputRemovePhoto');
+
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+            hasPhotoValidationError = false;
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            const allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+
+            if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
+                fileInput.value = '';
+                hasPhotoValidationError = true;
+                errEl.textContent = 'Format file tidak didukung. Pilih foto berformat JPG, PNG, atau WEBP.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            const maxBytes = 5 * 1024 * 1024;
+            if (file.size > maxBytes) {
+                fileInput.value = '';
+                hasPhotoValidationError = true;
+                errEl.textContent = 'Ukuran file melebihi batas maksimal 5 MB. Pilih foto dengan ukuran lebih kecil.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            revokeSpotPhotoObjectUrl();
+            currentSpotPhotoObjectUrl = URL.createObjectURL(file);
+            previewImg.src = currentSpotPhotoObjectUrl;
+            nameEl.textContent = file.name;
+            sizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB • Siap diunggah`;
+            if (removeFlag) removeFlag.value = '0';
+
+            emptyState.style.display = 'none';
+            previewBox.style.display = 'flex';
+        }
+
+        function clearSpotPhotoSelection() {
+            const fileInput = document.getElementById('inputSpotPhoto');
+            const emptyState = document.getElementById('spotPhotoEmptyState');
+            const previewBox = document.getElementById('spotPhotoPreviewBox');
+            const previewImg = document.getElementById('spotPhotoPreviewImg');
+            const errEl = document.getElementById('spotPhotoErrorText');
+            const removeFlag = document.getElementById('inputRemovePhoto');
+
+            if (fileInput) fileInput.value = '';
+            revokeSpotPhotoObjectUrl();
+            previewImg.src = '';
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+            hasPhotoValidationError = false;
+
+            if (removeFlag) {
+                removeFlag.value = isCreateMode ? '0' : '1';
+            }
+
+            previewBox.style.display = 'none';
+            emptyState.style.display = 'flex';
+        }
+
         function handleSpotFormSubmit(e) {
             const code = document.getElementById('inputCode').value.trim();
             const name = document.getElementById('inputName').value.trim();
@@ -1616,6 +1759,14 @@
             const lng = parseFloat(document.getElementById('inputLng').value);
             const banner = document.getElementById('modalValidationBanner');
             const bannerText = document.getElementById('modalValidationText');
+            const fileInput = document.getElementById('inputSpotPhoto');
+
+            if (hasPhotoValidationError) {
+                e.preventDefault();
+                bannerText.textContent = 'Perbaiki pilihan foto spot sebelum menyimpan.';
+                banner.style.display = 'flex';
+                return false;
+            }
 
             if (!name || isNaN(lat) || isNaN(lng)) {
                 e.preventDefault();
@@ -1643,7 +1794,8 @@
             const submitBtn = document.getElementById('spotSubmitBtn');
             const submitText = document.getElementById('spotSubmitBtnText');
             submitBtn.disabled = true;
-            submitText.textContent = 'Menyimpan...';
+            const hasUploadingFile = fileInput && fileInput.files && fileInput.files.length > 0;
+            submitText.textContent = hasUploadingFile ? 'Mengunggah Foto & Menyimpan...' : 'Menyimpan...';
             return true;
         }
 
@@ -1666,6 +1818,8 @@
             document.getElementById('inputStatus').value = 'ACTIVE';
             document.getElementById('inputStatusReason').value = '';
             document.getElementById('inputCatId').value = '';
+            clearSpotPhotoSelection();
+            document.getElementById('inputRemovePhoto').value = '0';
             handleStatusReasonRequirement();
 
             document.getElementById('spotModal').classList.add('open');
@@ -1691,6 +1845,16 @@
             document.getElementById('inputStatus').value = spot.status || 'ACTIVE';
             document.getElementById('inputStatusReason').value = spot.status_reason || '';
             document.getElementById('inputCatId').value = (spot.cats && spot.cats[0]) ? spot.cats[0].id : '';
+            clearSpotPhotoSelection();
+            document.getElementById('inputRemovePhoto').value = '0';
+
+            if (spot.image_url) {
+                document.getElementById('spotPhotoPreviewImg').src = spot.image_url;
+                document.getElementById('spotPhotoFileName').textContent = 'Foto dokumentasi spot tersimpan';
+                document.getElementById('spotPhotoFileSize').textContent = 'Klik Ganti Foto untuk memperbarui atau Hapus Foto';
+                document.getElementById('spotPhotoEmptyState').style.display = 'none';
+                document.getElementById('spotPhotoPreviewBox').style.display = 'flex';
+            }
             handleStatusReasonRequirement();
 
             document.getElementById('spotModal').classList.add('open');
@@ -1712,6 +1876,16 @@
             document.getElementById('detailModalTitle').textContent = `${spot.name} (${spot.code})`;
             document.getElementById('detailPrintQrBtn').href = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr-sheet`;
             document.getElementById('detailRegenQrForm').action = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr`;
+
+            const photoContainer = document.getElementById('detailSpotPhotoContainer');
+            const photoImg = document.getElementById('detailSpotPhotoImg');
+            if (spot.image_url) {
+                photoImg.src = spot.image_url;
+                photoContainer.style.display = 'block';
+            } else {
+                photoImg.src = '';
+                photoContainer.style.display = 'none';
+            }
 
             const areaInfo = identifyCampusArea(parseFloat(spot.latitude), parseFloat(spot.longitude), spot.code);
             const resolvedAreaName = spot.location_name || areaInfo.name;

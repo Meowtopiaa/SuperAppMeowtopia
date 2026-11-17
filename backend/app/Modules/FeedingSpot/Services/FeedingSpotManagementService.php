@@ -8,10 +8,13 @@ use App\Modules\FeedingSpot\Models\FeedingSpot;
 use App\Modules\FeedingSpot\Models\FeedingSpotHistory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class FeedingSpotManagementService
 {
@@ -460,6 +463,81 @@ class FeedingSpotManagementService
     }
 
     /**
+     * Simpan foto dokumentasi feeding spot melalui mekanisme storage project dan tabel media_files (MEOW-21).
+     * Terpisah dari foto bukti pemberian makan (purpose: spot_photo vs feeding_proof).
+     */
+    public function storeSpotPhoto(UploadedFile $file, ?User $actor = null): array
+    {
+        if ($file->getSize() > 5 * 1024 * 1024) {
+            throw new InvalidArgumentException('Ukuran foto spot melebihi batas maksimal 5 MB.');
+        }
+
+        $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            throw new InvalidArgumentException('Format file foto tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+        }
+
+        $realPath = $file->getRealPath();
+        $sha256 = $realPath && file_exists($realPath)
+            ? hash_file('sha256', $realPath)
+            : hash('sha256', $file->getContent());
+
+        $disk = config('filesystems.default', 'local');
+        $mediaId = (string) Str::ulid();
+        $fileName = "{$mediaId}.{$ext}";
+        $storedPath = 'media/spot_photo/' . $fileName;
+
+        Storage::disk($disk)->put($storedPath, $file->getContent());
+
+        $ownerId = $actor?->id ?? DB::table('users')->value('id');
+        if ($ownerId && Schema::hasTable('media_files')) {
+            DB::table('media_files')->insert([
+                'id' => $mediaId,
+                'owner_id' => $ownerId,
+                'disk' => $disk,
+                'path' => $storedPath,
+                'mime' => $file->getMimeType() ?: 'image/jpeg',
+                'size_bytes' => (int) $file->getSize(),
+                'sha256' => $sha256,
+                'purpose' => 'spot_photo',
+                'visibility' => 'public',
+                'captured_at' => now(),
+                'retention_until' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return [
+            'media_id' => $ownerId && Schema::hasTable('media_files') ? $mediaId : null,
+            'path' => $storedPath,
+        ];
+    }
+
+    private function deleteSpotPhoto(?string $mediaId, ?string $photoPath): void
+    {
+        $disk = config('filesystems.default', 'local');
+
+        if ($mediaId && Schema::hasTable('media_files')) {
+            $row = DB::table('media_files')
+                ->where('id', $mediaId)
+                ->where('purpose', 'spot_photo')
+                ->first();
+            if ($row) {
+                $rowDisk = $row->disk ?? $disk;
+                if (!empty($row->path) && Storage::disk($rowDisk)->exists($row->path)) {
+                    Storage::disk($rowDisk)->delete($row->path);
+                }
+                DB::table('media_files')->where('id', $mediaId)->delete();
+            }
+        }
+
+        if ($photoPath && Storage::disk($disk)->exists($photoPath)) {
+            Storage::disk($disk)->delete($photoPath);
+        }
+    }
+
+    /**
      * Polygon Perimeter Resmi Wilayah Kampus Telkom University Bandung
      * (76 titik presisi OSM Way 557649490 + Kantin Teknik, sinkron dengan Flutter CampusSpotMap).
      */
@@ -770,6 +848,17 @@ class FeedingSpotManagementService
                         }
                     }
 
+                    $photoMediaId = !empty($data['photo_media_id']) ? (string) $data['photo_media_id'] : null;
+                    $photoPath = !empty($data['photo_path']) ? (string) $data['photo_path'] : null;
+
+                    if (isset($data['photo']) && $data['photo'] instanceof UploadedFile) {
+                        $storedPhoto = $this->storeSpotPhoto($data['photo'], $actor);
+                        $photoMediaId = $storedPhoto['media_id'];
+                        $photoPath = $storedPhoto['path'];
+                    } elseif ($photoMediaId && !$photoPath && Schema::hasTable('media_files')) {
+                        $photoPath = DB::table('media_files')->where('id', $photoMediaId)->value('path');
+                    }
+
                     $spot = FeedingSpot::create([
                         'code' => $code,
                         'name' => trim((string) $data['name']),
@@ -782,6 +871,8 @@ class FeedingSpotManagementService
                         'qr_token' => Str::random(32),
                         'status' => $status,
                         'status_reason' => $status === 'ACTIVE' ? null : $statusReason,
+                        'photo_media_id' => $photoMediaId,
+                        'photo_path' => $photoPath,
                     ]);
 
                     $snapshot = $this->extractSnapshot($spot);
@@ -852,6 +943,28 @@ class FeedingSpotManagementService
                     : null;
             } elseif (($updates['status'] ?? null) === 'ACTIVE') {
                 $updates['status_reason'] = null;
+            }
+
+            if (!empty($data['remove_photo'])) {
+                $this->deleteSpotPhoto($spot->photo_media_id, $spot->photo_path);
+                $updates['photo_media_id'] = null;
+                $updates['photo_path'] = null;
+            }
+
+            if (isset($data['photo']) && $data['photo'] instanceof UploadedFile) {
+                $this->deleteSpotPhoto($spot->photo_media_id, $spot->photo_path);
+                $storedPhoto = $this->storeSpotPhoto($data['photo'], $actor);
+                $updates['photo_media_id'] = $storedPhoto['media_id'];
+                $updates['photo_path'] = $storedPhoto['path'];
+            } elseif (array_key_exists('photo_media_id', $data) && empty($data['remove_photo'])) {
+                $newMediaId = !empty($data['photo_media_id']) ? (string) $data['photo_media_id'] : null;
+                if ($newMediaId !== $spot->photo_media_id) {
+                    $this->deleteSpotPhoto($spot->photo_media_id, $spot->photo_path);
+                    $updates['photo_media_id'] = $newMediaId;
+                    $updates['photo_path'] = $newMediaId && Schema::hasTable('media_files')
+                        ? DB::table('media_files')->where('id', $newMediaId)->value('path')
+                        : null;
+                }
             }
 
             $spot->update($updates);
@@ -970,6 +1083,9 @@ class FeedingSpotManagementService
             'territory' => $territory,
             'status' => $spot->status,
             'status_reason' => $spot->status_reason,
+            'photo_media_id' => $spot->photo_media_id,
+            'photo_url' => $spot->image_url,
+            'image_url' => $spot->image_url,
             'qr_token' => $spot->qr_token,
             'qr_payload' => "MTP1.S.{$spot->qr_token}",
             'cats_count' => (int) ($spot->cats_count ?? ($spot->relationLoaded('cats') ? $spot->cats->count() : 0)),
@@ -1056,6 +1172,8 @@ class FeedingSpotManagementService
             'territory_id' => $spot->territory_id,
             'status' => $spot->status,
             'status_reason' => $spot->status_reason,
+            'photo_media_id' => $spot->photo_media_id,
+            'photo_path' => $spot->photo_path,
         ];
     }
 

@@ -1837,4 +1837,94 @@ class FeedingSpotTest extends TestCase
         $this->assertEquals('spot', $resolved['type']);
         $this->assertEquals($spotId, $resolved['id']);
     }
+
+    public function test_meow_21_spot_photo_upload_replace_remove_and_validation(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        // 1. Validasi gagal bila format file bukan gambar (mis. PDF) atau melebihi 5MB (422)
+        $invalidDoc = \Illuminate\Http\UploadedFile::fake()->create('dokumen.pdf', 200, 'application/pdf');
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->post('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot Gagal Format',
+                'latitude' => -6.9719500,
+                'longitude' => 107.6295500,
+                'photo' => $invalidDoc,
+            ], ['Accept' => 'application/json'])
+            ->assertStatus(422);
+
+        $oversizedPhoto = \Illuminate\Http\UploadedFile::fake()->create('besar.jpg', 5500, 'image/jpeg');
+        $this->actingAs($this->spotAdmin, 'sanctum')
+            ->post('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot Gagal Ukuran',
+                'latitude' => -6.9719500,
+                'longitude' => 107.6295500,
+                'photo' => $oversizedPhoto,
+            ], ['Accept' => 'application/json'])
+            ->assertStatus(422);
+
+        // 2. Sukses unggah foto saat membuat spot baru
+        $photo1 = \Illuminate\Http\UploadedFile::fake()->createWithContent(
+            'spot-gku.jpg',
+            "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xFF\xD9"
+        );
+
+        $createResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->post('/api/v1/admin/feeding/spots', [
+                'name' => 'Spot GKU Dengan Foto',
+                'description' => 'Dokumentasi visual GKU',
+                'latitude' => -6.9719500,
+                'longitude' => 107.6295500,
+                'photo' => $photo1,
+            ], ['Accept' => 'application/json']);
+
+        $createResp->assertStatus(201);
+        $spotId = $createResp->json('data.id');
+        $mediaId1 = $createResp->json('data.photo_media_id');
+        $imageUrl = $createResp->json('data.image_url');
+
+        $this->assertNotEmpty($mediaId1);
+        $this->assertNotEmpty($imageUrl);
+        $this->assertDatabaseHas('media_files', [
+            'id' => $mediaId1,
+            'purpose' => 'spot_photo',
+            'visibility' => 'public',
+        ]);
+
+        // 3. Foto tampil di endpoint publik & dapat diambil kembali lewat GET /api/v1/feeding/spots/{id}/photo
+        $publicDetail = $this->getJson("/api/v1/feeding/spots/{$spotId}");
+        $publicDetail->assertStatus(200)
+            ->assertJsonPath('data.photo_media_id', $mediaId1)
+            ->assertJsonPath('data.image_url', $imageUrl);
+
+        $photoStreamResp = $this->get("/api/v1/feeding/spots/{$spotId}/photo");
+        $photoStreamResp->assertStatus(200);
+
+        // 4. Mengganti foto pada saat edit spot
+        $photo2 = \Illuminate\Http\UploadedFile::fake()->createWithContent(
+            'spot-gku-baru.png',
+            "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+        );
+
+        $updateResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->post("/api/v1/feeding/admin-preview/spots/{$spotId}/update", [
+                'name' => 'Spot GKU Foto Diperbarui',
+                'photo' => $photo2,
+            ]);
+        $updateResp->assertRedirect();
+
+        $updatedSpot = FeedingSpot::find($spotId);
+        $this->assertNotNull($updatedSpot->photo_media_id);
+        $this->assertNotEquals($mediaId1, $updatedSpot->photo_media_id);
+        $this->assertDatabaseMissing('media_files', ['id' => $mediaId1]);
+
+        // 5. Menghapus foto spot
+        $removeResp = $this->actingAs($this->spotAdmin, 'sanctum')
+            ->patchJson("/api/v1/admin/feeding/spots/{$spotId}", [
+                'remove_photo' => true,
+            ]);
+        $removeResp->assertStatus(200)
+            ->assertJsonPath('data.photo_media_id', null)
+            ->assertJsonPath('data.image_url', null);
+    }
 }

@@ -77,6 +77,13 @@ class FeedingSpotResource extends BaseFeedingSpotResource
                 'label' => 'Alasan Status (Jika Tidak Tersedia)',
                 'nullable' => true,
             ],
+            'photo' => [
+                'type' => 'file',
+                'label' => 'Foto Dokumentasi Spot',
+                'nullable' => true,
+                'accept' => ['image/jpeg', 'image/png', 'image/webp'],
+                'maxSize' => 5120,
+            ],
         ];
     }
 

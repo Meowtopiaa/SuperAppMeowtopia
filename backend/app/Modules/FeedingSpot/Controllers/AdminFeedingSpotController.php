@@ -85,7 +85,13 @@ class AdminFeedingSpotController extends Controller
                 'max:500',
                 Rule::requiredIf(fn () => strtoupper((string) $request->input('status', 'ACTIVE')) === 'TEMPORARILY_UNAVAILABLE'),
             ],
+            'photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'photo_media_id' => ['nullable', 'string', 'size:26', 'exists:media_files,id'],
         ]);
+
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo');
+        }
 
         $spot = $this->spotService->createSpot($validated, $request->user());
 
@@ -129,7 +135,17 @@ class AdminFeedingSpotController extends Controller
                     return $request->has('status') || $request->has('status_reason') || empty($spot->status_reason);
                 }),
             ],
+            'photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'photo_media_id' => ['nullable', 'string', 'size:26', 'exists:media_files,id'],
+            'remove_photo' => ['nullable', 'boolean'],
         ]);
+
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo');
+        }
+        if ($request->boolean('remove_photo')) {
+            $validated['remove_photo'] = true;
+        }
 
         $updated = $this->spotService->updateSpot($spot, $validated, $request->user());
 
@@ -486,10 +502,15 @@ class AdminFeedingSpotController extends Controller
                     'max:500',
                     Rule::requiredIf(fn () => strtoupper((string) $request->input('status', 'ACTIVE')) === 'TEMPORARILY_UNAVAILABLE'),
                 ],
+                'photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $msg = collect($e->errors())->flatten()->implode(' ');
             return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode($msg));
+        }
+
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo');
         }
 
         if (!FeedingSpotManagementService::isPointInsideTelkomCampus((float) $validated['latitude'], (float) $validated['longitude'])) {
@@ -552,10 +573,19 @@ class AdminFeedingSpotController extends Controller
                         return $targetStatus === 'TEMPORARILY_UNAVAILABLE';
                     }),
                 ],
+                'photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+                'remove_photo' => ['nullable', 'boolean'],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $msg = collect($e->errors())->flatten()->implode(' ');
             return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode($msg));
+        }
+
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo');
+        }
+        if ($request->boolean('remove_photo')) {
+            $validated['remove_photo'] = true;
         }
 
         if (isset($validated['latitude'], $validated['longitude'])) {

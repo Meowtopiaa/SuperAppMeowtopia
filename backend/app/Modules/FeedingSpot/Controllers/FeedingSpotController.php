@@ -157,6 +157,44 @@ class FeedingSpotController extends Controller
     }
 
     /**
+     * GET /api/v1/feeding/spots/{id}/photo
+     * Tampilkan foto dokumentasi visual feeding spot (MEOW-21).
+     */
+    public function serveSpotPhoto(string $id)
+    {
+        $spot = FeedingSpot::query()
+            ->where('id', $id)
+            ->orWhere('code', $id)
+            ->first();
+
+        if (!$spot || (empty($spot->photo_media_id) && empty($spot->photo_path))) {
+            return ApiResponse::error('Foto feeding spot tidak ditemukan.', 404, 'PHOTO_NOT_FOUND');
+        }
+
+        $diskName = config('filesystems.default', 'local');
+        $path = $spot->photo_path;
+        $mime = 'image/jpeg';
+
+        if (!empty($spot->photo_media_id)) {
+            $media = DB::table('media_files')->where('id', $spot->photo_media_id)->first();
+            if ($media) {
+                $diskName = $media->disk ?: $diskName;
+                $path = $media->path ?: $path;
+                $mime = $media->mime ?: $mime;
+            }
+        }
+
+        if ($path && \Illuminate\Support\Facades\Storage::disk($diskName)->exists($path)) {
+            return response(\Illuminate\Support\Facades\Storage::disk($diskName)->get($path), 200, [
+                'Content-Type' => $mime,
+                'Cache-Control' => 'public, max-age=3600',
+            ]);
+        }
+
+        return ApiResponse::error('Berkas foto feeding spot tidak ditemukan di penyimpanan.', 404, 'PHOTO_NOT_FOUND');
+    }
+
+    /**
      * POST /api/v1/feeding/activities †
      * Buka sesi pemberian makan dengan memindai QR spot resmi (AFS-03, IT-03, MEOW-8).
      */
@@ -753,6 +791,9 @@ class FeedingSpotController extends Controller
             'territory' => $territory,
             'status' => $spot->status,
             'status_reason' => $spot->status_reason,
+            'photo_media_id' => $spot->photo_media_id,
+            'photo_url' => $spot->image_url,
+            'image_url' => $spot->image_url,
             'last_fed_at' => $lastFedIso,
             'has_pending_review' => $hasPendingReview,
             'aggregate' => [
