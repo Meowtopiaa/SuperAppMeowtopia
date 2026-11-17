@@ -1,5 +1,5 @@
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_client.dart';
@@ -9,6 +9,15 @@ import 'feeding_spot_model.dart';
 class FeedingSpotService {
   final ApiClient _client = ApiClient();
   final Uuid _uuid = const Uuid();
+
+  FeedingSpotService() {
+    if (kIsWeb && _client.dio.options.baseUrl.contains('10.0.2.2')) {
+      _client.dio.options.baseUrl = _client.dio.options.baseUrl.replaceFirst(
+        '10.0.2.2',
+        '127.0.0.1',
+      );
+    }
+  }
 
   Future<List<FeedingSpotModel>> getSpots() async {
     final response = await _client.get('/feeding/spots');

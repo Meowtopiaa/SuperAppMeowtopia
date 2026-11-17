@@ -151,6 +151,7 @@ class _CampusSpotMapState extends State<CampusSpotMap> {
   final MapController _mapController = MapController();
   static LatLng? _cachedUserLocation;
   LatLng? _userLocation;
+  String? _selectedSpotId;
   bool _isOutOfCampus = false;
   bool _locating = false;
 
@@ -252,11 +253,20 @@ class _CampusSpotMapState extends State<CampusSpotMap> {
   @override
   void initState() {
     super.initState();
+    _selectedSpotId = widget.selectedId;
     if (_cachedUserLocation != null) {
       _userLocation = _cachedUserLocation;
       _isOutOfCampus = !isPointInsideCampus(_cachedUserLocation!);
     }
     _checkUserLocation(moveToLocation: false);
+  }
+
+  @override
+  void didUpdateWidget(covariant CampusSpotMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedId != oldWidget.selectedId && widget.selectedId != null) {
+      _selectedSpotId = widget.selectedId;
+    }
   }
 
   Future<void> _checkUserLocation({bool moveToLocation = true}) async {
@@ -327,17 +337,18 @@ class _CampusSpotMapState extends State<CampusSpotMap> {
   @override
   Widget build(BuildContext context) {
     final validSpots = widget.spots.where((s) => s.latitude != 0.0 && s.longitude != 0.0).toList();
-    final center = widget.selectedId != null && validSpots.any((s) => s.id == widget.selectedId)
-        ? LatLng(
-            validSpots.firstWhere((s) => s.id == widget.selectedId).latitude,
-            validSpots.firstWhere((s) => s.id == widget.selectedId).longitude,
-          )
+    final activeSelectedId = _selectedSpotId ?? widget.selectedId;
+    final selectedSpot = activeSelectedId != null && validSpots.any((s) => s.id == activeSelectedId)
+        ? validSpots.firstWhere((s) => s.id == activeSelectedId)
+        : null;
+    final center = selectedSpot != null
+        ? LatLng(selectedSpot.latitude, selectedSpot.longitude)
         : campusCenter;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(widget.isFullScreen ? 0 : 18),
       child: Container(
-        height: widget.isFullScreen ? null : 240,
+        height: widget.isFullScreen ? null : 290,
         decoration: BoxDecoration(
           color: MeowStyle.lavender,
           border: widget.isFullScreen ? null : Border.all(color: MeowStyle.lilac),
@@ -348,9 +359,14 @@ class _CampusSpotMapState extends State<CampusSpotMap> {
               mapController: _mapController,
               options: MapOptions(
                 initialCenter: center,
-                initialZoom: widget.isFullScreen ? 16.5 : 15.8,
+                initialZoom: widget.isFullScreen ? 16.5 : 15.6,
+                onTap: (_, __) {
+                  if (_selectedSpotId != null) {
+                    setState(() => _selectedSpotId = null);
+                  }
+                },
                 interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                  flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag | InteractiveFlag.doubleTapZoom,
                 ),
               ),
               children: [
@@ -366,36 +382,47 @@ class _CampusSpotMapState extends State<CampusSpotMap> {
                     for (final spot in validSpots)
                       Marker(
                         point: LatLng(spot.latitude, spot.longitude),
-                        width: 44,
-                        height: 44,
-                        child: GestureDetector(
-                          onTap: () {
-                            if (widget.isFullScreen) {
-                              Navigator.pop(context);
-                            }
-                            context.push('/feeding/spot/${spot.id}');
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: widget.selectedId == spot.id
-                                  ? MeowStyle.orange
-                                  : spot.isActive
-                                      ? MeowStyle.green
-                                      : MeowStyle.slate,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2.5),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
+                        width: 48,
+                        height: 48,
+                        child: Semantics(
+                          label: '${spot.name} - ${spot.locationName}',
+                          button: true,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() => _selectedSpotId = spot.id);
+                              _mapController.move(
+                                LatLng(spot.latitude, spot.longitude),
+                                widget.isFullScreen ? 17.2 : 16.5,
+                              );
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              decoration: BoxDecoration(
+                                color: activeSelectedId == spot.id
+                                    ? MeowStyle.orange
+                                    : spot.isActive
+                                        ? MeowStyle.green
+                                        : const Color(0xFFD97706),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: activeSelectedId == spot.id ? 3.2 : 2.5,
                                 ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.pets_rounded,
-                              size: 22,
-                              color: Colors.white,
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 5,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                spot.isActive
+                                    ? Icons.pets_rounded
+                                    : Icons.pause_circle_outline_rounded,
+                                size: activeSelectedId == spot.id ? 24 : 21,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -426,14 +453,46 @@ class _CampusSpotMapState extends State<CampusSpotMap> {
                 ),
               ],
             ),
-            // Header Tag Kampus
-            const Positioned(
+            // Header Tag Kampus & Legenda Status (MEOW-26)
+            Positioned(
               top: 10,
               left: 10,
-              child: MeowPill(
-                'Area Telkom University',
-                color: Colors.white,
-                icon: Icons.school_outlined,
+              right: 58,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  const MeowPill(
+                    'Area Telkom University',
+                    color: Colors.white,
+                    icon: Icons.school_outlined,
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.pets_rounded, size: 12, color: MeowStyle.green),
+                        SizedBox(width: 4),
+                        Text(
+                          'Aktif',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: MeowStyle.green),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(Icons.pause_circle_outline_rounded, size: 12, color: Color(0xFFD97706)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Sementara Tutup',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFD97706)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             // Tombol Kontrol Kanan Atas: Center ke Kampus & Focus ke Lokasi Saya
@@ -516,22 +575,195 @@ class _CampusSpotMapState extends State<CampusSpotMap> {
                   ),
                 ),
               ),
-            // Label Bawah
-            Positioned(
-              bottom: 10,
-              right: 10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(8),
+            // Kartu Ringkas Spot saat Marker Diketuk (MEOW-26) atau Atribusi Bawah
+            if (selectedSpot != null)
+              Positioned(
+                bottom: 10,
+                left: 10,
+                right: 10,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.97),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: MeowStyle.lilac),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedSpot.name,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: MeowStyle.ink,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  selectedSpot.locationNumber != null
+                                      ? '${selectedSpot.locationNumber}. ${selectedSpot.locationName} (${selectedSpot.code})'
+                                      : '${selectedSpot.locationName} (${selectedSpot.code})',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: MeowStyle.brown,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          MeowPill(
+                            selectedSpot.isActive ? 'Spot aktif' : 'Sementara ditutup',
+                            color: selectedSpot.isActive
+                                ? const Color(0xFFDCFCE7)
+                                : const Color(0xFFFEF3C7),
+                            foreground: selectedSpot.isActive
+                                ? MeowStyle.green
+                                : const Color(0xFFB45309),
+                            icon: selectedSpot.isActive
+                                ? Icons.check_circle_rounded
+                                : Icons.pause_circle_outline_rounded,
+                          ),
+                          const SizedBox(width: 4),
+                          SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              tooltip: 'Tutup kartu lokasi',
+                              icon: const Icon(Icons.close_rounded, size: 17),
+                              onPressed: () => setState(() => _selectedSpotId = null),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!selectedSpot.isActive &&
+                          selectedSpot.statusReason != null &&
+                          selectedSpot.statusReason!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          'Alasan: ${selectedSpot.statusReason}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedSpot.lastFedSentence,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: MeowStyle.orangeDark,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (selectedSpot.hasPendingReview)
+                                  const Text(
+                                    'Ada pengajuan menunggu verifikasi',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: Color(0xFFD97706),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                if (selectedSpot.isStale)
+                                  const Text(
+                                    'Data agregat perlu disegarkan',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: MeowStyle.brown,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (widget.selectedId != selectedSpot.id)
+                            FilledButton.tonalIcon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: MeowStyle.orange,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () {
+                                if (widget.isFullScreen) {
+                                  Navigator.pop(context);
+                                }
+                                context.push('/feeding/spot/${selectedSpot.id}');
+                              },
+                              icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                              label: const Text(
+                                'Lihat detail',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Text(
-                  'Arsiran oranye: Luar wilayah Telkom University',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: MeowStyle.brown),
+              )
+            else
+              Positioned(
+                bottom: 10,
+                left: 10,
+                right: 10,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '© OpenStreetMap',
+                        style: TextStyle(fontSize: 9.5, color: MeowStyle.brown),
+                      ),
+                    ),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Ketuk marker untuk melihat info lokasi',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: MeowStyle.brown),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
           ],
         ),
       ),

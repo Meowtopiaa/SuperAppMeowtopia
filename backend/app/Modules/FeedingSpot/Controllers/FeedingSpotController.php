@@ -733,11 +733,19 @@ class FeedingSpotController extends Controller
         $lastFedIso = $fallbackLastFedAt ? Carbon::parse($fallbackLastFedAt)->toIso8601String() : null;
         $verifiedCount = (int) ($agg?->verified_count ?? 0);
         $needScore = round(max(0.0, min(100.0, (1.0 - min(1.0, $verifiedCount / 28.0)) * 100.0)), 1);
+        $campusLoc = \App\Modules\FeedingSpot\Services\FeedingSpotManagementService::resolveCampusLocation(
+            (float) $spot->latitude,
+            (float) $spot->longitude,
+            $spot->code,
+            $spot->name
+        );
 
         return [
             'id' => $spot->id,
             'code' => $spot->code,
             'name' => $spot->name,
+            'location_number' => $campusLoc['number'],
+            'location_name' => $campusLoc['name'],
             'description' => $spot->description,
             'latitude' => (float) $spot->latitude,
             'longitude' => (float) $spot->longitude,

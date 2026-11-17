@@ -439,6 +439,7 @@ class AdminFeedingSpotController extends Controller
             'auditLogs' => $auditLogs,
             'availableCats' => $availableCats,
             'telkomBoundary' => FeedingSpotManagementService::TELKOM_BOUNDARY,
+            'campusLocations' => FeedingSpotManagementService::CAMPUS_LOCATIONS,
             'filters' => $filters,
             'activeTab' => $request->query('tab', 'spots'),
         ]);
@@ -455,7 +456,7 @@ class AdminFeedingSpotController extends Controller
             abort(404);
         }
 
-        return response()->file($path, [
+        return response(file_get_contents($path), 200, [
             'Content-Type' => 'image/jpeg',
             'Cache-Control' => 'public, max-age=86400',
         ]);

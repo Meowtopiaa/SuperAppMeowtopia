@@ -232,9 +232,12 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                 ),
                 if (!spot.isActive) ...[
                   const SizedBox(height: 12),
-                  const MeowPill(
-                    'Pengajuan baru dinonaktifkan sementara',
+                  MeowPill(
+                    spot.statusReason != null && spot.statusReason!.trim().isNotEmpty
+                        ? 'Sementara ditutup: ${spot.statusReason}'
+                        : 'Pengajuan baru dinonaktifkan sementara',
                     color: MeowStyle.peach,
+                    icon: Icons.pause_circle_outline_rounded,
                   ),
                 ],
               ],

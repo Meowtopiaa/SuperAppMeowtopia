@@ -52,6 +52,16 @@ class SetupLocalFeedingEnvironmentCommand extends Command
             Artisan::call('db:seed', ['--class' => DatabaseSeeder::class, '--force' => true]);
         }
 
+        // Sinkronkan koordinat & nama lokasi sample spot agar sesuai Denah Telkom University (MEOW-26)
+        $canonicalSpots = [
+            'SPOT-TULT-01' => ['latitude' => -6.9693000, 'longitude' => 107.6281500],
+            'SPOT-GKU-01' => ['latitude' => -6.9719500, 'longitude' => 107.6295500],
+            'SPOT-ASRP-01' => ['latitude' => -6.9722000, 'longitude' => 107.6286500],
+        ];
+        foreach ($canonicalSpots as $code => $coords) {
+            DB::table('feeding_spots')->where('code', $code)->update($coords);
+        }
+
         Artisan::call('db:seed', ['--class' => FeedingSettingSeeder::class, '--force' => true]);
         Artisan::call('feeding:refresh-aggregates');
 

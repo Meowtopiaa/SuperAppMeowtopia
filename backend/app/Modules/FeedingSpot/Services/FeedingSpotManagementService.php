@@ -20,6 +20,393 @@ class FeedingSpotManagementService
     ];
 
     /**
+     * Referensi Resmi 38 Lokasi Kampus Telkom University Berdasarkan Denah Resmi Kampus.
+     * Setiap entri memiliki nomor denah (1..38), nama resmi sesuai denah, prefix kode spot,
+     * kode territory, dan titik koordinat bangunan di dalam poligon kampus.
+     */
+    public const CAMPUS_LOCATIONS = [
+        [
+            'number' => 1,
+            'name' => 'Telkom University Landmark Tower (TULT)',
+            'short_name' => 'Landmark Tower (TULT)',
+            'code_prefix' => 'SPOT-TULT',
+            'territory_code' => 'TULT',
+            'lat' => -6.9693000,
+            'lng' => 107.6281500,
+        ],
+        [
+            'number' => 2,
+            'name' => 'Kantin TULT',
+            'short_name' => 'Kantin TULT',
+            'code_prefix' => 'SPOT-KTULT',
+            'territory_code' => 'TULT',
+            'lat' => -6.9698500,
+            'lng' => 107.6281000,
+        ],
+        [
+            'number' => 3,
+            'name' => 'Asrama Putra',
+            'short_name' => 'Asrama Putra',
+            'code_prefix' => 'SPOT-ASPA',
+            'territory_code' => 'ASRAMA_PA',
+            'lat' => -6.9704500,
+            'lng' => 107.6279500,
+        ],
+        [
+            'number' => 4,
+            'name' => 'Gedung Batek - BTP (Bandung Techno Park)',
+            'short_name' => 'Gedung Batek (BTP)',
+            'code_prefix' => 'SPOT-BTP',
+            'territory_code' => 'GKU',
+            'lat' => -6.9703500,
+            'lng' => 107.6299500,
+        ],
+        [
+            'number' => 5,
+            'name' => 'Sport Center',
+            'short_name' => 'Sport Center',
+            'code_prefix' => 'SPOT-SPORT',
+            'territory_code' => 'ASRAMA_PA',
+            'lat' => -6.9712500,
+            'lng' => 107.6283500,
+        ],
+        [
+            'number' => 6,
+            'name' => 'Asrama Putri',
+            'short_name' => 'Asrama Putri',
+            'code_prefix' => 'SPOT-ASRP',
+            'territory_code' => 'ASRAMA_PI',
+            'lat' => -6.9722000,
+            'lng' => 107.6286500,
+        ],
+        [
+            'number' => 7,
+            'name' => 'Gedung Tokong Nanas (Gd. Kuliah Umum-GKU)',
+            'short_name' => 'Gedung Tokong Nanas (GKU)',
+            'code_prefix' => 'SPOT-GKU',
+            'territory_code' => 'GKU',
+            'lat' => -6.9719500,
+            'lng' => 107.6295500,
+        ],
+        [
+            'number' => 8,
+            'name' => 'Tel-U Coffee',
+            'short_name' => 'Tel-U Coffee',
+            'code_prefix' => 'SPOT-COFFEE',
+            'territory_code' => 'GKU',
+            'lat' => -6.9717500,
+            'lng' => 107.6290500,
+        ],
+        [
+            'number' => 9,
+            'name' => 'Gedung Lingian - Gd.L (Lab. Perhotelan)',
+            'short_name' => 'Gedung Lingian',
+            'code_prefix' => 'SPOT-LING',
+            'territory_code' => 'FIT',
+            'lat' => -6.9727500,
+            'lng' => 107.6294500,
+        ],
+        [
+            'number' => 10,
+            'name' => 'Research & Recreation Area',
+            'short_name' => 'Research & Recreation Area',
+            'code_prefix' => 'SPOT-RRA',
+            'territory_code' => 'GKU',
+            'lat' => -6.9711000,
+            'lng' => 107.6297500,
+        ],
+        [
+            'number' => 11,
+            'name' => 'Gedung Benggala - TUCH (Tel-U Convention Center)',
+            'short_name' => 'Gedung Benggala (TUCH)',
+            'code_prefix' => 'SPOT-TUCH',
+            'territory_code' => 'GKU',
+            'lat' => -6.9716500,
+            'lng' => 107.6307500,
+        ],
+        [
+            'number' => 12,
+            'name' => 'Gedung Sebatik (FIK)',
+            'short_name' => 'Gedung Sebatik (FIK)',
+            'code_prefix' => 'SPOT-FIK',
+            'territory_code' => 'GKU',
+            'lat' => -6.9720500,
+            'lng' => 107.6311500,
+        ],
+        [
+            'number' => 13,
+            'name' => 'Gd. Miossu & Maratua (Gd. C & D - FEB)',
+            'short_name' => 'Gedung Miossu & Maratua',
+            'code_prefix' => 'SPOT-FEB',
+            'territory_code' => 'GKU',
+            'lat' => -6.9715500,
+            'lng' => 107.6319500,
+        ],
+        [
+            'number' => 14,
+            'name' => 'Open Library',
+            'short_name' => 'Open Library',
+            'code_prefix' => 'SPOT-LIB',
+            'territory_code' => 'GKU',
+            'lat' => -6.9719500,
+            'lng' => 107.6322500,
+        ],
+        [
+            'number' => 15,
+            'name' => 'Kantin Dekanat',
+            'short_name' => 'Kantin Dekanat',
+            'code_prefix' => 'SPOT-KDEK',
+            'territory_code' => 'GKU',
+            'lat' => -6.9722000,
+            'lng' => 107.6326500,
+        ],
+        [
+            'number' => 16,
+            'name' => 'Gd. Kawalusu & Intata (Gd. A & B - FKS)',
+            'short_name' => 'Gedung Kawalusu & Intata',
+            'code_prefix' => 'SPOT-FKS',
+            'territory_code' => 'GKU',
+            'lat' => -6.9725500,
+            'lng' => 107.6329000,
+        ],
+        [
+            'number' => 17,
+            'name' => 'Gedung Selaru (FIT)',
+            'short_name' => 'Gedung Selaru (FIT)',
+            'code_prefix' => 'SPOT-FIT',
+            'territory_code' => 'FIT',
+            'lat' => -6.9731500,
+            'lng' => 107.6324500,
+        ],
+        [
+            'number' => 18,
+            'name' => 'Danau (Situ Techno)',
+            'short_name' => 'Danau (Situ Techno)',
+            'code_prefix' => 'SPOT-DANAU',
+            'territory_code' => 'GKU',
+            'lat' => -6.9729500,
+            'lng' => 107.6311500,
+        ],
+        [
+            'number' => 19,
+            'name' => 'Gedung Bangkit (Gd. Rektorat)',
+            'short_name' => 'Gedung Bangkit (Rektorat)',
+            'code_prefix' => 'SPOT-REKT',
+            'territory_code' => 'GKU',
+            'lat' => -6.9734500,
+            'lng' => 107.6301500,
+        ],
+        [
+            'number' => 20,
+            'name' => 'Gedung Damar - Gd. K (Gedung Auditorium)',
+            'short_name' => 'Gedung Damar (Auditorium)',
+            'code_prefix' => 'SPOT-DAMAR',
+            'territory_code' => 'GKU',
+            'lat' => -6.9738500,
+            'lng' => 107.6295500,
+        ],
+        [
+            'number' => 21,
+            'name' => 'Grha Wiyata Cacuk Sudarijanto',
+            'short_name' => 'Grha Wiyata Cacuk Sudarijanto',
+            'code_prefix' => 'SPOT-CACUK',
+            'territory_code' => 'GKU',
+            'lat' => -6.9740500,
+            'lng' => 107.6306500,
+        ],
+        [
+            'number' => 22,
+            'name' => 'Gedung Deli (Gd. P)',
+            'short_name' => 'Gedung Deli',
+            'code_prefix' => 'SPOT-DELI',
+            'territory_code' => 'GKU',
+            'lat' => -6.9742500,
+            'lng' => 107.6290500,
+        ],
+        [
+            'number' => 23,
+            'name' => 'Gedung Arakula (Gd. O)',
+            'short_name' => 'Gedung Arakula',
+            'code_prefix' => 'SPOT-ARAK',
+            'territory_code' => 'GKU',
+            'lat' => -6.9747500,
+            'lng' => 107.6288500,
+        ],
+        [
+            'number' => 24,
+            'name' => 'Gedung Barung (Gd. N)',
+            'short_name' => 'Gedung Barung',
+            'code_prefix' => 'SPOT-BARUNG',
+            'territory_code' => 'GKU',
+            'lat' => -6.9752500,
+            'lng' => 107.6291800,
+        ],
+        [
+            'number' => 25,
+            'name' => 'Gedung Penambulai (Gd. D)',
+            'short_name' => 'Gedung Penambulai',
+            'code_prefix' => 'SPOT-PENAM',
+            'territory_code' => 'GKU',
+            'lat' => -6.9747000,
+            'lng' => 107.6298500,
+        ],
+        [
+            'number' => 26,
+            'name' => 'Gedung Panehan (Gd. G - Pascasarjana)',
+            'short_name' => 'Gedung Panehan',
+            'code_prefix' => 'SPOT-PANEH',
+            'territory_code' => 'GKU',
+            'lat' => -6.9749500,
+            'lng' => 107.6303500,
+        ],
+        [
+            'number' => 27,
+            'name' => 'Gedung Karang (Gd. C - Pascasarjana)',
+            'short_name' => 'Gedung Karang',
+            'code_prefix' => 'SPOT-KARANG',
+            'territory_code' => 'GKU',
+            'lat' => -6.9748000,
+            'lng' => 107.6308500,
+        ],
+        [
+            'number' => 28,
+            'name' => 'Gedung Pelampong - GSG (Gd. H - GD. Serba Guna)',
+            'short_name' => 'Gedung Pelampong (GSG)',
+            'code_prefix' => 'SPOT-GSG',
+            'territory_code' => 'GKU',
+            'lat' => -6.9755500,
+            'lng' => 107.6295500,
+        ],
+        [
+            'number' => 29,
+            'name' => 'Gd. Kultubai Utara (Gd. E)',
+            'short_name' => 'Gedung Kultubai Utara',
+            'code_prefix' => 'SPOT-KULTU',
+            'territory_code' => 'GKU',
+            'lat' => -6.9755000,
+            'lng' => 107.6301500,
+        ],
+        [
+            'number' => 30,
+            'name' => 'Gd. Kultubai Selatan (Gd. F)',
+            'short_name' => 'Gedung Kultubai Selatan',
+            'code_prefix' => 'SPOT-KULTS',
+            'territory_code' => 'GKU',
+            'lat' => -6.9759500,
+            'lng' => 107.6304500,
+        ],
+        [
+            'number' => 31,
+            'name' => 'Gedung Karaweira (Gd. Student Center)',
+            'short_name' => 'Gedung Karaweira (Student Center)',
+            'code_prefix' => 'SPOT-SC',
+            'territory_code' => 'GKU',
+            'lat' => -6.9761500,
+            'lng' => 107.6291500,
+        ],
+        [
+            'number' => 32,
+            'name' => 'Lapangan Tenis',
+            'short_name' => 'Lapangan Tenis',
+            'code_prefix' => 'SPOT-TENIS',
+            'territory_code' => 'GKU',
+            'lat' => -6.9763500,
+            'lng' => 107.6294500,
+        ],
+        [
+            'number' => 33,
+            'name' => 'Gedung Alor (Gd. Business Center)',
+            'short_name' => 'Gedung Alor (Business Center)',
+            'code_prefix' => 'SPOT-ALOR',
+            'territory_code' => 'GKU',
+            'lat' => -6.9762500,
+            'lng' => 107.6299000,
+        ],
+        [
+            'number' => 34,
+            'name' => 'Kantin Teknik',
+            'short_name' => 'Kantin Teknik',
+            'code_prefix' => 'SPOT-KTEK',
+            'territory_code' => 'GKU',
+            'lat' => -6.9765500,
+            'lng' => 107.6303500,
+        ],
+        [
+            'number' => 35,
+            'name' => 'Greenhouse',
+            'short_name' => 'Greenhouse',
+            'code_prefix' => 'SPOT-GH',
+            'territory_code' => 'GKU',
+            'lat' => -6.9764500,
+            'lng' => 107.6309500,
+        ],
+        [
+            'number' => 36,
+            'name' => 'Pool KBM',
+            'short_name' => 'Pool KBM',
+            'code_prefix' => 'SPOT-KBM',
+            'territory_code' => 'GKU',
+            'lat' => -6.9759500,
+            'lng' => 107.6317500,
+        ],
+        [
+            'number' => 37,
+            'name' => 'Masjid Syamsul Ulum',
+            'short_name' => 'Masjid Syamsul Ulum',
+            'code_prefix' => 'SPOT-MSU',
+            'territory_code' => 'GKU',
+            'lat' => -6.9752500,
+            'lng' => 107.6316500,
+        ],
+        [
+            'number' => 38,
+            'name' => 'Jogging Track',
+            'short_name' => 'Jogging Track',
+            'code_prefix' => 'SPOT-JOG',
+            'territory_code' => 'GKU',
+            'lat' => -6.9743500,
+            'lng' => 107.6318500,
+        ],
+    ];
+
+    /**
+     * Resolusi lokasi resmi berdasarkan denah 38 lokasi Telkom University.
+     * Memprioritaskan kecocokan prefix kode spot bila eksplisit, lalu jarak koordinat terdekat.
+     */
+    public static function resolveCampusLocation(
+        float $latitude,
+        float $longitude,
+        ?string $spotCode = null,
+        ?string $spotName = null
+    ): array {
+        if ($spotCode !== null && $spotCode !== '') {
+            $upperCode = strtoupper(trim($spotCode));
+            foreach (self::CAMPUS_LOCATIONS as $loc) {
+                $prefix = strtoupper($loc['code_prefix']);
+                $shortPrefix = str_replace('SPOT-', 'FS-', $prefix);
+                if (str_starts_with($upperCode, $prefix . '-') || str_starts_with($upperCode, $shortPrefix . '-')) {
+                    return $loc;
+                }
+            }
+        }
+
+        $bestMatch = self::CAMPUS_LOCATIONS[0];
+        $minDistSq = PHP_FLOAT_MAX;
+
+        foreach (self::CAMPUS_LOCATIONS as $loc) {
+            $dLat = $latitude - (float) $loc['lat'];
+            $dLng = $longitude - (float) $loc['lng'];
+            $distSq = ($dLat * $dLat) + ($dLng * $dLng);
+            if ($distSq < $minDistSq) {
+                $minDistSq = $distSq;
+                $bestMatch = $loc;
+            }
+        }
+
+        return $bestMatch;
+    }
+
+    /**
      * Polygon Perimeter Resmi Wilayah Kampus Telkom University Bandung
      * (76 titik presisi OSM Way 557649490 + Kantin Teknik, sinkron dengan Flutter CampusSpotMap).
      */
@@ -421,10 +808,19 @@ class FeedingSpotManagementService
         $verifiedCount = (int) ($agg?->verified_count ?? 0);
         $needScore = round(max(0.0, min(100.0, (1.0 - min(1.0, $verifiedCount / 28.0)) * 100.0)), 1);
 
+        $campusLoc = self::resolveCampusLocation(
+            (float) $spot->latitude,
+            (float) $spot->longitude,
+            $spot->code,
+            $spot->name
+        );
+
         return [
             'id' => $spot->id,
             'code' => $spot->code,
             'name' => $spot->name,
+            'location_number' => $campusLoc['number'],
+            'location_name' => $campusLoc['name'],
             'description' => $spot->description,
             'latitude' => (float) $spot->latitude,
             'longitude' => (float) $spot->longitude,

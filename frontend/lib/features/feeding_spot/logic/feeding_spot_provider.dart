@@ -74,6 +74,19 @@ class FeedingSpotProvider extends ChangeNotifier {
       if (!isDemo) {
         _spots = await _service.getSpots();
         await fetchMyActivities();
+      } else {
+        // Coba sinkronisasi data spot aktual dari backend bila server aktif,
+        // dengan fallback otomatis ke data contoh apabila berjalan secara offline.
+        try {
+          final remoteSpots = await _service.getSpots();
+          if (remoteSpots.isNotEmpty) {
+            _spots = remoteSpots;
+          }
+        } catch (_) {
+          if (_spots.isEmpty) {
+            _spots = demoFeedingSpots(DateTime.now());
+          }
+        }
       }
       await _sortSpotsClientSide();
       _loaded = true;

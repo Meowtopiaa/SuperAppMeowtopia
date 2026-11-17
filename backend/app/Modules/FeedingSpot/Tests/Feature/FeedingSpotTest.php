@@ -1705,4 +1705,46 @@ class FeedingSpotTest extends TestCase
             ->assertSee('FEEDING_REVIEW_REJECTED')
             ->assertSee($rejectReason);
     }
+
+    public function test_meow_26_campus_location_mapping_matches_telkom_university_denah(): void
+    {
+        $locations = \App\Modules\FeedingSpot\Services\FeedingSpotManagementService::CAMPUS_LOCATIONS;
+        $this->assertCount(38, $locations);
+
+        $numbers = array_column($locations, 'number');
+        $this->assertEquals(range(1, 38), $numbers);
+
+        foreach ($locations as $loc) {
+            $this->assertTrue(
+                \App\Modules\FeedingSpot\Services\FeedingSpotManagementService::isPointInsideTelkomCampus(
+                    (float) $loc['lat'],
+                    (float) $loc['lng']
+                ),
+                "Lokasi #{$loc['number']} ({$loc['name']}) harus berada di dalam poligon kampus Telkom University."
+            );
+        }
+
+        // Pastikan resolusi lokasi spot sesuai denah
+        $tult = \App\Modules\FeedingSpot\Services\FeedingSpotManagementService::resolveCampusLocation(-6.9693000, 107.6281500, 'SPOT-TULT-01');
+        $this->assertEquals(1, $tult['number']);
+        $this->assertEquals('Telkom University Landmark Tower (TULT)', $tult['name']);
+
+        $gku = \App\Modules\FeedingSpot\Services\FeedingSpotManagementService::resolveCampusLocation(-6.9719500, 107.6295500, 'SPOT-GKU-01');
+        $this->assertEquals(7, $gku['number']);
+        $this->assertEquals('Gedung Tokong Nanas (Gd. Kuliah Umum-GKU)', $gku['name']);
+
+        $asrp = \App\Modules\FeedingSpot\Services\FeedingSpotManagementService::resolveCampusLocation(-6.9722000, 107.6286500, 'SPOT-ASRP-01');
+        $this->assertEquals(6, $asrp['number']);
+        $this->assertEquals('Asrama Putri', $asrp['name']);
+
+        $msu = \App\Modules\FeedingSpot\Services\FeedingSpotManagementService::resolveCampusLocation(-6.9752500, 107.6316500);
+        $this->assertEquals(37, $msu['number']);
+        $this->assertEquals('Masjid Syamsul Ulum', $msu['name']);
+
+        // Pastikan API publik menyertakan location_number & location_name yang akurat
+        $publicResp = $this->getJson("/api/v1/feeding/spots/{$this->activeSpot->id}");
+        $publicResp->assertStatus(200)
+            ->assertJsonPath('data.location_number', 1)
+            ->assertJsonPath('data.location_name', 'Telkom University Landmark Tower (TULT)');
+    }
 }

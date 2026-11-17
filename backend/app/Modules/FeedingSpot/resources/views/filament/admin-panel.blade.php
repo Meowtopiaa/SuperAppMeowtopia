@@ -916,7 +916,7 @@
                                             @endif
                                         </td>
                                         <td style="color: var(--text-secondary);">
-                                            {{ $spot['territory']['name'] ?? 'Area Kampus Telkom University' }}
+                                            {{ $spot['location_name'] ?? $spot['territory']['name'] ?? 'Area Kampus Telkom University' }}
                                         </td>
                                         <td>
                                             <!-- STANDARD DROPDOWN FOR CAT INFORMATION (POINT 4) -->
@@ -1293,119 +1293,30 @@
         const TELKOM_POLYGON = @json($telkomBoundary);
         const CAMPUS_CENTER = [-6.9731000, 107.6300000];
 
-        // Accurate Telkom University Campus Landmarks & Zones for Automatic Area Identification (Point 5)
-        const TELKOM_CAMPUS_AREAS = [
-            {
-                name: 'Area Gedung TULT (Telkom University Landmark Tower)',
-                shortName: 'Gedung TULT',
-                codePrefix: 'SPOT-TULT',
-                territoryCode: 'TULT',
-                lat: -6.96935,
-                lng: 107.62825,
-                radius: 0.00145
-            },
-            {
-                name: 'Area Asrama Putri',
-                shortName: 'Asrama Putri',
-                codePrefix: 'SPOT-ASRP',
-                territoryCode: 'ASRAMA_PI',
-                lat: -6.97055,
-                lng: 107.62775,
-                radius: 0.00130
-            },
-            {
-                name: 'Area Asrama Putra',
-                shortName: 'Asrama Putra',
-                codePrefix: 'SPOT-ASPA',
-                territoryCode: 'ASRAMA_PA',
-                lat: -6.97115,
-                lng: 107.62645,
-                radius: 0.00135
-            },
-            {
-                name: 'Area Fakultas Ilmu Terapan (FIT)',
-                shortName: 'Fakultas Ilmu Terapan (FIT)',
-                codePrefix: 'SPOT-FIT',
-                territoryCode: 'FIT',
-                lat: -6.97255,
-                lng: 107.62855,
-                radius: 0.00120
-            },
-            {
-                name: 'Area Gedung Kuliah Umum (GKU / Tokong Nanas)',
-                shortName: 'Gedung Kuliah Umum (GKU)',
-                codePrefix: 'SPOT-GKU',
-                territoryCode: 'GKU',
-                lat: -6.97305,
-                lng: 107.63000,
-                radius: 0.00125
-            },
-            {
-                name: 'Area Danau Galau',
-                shortName: 'Danau Galau',
-                codePrefix: 'SPOT-DANAU',
-                territoryCode: 'GKU',
-                lat: -6.97315,
-                lng: 107.63110,
-                radius: 0.00110
-            },
-            {
-                name: 'Area Gedung Bangkit (Rektorat)',
-                shortName: 'Gedung Bangkit',
-                codePrefix: 'SPOT-REKT',
-                territoryCode: 'GKU',
-                lat: -6.97405,
-                lng: 107.63035,
-                radius: 0.00110
-            },
-            {
-                name: 'Area Kantin Ruang Riung',
-                shortName: 'Kantin Ruang Riung',
-                codePrefix: 'SPOT-RIUNG',
-                territoryCode: 'FIT',
-                lat: -6.97445,
-                lng: 107.62885,
-                radius: 0.00115
-            },
-            {
-                name: 'Area Masjid Syamsul Ulum (MSU)',
-                shortName: 'Masjid Syamsul Ulum (MSU)',
-                codePrefix: 'SPOT-MSU',
-                territoryCode: 'GKU',
-                lat: -6.97525,
-                lng: 107.63145,
-                radius: 0.00125
-            },
-            {
-                name: 'Area Gedung Serba Guna (GSG)',
-                shortName: 'Gedung Serba Guna (GSG)',
-                codePrefix: 'SPOT-GSG',
-                territoryCode: 'GKU',
-                lat: -6.97585,
-                lng: 107.62985,
-                radius: 0.00115
-            },
-            {
-                name: 'Area Taman Fakultas Elektro',
-                shortName: 'Taman Fakultas Elektro',
-                codePrefix: 'SPOT-FTE',
-                territoryCode: 'GKU',
-                lat: -6.97655,
-                lng: 107.62945,
-                radius: 0.00115
-            },
-            {
-                name: 'Area Kantin Teknik',
-                shortName: 'Kantin Teknik',
-                codePrefix: 'SPOT-KTEK',
-                territoryCode: 'GKU',
-                lat: -6.97720,
-                lng: 107.63050,
-                radius: 0.00120
-            }
-        ];
+        // Referensi Resmi 38 Lokasi Denah Kampus Telkom University (Area Gedung TULT, Area Asrama Putri, dll.)
+        const RAW_CAMPUS_LOCATIONS = @json($campusLocations ?? []);
+        const TELKOM_CAMPUS_AREAS = RAW_CAMPUS_LOCATIONS.map((loc) => ({
+            number: loc.number,
+            name: loc.name,
+            shortName: loc.short_name || loc.name,
+            codePrefix: loc.code_prefix,
+            territoryCode: loc.territory_code,
+            lat: Number(loc.lat),
+            lng: Number(loc.lng)
+        }));
 
-        function identifyCampusArea(lat, lng) {
+        function identifyCampusArea(lat, lng, spotCode = '') {
+            if (spotCode) {
+                const upperCode = String(spotCode).trim().toUpperCase();
+                for (const area of TELKOM_CAMPUS_AREAS) {
+                    const prefix = String(area.codePrefix).toUpperCase();
+                    const altPrefix = prefix.replace(/^SPOT-/, 'FS-');
+                    if (upperCode.startsWith(prefix + '-') || upperCode.startsWith(altPrefix + '-')) {
+                        return area;
+                    }
+                }
+            }
+
             let bestMatch = null;
             let minDistance = Infinity;
 
@@ -1424,6 +1335,7 @@
             }
 
             return {
+                number: 0,
                 name: 'Area Kampus Telkom University',
                 shortName: 'Kampus Telkom University',
                 codePrefix: 'SPOT-TELU',
@@ -1571,6 +1483,21 @@
                 interactive: false
             }).addTo(pickerMap);
 
+            // Tampilkan titik referensi 38 lokasi sesuai Denah Telkom University
+            TELKOM_CAMPUS_AREAS.forEach((loc) => {
+                const pin = L.circleMarker([loc.lat, loc.lng], {
+                    radius: 6,
+                    color: '#1B365D',
+                    weight: 1.5,
+                    fillColor: '#EA580C',
+                    fillOpacity: 0.85
+                }).addTo(pickerMap);
+                pin.bindTooltip(`${loc.number}. ${loc.name}`, { direction: 'top', offset: [0, -6] });
+                pin.on('click', function () {
+                    selectMapCoordinates(loc.lat, loc.lng, true, true);
+                });
+            });
+
             pickerMarker = L.marker(CAMPUS_CENTER, { draggable: true }).addTo(pickerMap);
 
             pickerMarker.on('dragend', function (e) {
@@ -1613,7 +1540,9 @@
             const detectedArea = identifyCampusArea(Number(lat), Number(lng));
             label.textContent = `Koordinat dipilih (${latFixed}, ${lngFixed})`;
             label.style.color = 'var(--text-secondary)';
-            areaBadge.textContent = detectedArea.name;
+            areaBadge.textContent = detectedArea.number
+                ? `${detectedArea.number}. ${detectedArea.name}`
+                : detectedArea.name;
             areaBadge.style.color = 'var(--sidebar-navy)';
             document.getElementById('inputTerritoryCode').value = detectedArea.territoryCode;
             submitBtn.disabled = false;
@@ -1632,23 +1561,6 @@
                     codeInput.dataset.autoGenerated = '1';
                 }
             }
-
-            // Refine area name via OpenStreetMap Nominatim if specific campus building name is available
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latFixed}&lon=${lngFixed}&zoom=18`, {
-                headers: { 'Accept-Language': 'id' }
-            })
-                .then((res) => res.ok ? res.json() : null)
-                .then((data) => {
-                    if (!data || !isPointInsidePolygon(Number(lat), Number(lng), TELKOM_POLYGON)) return;
-                    const osmName = data.name || (data.address && (data.address.building || data.address.amenity || data.address.university));
-                    if (osmName && osmName.toLowerCase() !== 'telkom university') {
-                        areaBadge.textContent = `${detectedArea.shortName} (${osmName})`;
-                        if (autoFillFields && isCreateMode && isNameAutoSuggested) {
-                            document.getElementById('inputName').value = `Spot Pakan ${osmName}`;
-                        }
-                    }
-                })
-                .catch(() => {});
         }
 
         function resetMapToCampusCenter() {
@@ -1776,7 +1688,8 @@
             document.getElementById('detailPrintQrBtn').href = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr-sheet`;
             document.getElementById('detailRegenQrForm').action = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr`;
 
-            const areaInfo = identifyCampusArea(parseFloat(spot.latitude), parseFloat(spot.longitude));
+            const areaInfo = identifyCampusArea(parseFloat(spot.latitude), parseFloat(spot.longitude), spot.code);
+            const resolvedAreaName = spot.location_name || areaInfo.name;
             const catName = (spot.cats && spot.cats[0]) ? `${spot.cats[0].name} (${spot.cats[0].unique_code})` : 'Belum dipilih';
 
             const dl = document.getElementById('detailSpotList');
@@ -1786,7 +1699,7 @@
                 <dt>Nama Lokasi</dt>
                 <dd>${spot.name}</dd>
                 <dt>Area Kampus</dt>
-                <dd>${areaInfo.name}</dd>
+                <dd>${resolvedAreaName}</dd>
                 <dt>Informasi Kucing</dt>
                 <dd>${catName}</dd>
                 <dt>Status</dt>

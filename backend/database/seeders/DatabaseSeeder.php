@@ -204,11 +204,11 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // 5. Seed Campus Territories
+        // 5. Seed Campus Territories (Sesuai Denah Resmi Telkom University)
         $territories = [
-            ['code' => 'TULT', 'name' => 'Telkom University Landmark Tower'],
-            ['code' => 'GKU', 'name' => 'Gedung Kuliah Umum'],
-            ['code' => 'FIT', 'name' => 'Fakultas Ilmu Terapan'],
+            ['code' => 'TULT', 'name' => 'Telkom University Landmark Tower (TULT)'],
+            ['code' => 'GKU', 'name' => 'Gedung Tokong Nanas (Gd. Kuliah Umum-GKU)'],
+            ['code' => 'FIT', 'name' => 'Gedung Selaru (FIT)'],
             ['code' => 'ASRAMA_PA', 'name' => 'Asrama Putra'],
             ['code' => 'ASRAMA_PI', 'name' => 'Asrama Putri'],
         ];
@@ -269,30 +269,30 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 7. Seed 3 Sample Feeding Spots
+        // 7. Seed 3 Sample Feeding Spots (Koordinat & nama sesuai Denah Telkom University)
         $spots = [
             [
                 'code' => 'SPOT-TULT-01',
                 'name' => 'Spot Pakan TULT Lobby',
-                'description' => 'Titik makan resmi dekat lobby barat TULT',
-                'latitude' => -6.9740000,
-                'longitude' => 107.6300000,
+                'description' => 'Titik makan resmi dekat lobby Telkom University Landmark Tower (TULT)',
+                'latitude' => -6.9693000,
+                'longitude' => 107.6281500,
                 't_code' => 'TULT',
             ],
             [
                 'code' => 'SPOT-GKU-01',
                 'name' => 'Spot Pakan GKU Gazebo',
-                'description' => 'Titik makan di sebelah gazebo barat GKU',
-                'latitude' => -6.9730000,
-                'longitude' => 107.6310000,
+                'description' => 'Titik makan di sebelah gazebo Gedung Tokong Nanas (Gd. Kuliah Umum-GKU)',
+                'latitude' => -6.9719500,
+                'longitude' => 107.6295500,
                 't_code' => 'GKU',
             ],
             [
                 'code' => 'SPOT-ASRP-01',
                 'name' => 'Spot Pakan Asrama Putri',
-                'description' => 'Titik makan samping pos satpam asrama putri',
-                'latitude' => -6.9750000,
-                'longitude' => 107.6290000,
+                'description' => 'Titik makan samping pos satpam Asrama Putri',
+                'latitude' => -6.9722000,
+                'longitude' => 107.6286500,
                 't_code' => 'ASRAMA_PI',
             ],
         ];
