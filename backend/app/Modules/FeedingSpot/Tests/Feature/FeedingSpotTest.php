@@ -1602,6 +1602,8 @@ class FeedingSpotTest extends TestCase
             ->assertDontSee('Tampilkan Menu')
             ->assertDontSee('Sembunyikan Menu')
             ->assertSee('spotPickerMap')
+            ->assertSee('btn-icon-close')
+            ->assertDontSee('>Tutup</button>')
             ->assertSee($this->activeSpot->code)
             ->assertSee($this->inactiveSpot->code);
 

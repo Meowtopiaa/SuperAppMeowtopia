@@ -614,6 +614,28 @@
             color: var(--text-primary);
         }
 
+        .btn-icon-close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            border: 1px solid var(--border-strong);
+            background: var(--surface);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .btn-icon-close:hover {
+            background: var(--surface-subtle);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+        }
+
         .modal-body {
             padding: 18px 20px;
             overflow-y: auto;
@@ -1187,7 +1209,12 @@
         <div class="modal-box">
             <div class="modal-header">
                 <h3 id="spotModalTitle">Tambah Feeding Spot</h3>
-                <button type="button" class="btn btn-neutral btn-sm" onclick="closeSpotModal()">Tutup</button>
+                <button type="button" class="btn-icon-close" onclick="closeSpotModal()" title="Tutup" aria-label="Tutup">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M18 6 6 18"/>
+                        <path d="m6 6 12 12"/>
+                    </svg>
+                </button>
             </div>
 
             <form method="POST" action="/api/v1/feeding/admin-preview/spots" id="spotForm" enctype="multipart/form-data" class="modal-form-flex" onsubmit="return handleSpotFormSubmit(event);">
@@ -1319,7 +1346,12 @@
         <div class="modal-box modal-sm">
             <div class="modal-header">
                 <h3 id="detailModalTitle">Detail Spot</h3>
-                <button type="button" class="btn btn-neutral btn-sm" onclick="closeDetailSpotModal()">Tutup</button>
+                <button type="button" class="btn-icon-close" onclick="closeDetailSpotModal()" title="Tutup" aria-label="Tutup">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M18 6 6 18"/>
+                        <path d="m6 6 12 12"/>
+                    </svg>
+                </button>
             </div>
             <div class="modal-body">
                 <div id="detailSpotPhotoContainer" style="display: none; margin-bottom: 14px;">
@@ -1337,9 +1369,6 @@
                         </form>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-neutral" onclick="closeDetailSpotModal()">Tutup</button>
             </div>
         </div>
     </div>

@@ -801,7 +801,13 @@
 
     <!-- LIGHTBOX -->
     <div class="lightbox-backdrop" id="photoLightbox" onclick="closeLightbox()">
-        <div class="lightbox-box" onclick="event.stopPropagation()">
+        <div class="lightbox-box" style="position: relative;" onclick="event.stopPropagation()">
+            <button type="button" onclick="closeLightbox()" title="Tutup" aria-label="Tutup" style="position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(15,23,42,0.75); color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 6 6 18"/>
+                    <path d="m6 6 12 12"/>
+                </svg>
+            </button>
             <img src="" id="lightboxImg" alt="Foto Bukti">
         </div>
     </div>
