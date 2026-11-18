@@ -112,10 +112,15 @@ class AdoptionApplication extends Model
     {
         return $query->where(function (Builder $q) {
             $q->whereIn('status', [self::STATUS_DRAFT, self::STATUS_SUBMITTED, self::STATUS_REVISION_REQUESTED])
-                ->orWhere(fn (Builder $approved) => $approved
-                    ->where('status', self::STATUS_APPROVED)
-                    ->where('reviewed_at', '>', now()->subDays(self::ELIGIBILITY_VALID_DAYS)));
+                ->orWhere(fn (Builder $approved) => $approved->validApproval());
         });
+    }
+
+    /** Kelayakan APPROVED yang masih berlaku (OQ-09). */
+    public function scopeValidApproval(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_APPROVED)
+            ->where('reviewed_at', '>', now()->subDays(self::ELIGIBILITY_VALID_DAYS));
     }
 
     public function isEditable(): bool
