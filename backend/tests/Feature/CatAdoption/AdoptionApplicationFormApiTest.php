@@ -3,6 +3,8 @@
 namespace Tests\Feature\CatAdoption;
 
 use App\Models\User;
+use App\Modules\Cat\Models\Cat;
+use App\Modules\CatAdoption\Models\Adoption;
 use App\Modules\CatAdoption\Models\AdoptionApplication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +13,7 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * EN-14 (ADP-02): PUT /adoption/applications/{id} dan POST /adoption/applications/{id}/submit
+ * EN-14 (ADP-02) dan EN-15 (ADP-03): PUT /adoption/applications/{id} dan POST /adoption/applications/{id}/submit
  */
 class AdoptionApplicationFormApiTest extends TestCase
 {
@@ -137,9 +139,47 @@ class AdoptionApplicationFormApiTest extends TestCase
         $this->submit($application->id)
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.status', AdoptionApplication::STATUS_SUBMITTED);
+            ->assertJsonPath('data.status', AdoptionApplication::STATUS_SUBMITTED)
+            ->assertJsonPath('data.precheck_passed', true)
+            ->assertJsonPath('meta.precheck_failures', []);
 
         $this->assertNotNull($application->fresh()->submitted_at);
+    }
+
+    /** EN-15 (ADP-03): precheck gagal tetap SUBMITTED; admin yang memutuskan. */
+    public function test_failed_precheck_is_still_submitted_with_reasons(): void
+    {
+        $user = User::factory()->create();
+        $old = $this->draft($user, ['status' => AdoptionApplication::STATUS_APPROVED]);
+        $cat = fn () => Cat::create(['unique_code' => 'TST-' . Str::upper(Str::random(6)), 'name' => 'Oyen']);
+        Adoption::create(['application_id' => $old->id, 'cat_id' => $cat()->id, 'adopter_id' => $user->id])
+            ->update(['status' => Adoption::STATUS_CLOSED_RETURNED, 'closed_at' => now(), 'rehome_cooldown_until' => now()->addDays(10)]);
+        Adoption::create(['application_id' => $old->id, 'cat_id' => $cat()->id, 'adopter_id' => $user->id]);
+
+        $application = $this->draft($user);
+        Sanctum::actingAs($user);
+        $this->putJson("/api/v1/adoption/applications/{$application->id}", ['owner_permission' => false] + $this->completePayload($user))->assertOk();
+
+        $this->submit($application->id)
+            ->assertOk()
+            ->assertJsonPath('data.status', AdoptionApplication::STATUS_SUBMITTED)
+            ->assertJsonPath('data.precheck_passed', false)
+            ->assertJsonPath('meta.precheck_failures', ['NO_OWNER_PERMISSION', 'ALREADY_ADOPTING', 'COOLDOWN_ACTIVE']);
+    }
+
+    public function test_expired_cooldown_and_closed_adoption_pass_precheck(): void
+    {
+        $user = User::factory()->create();
+        $old = $this->draft($user, ['status' => AdoptionApplication::STATUS_APPROVED]);
+        $cat = Cat::create(['unique_code' => 'TST-' . Str::upper(Str::random(6)), 'name' => 'Belang']);
+        Adoption::create(['application_id' => $old->id, 'cat_id' => $cat->id, 'adopter_id' => $user->id])
+            ->update(['status' => Adoption::STATUS_CLOSED_RETURNED, 'closed_at' => now()->subDays(40), 'rehome_cooldown_until' => now()->subDays(10)]);
+
+        $application = $this->draft($user);
+        Sanctum::actingAs($user);
+        $this->putJson("/api/v1/adoption/applications/{$application->id}", $this->completePayload($user))->assertOk();
+
+        $this->submit($application->id)->assertOk()->assertJsonPath('data.precheck_passed', true);
     }
 
     public function test_incomplete_draft_cannot_be_submitted(): void

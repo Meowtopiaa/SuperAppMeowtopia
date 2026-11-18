@@ -4,6 +4,7 @@ namespace App\Modules\CatAdoption\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Modules\CatAdoption\Models\Adoption;
 use App\Modules\CatAdoption\Models\AdoptionApplication;
 use App\Modules\CatAdoption\Requests\StoreApplicationDraftRequest;
 use App\Support\ApiResponse;
@@ -64,10 +65,12 @@ class AdoptionApplicationController extends Controller
         return ApiResponse::success($this->present($application->fresh()), 'Draf kelayakan berhasil disimpan.');
     }
 
-    /** ADP-02: kirim draf lengkap. Precheck (ADP-03) menyusul di EN-15. */
+    /** ADP-02 dan ADP-03: kirim draf lengkap lalu jalankan precheck. Gagal precheck tetap SUBMITTED; admin yang memutuskan. */
     public function submit(Request $request, string $id)
     {
-        $application = DB::transaction(function () use ($request, $id) {
+        $failures = [];
+
+        $application = DB::transaction(function () use ($request, $id, &$failures) {
             $application = $this->editableApplication($request, $id);
 
             $errors = $this->missingForSubmit($application);
@@ -77,15 +80,23 @@ class AdoptionApplicationController extends Controller
                 );
             }
 
+            $failures = $this->precheckFailures($application);
+
             $application->update([
                 'status' => AdoptionApplication::STATUS_SUBMITTED,
                 'submitted_at' => now(),
+                'precheck_passed' => $failures === [],
             ]);
 
             return $application;
         });
 
-        return ApiResponse::success($this->present($application->fresh()), 'Pengajuan kelayakan berhasil dikirim.');
+        return ApiResponse::success(
+            $this->present($application->fresh()),
+            'Pengajuan kelayakan berhasil dikirim.',
+            200,
+            ['precheck_failures' => $failures]
+        );
     }
 
     public function mine(Request $request)
@@ -169,6 +180,27 @@ class AdoptionApplicationController extends Controller
         }
 
         return $errors;
+    }
+
+    /** ADP-03. Kelengkapan sudah dijamin missingForSubmit(); hasilnya kode alasan yang gagal. */
+    private function precheckFailures(AdoptionApplication $application): array
+    {
+        $adoptions = Adoption::where('adopter_id', $application->applicant_id);
+        $failures = [];
+
+        if ($application->owner_permission !== true) {
+            $failures[] = 'NO_OWNER_PERMISSION';
+        }
+
+        if ((clone $adoptions)->open()->exists()) {
+            $failures[] = 'ALREADY_ADOPTING';
+        }
+
+        if ((clone $adoptions)->where('rehome_cooldown_until', '>', now())->exists()) {
+            $failures[] = 'COOLDOWN_ACTIVE';
+        }
+
+        return $failures;
     }
 
     /** Data privat: hanya untuk pemilik aplikasi. */
