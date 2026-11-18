@@ -52,7 +52,8 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
   static const List<Map<String, dynamic>> _stepsMeta = [
     {
       'title': 'Tempat tinggal',
-      'subtitle': 'Di mana kucing akan tinggal dan siapa yang perlu mengizinkan.',
+      'subtitle':
+          'Di mana kucing akan tinggal dan siapa yang perlu mengizinkan.',
     },
     {
       'title': 'Kesiapan merawat',
@@ -246,37 +247,36 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
                 padding: EdgeInsets.only(bottom: AdoptionTheme.sp16),
                 child: AdoptionBanner(
                   variant: 'warning',
-                  message: 'Pengajuan adopsi hanya bisa dikirim dari akun mahasiswa. '
+                  message:
+                      'Pengajuan adopsi hanya bisa dikirim dari akun mahasiswa. '
                       'Kamu tetap bisa melihat isi form ini.',
                 ),
               ),
-            if (widget.catName != null) ...[
-              Text('Untuk ${widget.catName}', style: AdoptionTheme.bodyStyle),
-              const SizedBox(height: 4),
-            ],
-            Text(step['title'] as String, style: AdoptionTheme.headlineStyle),
-            const SizedBox(height: 4),
-            Text(step['subtitle'] as String, style: AdoptionTheme.bodyStyle),
-            const SizedBox(height: 16),
-            _buildProgress(),
-            const SizedBox(height: 28),
+            AdoptionHeader(
+              overline: widget.catName != null
+                  ? 'Form kelayakan untuk ${widget.catName}'
+                  : 'Form kelayakan',
+              title: step['title'] as String,
+              subtitle: step['subtitle'] as String,
+              icon: Icons.edit_note_rounded,
+              footer: _buildProgress(),
+            ),
             KeyedSubtree(
               key: ValueKey<int>(_currentStep),
               child: _buildCurrentStepContent(),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 8),
             _buildNavigationButtons(isStudent, provider),
             if (_currentStep == 0) ...[
-              const SizedBox(height: 28),
-              const Divider(height: 1, color: AdoptionTheme.divider),
-              const SizedBox(height: 16),
-              const Text('Yang perlu kamu tahu', style: AdoptionTheme.subtitleStyle),
-              const SizedBox(height: 8),
-              const Text(
-                'Form ini menilai kesiapanmu, belum memilih kucing. Setelah pengurus adopsi '
-                'menyetujui, kamu memindai QR di kalung kucing saat pengambilan. Selama tiga '
-                'bulan pertama kamu mengirim laporan kondisi kucing setiap 14 hari.',
-                style: AdoptionTheme.bodyStyle,
+              const SizedBox(height: 24),
+              const AdoptionSection(
+                title: 'Yang perlu kamu tahu',
+                child: Text(
+                  'Form ini menilai kesiapanmu, belum memilih kucing. Setelah pengurus adopsi '
+                  'menyetujui, kamu memindai QR di kalung kucing saat pengambilan. Selama tiga '
+                  'bulan pertama kamu mengirim laporan kondisi kucing setiap 14 hari.',
+                  style: AdoptionTheme.bodyStyle,
+                ),
               ),
             ],
           ],
@@ -293,11 +293,13 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
           children: List.generate(_stepsMeta.length, (i) {
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: i == _stepsMeta.length - 1 ? 0 : 6),
+                padding:
+                    EdgeInsets.only(right: i == _stepsMeta.length - 1 ? 0 : 6),
                 child: Container(
-                  height: 4,
+                  height: 5,
                   decoration: BoxDecoration(
-                    color: i <= _currentStep ? AdoptionTheme.accent : AdoptionTheme.divider,
+                    color:
+                        i <= _currentStep ? AdoptionTheme.accent : Colors.white,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -330,7 +332,8 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
   InputDecoration _inputDecoration({String? hint}) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textHint),
+      hintStyle:
+          AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textHint),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: const OutlineInputBorder(
         borderRadius: AdoptionTheme.borderMd,
@@ -363,11 +366,16 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
             initialValue: _housingType,
             isExpanded: true,
             decoration: _inputDecoration(),
-            style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+            style:
+                AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
             items: const [
-              DropdownMenuItem(value: 'kos', child: Text('Kos yang mengizinkan hewan')),
-              DropdownMenuItem(value: 'rumah_kontrakan', child: Text('Rumah kontrakan')),
-              DropdownMenuItem(value: 'rumah_pribadi', child: Text('Rumah sendiri atau keluarga')),
+              DropdownMenuItem(
+                  value: 'kos', child: Text('Kos yang mengizinkan hewan')),
+              DropdownMenuItem(
+                  value: 'rumah_kontrakan', child: Text('Rumah kontrakan')),
+              DropdownMenuItem(
+                  value: 'rumah_pribadi',
+                  child: Text('Rumah sendiri atau keluarga')),
             ],
             onChanged: (val) {
               if (val != null) setState(() => _housingType = val);
@@ -376,7 +384,8 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
         ),
         _SwitchTile(
           title: 'Pemilik tempat atau keluarga sudah mengizinkan',
-          subtitle: 'Pemilik kos atau keluarga serumah setuju kamu memelihara kucing.',
+          subtitle:
+              'Pemilik kos atau keluarga serumah setuju kamu memelihara kucing.',
           value: _familyPermission,
           onChanged: (v) => setState(() => _familyPermission = v),
         ),
@@ -394,15 +403,17 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
           value: _financialReadiness,
           onChanged: (v) => setState(() => _financialReadiness = v),
         ),
-        const SizedBox(height: AdoptionTheme.sp24),
+        const SizedBox(height: AdoptionTheme.sp16),
         AdoptionSection(
           title: 'Rencana jangka panjang',
-          description: 'Siapa yang merawat kucing saat kamu libur semester, dan apa rencanamu setelah lulus?',
+          description:
+              'Siapa yang merawat kucing saat kamu libur semester, dan apa rencanamu setelah lulus?',
           child: TextFormField(
             controller: _longTermPlanController,
             maxLines: 4,
             onChanged: (_) => setState(() {}),
-            style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+            style:
+                AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
             decoration: _inputDecoration(
               hint: 'Contoh: saat libur kucing dititipkan ke kakak di Bandung',
             ),
@@ -426,7 +437,8 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
       children: [
         AdoptionSection(
           title: 'Foto tempat kucing akan tinggal',
-          description: 'Foto kamar atau ruangan yang akan dipakai kucing sehari-hari.',
+          description:
+              'Foto kamar atau ruangan yang akan dipakai kucing sehari-hari.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -439,7 +451,8 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
                 const SizedBox(height: 6),
                 Text(
                   'Foto ruangan wajib diambil.',
-                  style: AdoptionTheme.captionStyle.copyWith(color: AdoptionTheme.danger),
+                  style: AdoptionTheme.captionStyle
+                      .copyWith(color: AdoptionTheme.danger),
                 ),
               ],
             ],
@@ -459,13 +472,15 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
                 ),
                 child: Text(
                   kAdopterCommitmentText,
-                  style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+                  style: AdoptionTheme.bodyStyle
+                      .copyWith(color: AdoptionTheme.textMain),
                 ),
               ),
               const SizedBox(height: 8),
               CheckboxListTile(
                 value: _commitmentAccepted,
-                onChanged: (v) => setState(() => _commitmentAccepted = v ?? false),
+                onChanged: (v) =>
+                    setState(() => _commitmentAccepted = v ?? false),
                 activeColor: AdoptionTheme.accent,
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
@@ -477,7 +492,8 @@ class _AdoptionFormPageState extends State<AdoptionFormPage> {
               if (_commitmentAttempted && !_commitmentAccepted)
                 Text(
                   'Centang persetujuan komitmen dulu.',
-                  style: AdoptionTheme.captionStyle.copyWith(color: AdoptionTheme.danger),
+                  style: AdoptionTheme.captionStyle
+                      .copyWith(color: AdoptionTheme.danger),
                 ),
             ],
           ),
@@ -534,27 +550,31 @@ class _SwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MergeSemantics(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AdoptionTheme.subtitleStyle),
-                const SizedBox(height: 2),
-                Text(subtitle, style: AdoptionTheme.bodyStyle),
-              ],
+      child: Container(
+        padding: AdoptionTheme.padCard,
+        decoration: AdoptionTheme.cardDecoration,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AdoptionTheme.subtitleStyle),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: AdoptionTheme.bodyStyle),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Switch(
-            value: value,
-            activeThumbColor: Colors.white,
-            activeTrackColor: AdoptionTheme.accent,
-            onChanged: onChanged,
-          ),
-        ],
+            const SizedBox(width: 12),
+            Switch(
+              value: value,
+              activeThumbColor: Colors.white,
+              activeTrackColor: AdoptionTheme.accent,
+              onChanged: onChanged,
+            ),
+          ],
+        ),
       ),
     );
   }

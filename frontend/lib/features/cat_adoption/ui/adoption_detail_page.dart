@@ -57,31 +57,36 @@ class _AdoptionDetailPageState extends State<AdoptionDetailPage> {
     }
 
     final AdoptionApplicationModel app = application;
-    final catName =
-        app.catName ?? (app.cat != null ? app.cat!.name : 'Belum memilih kucing');
-    final hasNotes = app.adminNotes != null && app.adminNotes!.trim().isNotEmpty;
+    final catName = app.catName ??
+        (app.cat != null ? app.cat!.name : 'Belum memilih kucing');
+    final hasNotes =
+        app.adminNotes != null && app.adminNotes!.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: AdoptionTheme.pageBg,
       appBar: appBar,
       body: AdoptionPageBody(
         children: [
-          ApplicationStatusBadge(status: app.status),
-          const SizedBox(height: 10),
-          Text(catName, style: AdoptionTheme.headlineStyle),
-          const SizedBox(height: 4),
-          Text('Diajukan oleh ${app.applicantName}', style: AdoptionTheme.bodyStyle),
-          const SizedBox(height: 24),
-          ApplicationStatusTimeline(
-            currentStatus: app.status,
-            precheckPassed: app.precheckPassed,
+          AdoptionHeader(
+            overline: 'Pengajuan kelayakan',
+            title: catName,
+            subtitle: 'Diajukan oleh ${app.applicantName}',
+            icon: Icons.assignment_outlined,
+            footer: ApplicationStatusBadge(status: app.status),
           ),
-          const SizedBox(height: 28),
+          AdoptionSection(
+            title: 'Tahapan',
+            child: ApplicationStatusTimeline(
+              currentStatus: app.status,
+              precheckPassed: app.precheckPassed,
+            ),
+          ),
           if (app.isRevisionRequested) ...[
             AdoptionBanner(
               variant: 'warning',
               title: 'Perlu diperbaiki',
-              message: 'Pengurus adopsi meminta kamu memperbaiki beberapa jawaban.',
+              message:
+                  'Pengurus adopsi meminta kamu memperbaiki beberapa jawaban.',
               action: AdoptionPrimaryButton(
                 label: 'Perbaiki dan kirim ulang',
                 onPressed: () => context.push(
@@ -89,13 +94,14 @@ class _AdoptionDetailPageState extends State<AdoptionDetailPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
           ],
           if (app.isApproved) ...[
             AdoptionBanner(
               variant: 'success',
               title: 'Kelayakan disetujui',
-              message: 'Kamu belum resmi mengadopsi. Adopsi aktif setelah kamu memindai '
+              message:
+                  'Kamu belum resmi mengadopsi. Adopsi aktif setelah kamu memindai '
                   'QR di kalung kucing dan memotretnya saat pengambilan.',
               action: app.catId != null
                   ? AdoptionPrimaryButton(
@@ -107,14 +113,15 @@ class _AdoptionDetailPageState extends State<AdoptionDetailPage> {
                     )
                   : null,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
           ],
           if (hasNotes)
             AdoptionSection(
               title: 'Catatan pengurus adopsi',
               child: Text(
                 app.adminNotes!,
-                style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+                style: AdoptionTheme.bodyStyle
+                    .copyWith(color: AdoptionTheme.textMain),
               ),
             ),
           AdoptionSection(
@@ -135,10 +142,14 @@ class _AdoptionDetailPageState extends State<AdoptionDetailPage> {
                 ),
                 AdoptionInfoRow(
                   label: 'Lembar komitmen',
-                  value: app.commitmentAccepted ? 'Sudah disetujui' : 'Belum disetujui',
+                  value: app.commitmentAccepted
+                      ? 'Sudah disetujui'
+                      : 'Belum disetujui',
                 ),
                 if (app.longTermPlan != null && app.longTermPlan!.isNotEmpty)
-                  AdoptionInfoRow(label: 'Rencana jangka panjang', value: app.longTermPlan!),
+                  AdoptionInfoRow(
+                      label: 'Rencana jangka panjang',
+                      value: app.longTermPlan!),
               ],
             ),
           ),

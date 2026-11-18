@@ -116,8 +116,7 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            provider.actionSuccessMessage ??
-                'Laporan terkirim.',
+            provider.actionSuccessMessage ?? 'Laporan terkirim.',
           ),
           backgroundColor: AdoptionTheme.success,
         ),
@@ -167,27 +166,22 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
               key: _formKey,
               child: AdoptionPageBody(
                 children: [
-                  Text(widget.catName, style: AdoptionTheme.bodyStyle),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Laporan ke-${widget.cycleNumber} dari $total',
-                    style: AdoptionTheme.headlineStyle,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    nextDue != null
+                  AdoptionHeader(
+                    overline: 'Laporan kondisi ${widget.catName}',
+                    title: 'Laporan ke-${widget.cycleNumber} dari $total',
+                    subtitle: nextDue != null
                         ? 'Paling lambat ${formatAdoptionDate(nextDue)}.'
                         : 'Dikirim setiap 14 hari selama tiga bulan pertama.',
-                    style: AdoptionTheme.bodyStyle,
+                    icon: Icons.event_note_rounded,
                   ),
                   if (isLate) ...[
-                    const SizedBox(height: 12),
                     const AdoptionBanner(
                       variant: 'warning',
-                      message: 'Laporan ini sudah lewat batas waktu, tapi tetap bisa dikirim.',
+                      message:
+                          'Laporan ini sudah lewat batas waktu, tapi tetap bisa dikirim.',
                     ),
+                    const SizedBox(height: 16),
                   ],
-                  const SizedBox(height: 28),
                   AdoptionSection(
                     title: 'Foto kucing hari ini',
                     child: Column(
@@ -198,7 +192,8 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
                           hint: 'Ambil foto kucing',
                           onTap: _takeFollowupPhoto,
                         ),
-                        if (_photoAttempted && (_photoPath == null || _photoPath!.isEmpty)) ...[
+                        if (_photoAttempted &&
+                            (_photoPath == null || _photoPath!.isEmpty)) ...[
                           const SizedBox(height: 6),
                           Text(
                             'Foto kucing wajib diambil.',
@@ -215,24 +210,28 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: ['Sehat', 'Perlu perhatian', 'Sakit'].map((option) {
+                      children:
+                          ['Sehat', 'Perlu perhatian', 'Sakit'].map((option) {
                         final selected = _condition == option;
                         return ChoiceChip(
                           label: Text(option),
                           selected: selected,
                           showCheckmark: false,
-                          onSelected: (_) => setState(() => _condition = option),
+                          onSelected: (_) =>
+                              setState(() => _condition = option),
                           labelStyle: AdoptionTheme.bodyStyle.copyWith(
-                            color: selected ? Colors.white : AdoptionTheme.textMain,
+                            color: selected
+                                ? Colors.white
+                                : AdoptionTheme.textMain,
                           ),
-                          backgroundColor: AdoptionTheme.cardBg,
+                          backgroundColor: AdoptionTheme.chipBg,
                           selectedColor: AdoptionTheme.accent,
                           side: BorderSide(
-                            color: selected ? AdoptionTheme.accent : AdoptionTheme.inputBorder,
+                            color: selected
+                                ? AdoptionTheme.accent
+                                : AdoptionTheme.chipBg,
                           ),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: AdoptionTheme.borderSm,
-                          ),
+                          shape: const StadiumBorder(),
                         );
                       }).toList(),
                     ),
@@ -242,7 +241,8 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
                       padding: EdgeInsets.only(bottom: AdoptionTheme.sp24),
                       child: AdoptionBanner(
                         variant: 'warning',
-                        message: 'Kalau kucing butuh bantuan segera, gunakan juga '
+                        message:
+                            'Kalau kucing butuh bantuan segera, gunakan juga '
                             'Laporkan kendala di halaman Kucing saya.',
                       ),
                     ),
@@ -252,8 +252,10 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
                     child: TextFormField(
                       controller: _notesController,
                       maxLines: 3,
-                      style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
-                      decoration: _inputDecoration('Contoh: makan lahap, sudah mau tidur di kasurnya'),
+                      style: AdoptionTheme.bodyStyle
+                          .copyWith(color: AdoptionTheme.textMain),
+                      decoration: _inputDecoration(
+                          'Contoh: makan lahap, sudah mau tidur di kasurnya'),
                     ),
                   ),
                   AdoptionSection(
@@ -262,17 +264,20 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
                     child: TextFormField(
                       controller: _issuesController,
                       maxLines: 2,
-                      style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
-                      decoration: _inputDecoration('Contoh: belum cocok dengan pasir baru'),
+                      style: AdoptionTheme.bodyStyle
+                          .copyWith(color: AdoptionTheme.textMain),
+                      decoration: _inputDecoration(
+                          'Contoh: belum cocok dengan pasir baru'),
                     ),
                   ),
                   AdoptionPrimaryButton(
                     label: 'Kirim laporan',
                     isLoading: provider.isActionLoading,
-                    onPressed: provider.isActionLoading ? null : _onSubmitFollowup,
+                    onPressed:
+                        provider.isActionLoading ? null : _onSubmitFollowup,
                   ),
                   if (followups.isNotEmpty) ...[
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 24),
                     AdoptionSection(
                       title: 'Laporan sebelumnya',
                       child: Column(
@@ -282,14 +287,16 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: const BoxDecoration(
                               border: Border(
-                                bottom: BorderSide(color: AdoptionTheme.divider),
+                                bottom:
+                                    BorderSide(color: AdoptionTheme.divider),
                               ),
                             ),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Laporan ke-${f.cycleNumber}',
@@ -306,9 +313,9 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
                                   ),
                                 ),
                                 Text(
-                                    formatAdoptionDate(date),
-                                    style: AdoptionTheme.captionStyle,
-                                  ),
+                                  formatAdoptionDate(date),
+                                  style: AdoptionTheme.captionStyle,
+                                ),
                               ],
                             ),
                           );
@@ -325,7 +332,8 @@ class _AdoptionFollowupPageState extends State<AdoptionFollowupPage> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textHint),
+      hintStyle:
+          AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textHint),
       contentPadding: const EdgeInsets.all(14),
       border: const OutlineInputBorder(
         borderRadius: AdoptionTheme.borderMd,

@@ -2,55 +2,67 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/meow_style.dart';
 
 /// Token tampilan modul Adopsi (EN-8, Tim E-Nigma).
 ///
-/// Prinsip: satu warna aksen (terakota), permukaan datar tanpa bayangan,
-/// bagian dipisah judul dan garis tipis. Kartu hanya untuk item yang bisa
-/// diketuk. Semua warna layar adopsi diambil dari sini, bukan hex di halaman.
+/// Semua nilai diturunkan dari [MeowStyle] dan [AppConstants] supaya adopsi
+/// sejalan dengan fitur lain (Beranda, Spot Makan, Cat Hunter): oranye tim,
+/// latar gradasi peach ke mint, kartu kaca bersudut 24, tombol kapsul.
 abstract final class AdoptionTheme {
-  // Warna aksen
-  static const Color accent = Color(0xFFA9532F);
-  static const Color accentLight = Color(0xFFF3E4DC);
-  static const Color accentSurface = Color(0xFFFAF1EC);
+  // Warna aksen (oranye tim)
+  static const Color accent = MeowStyle.orange;
+  static const Color accentDark = MeowStyle.orangeDark;
+  static const Color accentLight = MeowStyle.peach;
+  static const Color accentSurface = AppConstants.primaryLight;
 
   // Latar dan permukaan
-  static const Color pageBg = Color(0xFFFBF8F5);
+  static const Color pageBg = MeowStyle.background;
+  static const Color bgPeach = Color(0xFFFFE7D9);
+  static const Color bgMint = Color(0xFFE5F8F0);
   static const Color cardBg = Colors.white;
-  static const Color chipBg = Color(0xFFF1ECE7);
+  static const Color glassBg =
+      Color(0xD1FFFFFF); // putih 82%, sama dengan GlassCard
+  static const Color chipBg = MeowStyle.lilac;
 
   // Teks
-  static const Color textMain = AppConstants.textPrimary;
-  static const Color textSub = AppConstants.textSecondary;
+  static const Color textMain = MeowStyle.ink;
+  static const Color textSub = MeowStyle.brown;
   static const Color textHint = Color(0xFF75665B);
 
   // Garis
-  static const Color divider = Color(0xFFE9E2DB);
-  static const Color cardBorder = Color(0xFFE4DCD4);
-  static const Color inputBorder = Color(0xFFD4C6BC);
+  static const Color divider = Color(0xFFEDE6F0);
+  static const Color cardBorder = Colors.white;
+  static const Color inputBorder = Color(0xFFE2DCE6);
 
   // Status semantik (selalu dipasangkan dengan teks, tidak hanya warna)
-  static const Color success = Color(0xFF2F7D4F);
-  static const Color successLight = Color(0xFFE6F2EA);
-  static const Color danger = Color(0xFFB3261E);
-  static const Color dangerLight = Color(0xFFFBEAE8);
+  static const Color success = MeowStyle.green;
+  static const Color successLight = Color(0xFFE3F7EE);
+  static const Color danger = MeowStyle.danger;
+  static const Color dangerLight = Color(0xFFFBE9EA);
   static const Color warning = Color(0xFF9A6200);
-  static const Color warningLight = Color(0xFFFBF1DE);
-  static const Color info = Color(0xFF35618F);
-  static const Color infoLight = Color(0xFFE8EFF6);
+  static const Color warningLight = Color(0xFFFFF3DC);
+  static const Color info = MeowStyle.blue;
+  static const Color infoLight = Color(0xFFE8F0FC);
 
-  // Radius
-  static const double radiusSm = 6.0;
-  static const double radiusMd = 10.0;
-  static const double radiusLg = 12.0;
-  static const double radiusXl = 12.0;
-  static const double radiusPhoto = 10.0;
+  // Radius (mengikuti GlassCard dan MeowPill)
+  static const double radiusSm = 12.0;
+  static const double radiusMd = 16.0;
+  static const double radiusLg = 24.0;
+  static const double radiusXl = 24.0;
+  static const double radiusPhoto = 20.0;
 
-  static const BorderRadius borderSm = BorderRadius.all(Radius.circular(radiusSm));
-  static const BorderRadius borderMd = BorderRadius.all(Radius.circular(radiusMd));
-  static const BorderRadius borderLg = BorderRadius.all(Radius.circular(radiusLg));
-  static const BorderRadius borderXl = BorderRadius.all(Radius.circular(radiusXl));
-  static const BorderRadius borderPhoto = BorderRadius.all(Radius.circular(radiusPhoto));
+  static const BorderRadius borderSm =
+      BorderRadius.all(Radius.circular(radiusSm));
+  static const BorderRadius borderMd =
+      BorderRadius.all(Radius.circular(radiusMd));
+  static const BorderRadius borderLg =
+      BorderRadius.all(Radius.circular(radiusLg));
+  static const BorderRadius borderXl =
+      BorderRadius.all(Radius.circular(radiusXl));
+  static const BorderRadius borderPhoto =
+      BorderRadius.all(Radius.circular(radiusPhoto));
+  static const BorderRadius borderPill = BorderRadius.all(Radius.circular(30));
 
   // Jarak
   static const double sp4 = 4.0;
@@ -60,17 +72,27 @@ abstract final class AdoptionTheme {
   static const double sp24 = 24.0;
   static const double sp32 = 32.0;
 
-  static const EdgeInsets padCard = EdgeInsets.all(sp16);
-  static const EdgeInsets padSection = EdgeInsets.symmetric(horizontal: sp16, vertical: sp12);
-  static const EdgeInsets padPage = EdgeInsets.fromLTRB(sp16, sp16, sp16, sp32);
+  static const EdgeInsets padCard = EdgeInsets.all(18);
+  static const EdgeInsets padSection =
+      EdgeInsets.symmetric(horizontal: sp16, vertical: sp12);
+  static const EdgeInsets padPage = EdgeInsets.fromLTRB(20, 20, 20, 20);
 
-  /// Lebar maksimum konten agar tetap nyaman dibaca di web lebar.
+  /// Lebar maksimum konten, sama dengan MeowPage.
   static const double maxContentWidth = 720;
 
-  // Tipografi: judul halaman, judul bagian, isi, keterangan.
+  /// Gradasi latar halaman, sama dengan MeowPage.
+  static const LinearGradient pageGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [bgPeach, pageBg, bgMint, pageBg],
+    stops: [0, .35, .7, 1],
+  );
+
+  // Tipografi (mengikuti ukuran di Beranda dan Spot Makan)
   static const TextStyle headlineStyle = TextStyle(
     fontSize: 22,
     fontWeight: FontWeight.w700,
+    letterSpacing: -.7,
     color: textMain,
     fontFamily: 'Inter',
     height: 1.25,
@@ -78,7 +100,7 @@ abstract final class AdoptionTheme {
 
   static const TextStyle titleStyle = TextStyle(
     fontSize: 17,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
     color: textMain,
     fontFamily: 'Inter',
     height: 1.3,
@@ -93,11 +115,11 @@ abstract final class AdoptionTheme {
   );
 
   static const TextStyle bodyStyle = TextStyle(
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: FontWeight.w400,
     color: textSub,
     fontFamily: 'Inter',
-    height: 1.45,
+    height: 1.5,
   );
 
   static const TextStyle captionStyle = TextStyle(
@@ -105,17 +127,20 @@ abstract final class AdoptionTheme {
     fontWeight: FontWeight.w500,
     color: textHint,
     fontFamily: 'Inter',
-    height: 1.35,
+    height: 1.4,
   );
 
-  // Dekorasi: datar, border tipis, tanpa bayangan.
+  // Dekorasi: kartu kaca seperti GlassCard.
   static BoxDecoration get cardDecoration => BoxDecoration(
-        color: cardBg,
+        color: glassBg,
         borderRadius: borderLg,
-        border: Border.all(color: cardBorder),
+        border: Border.all(color: Colors.white, width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0F9D4300), blurRadius: 28, offset: Offset(0, 8)),
+        ],
       );
 
-  /// Dipertahankan untuk kompatibilitas; sama dengan [cardDecoration].
   static BoxDecoration get heroCardDecoration => cardDecoration;
 
   static BoxDecoration get photoDecoration => const BoxDecoration(
@@ -123,25 +148,32 @@ abstract final class AdoptionTheme {
         borderRadius: borderPhoto,
       );
 
-  // Tombol
-  static ButtonStyle get primaryButtonStyle => ElevatedButton.styleFrom(
+  // Tombol kapsul seperti MeowButton.
+  static ButtonStyle get primaryButtonStyle => FilledButton.styleFrom(
         backgroundColor: accent,
         foregroundColor: Colors.white,
         disabledBackgroundColor: chipBg,
         disabledForegroundColor: textHint,
-        elevation: 0,
-        minimumSize: const Size(0, 48),
-        padding: const EdgeInsets.symmetric(horizontal: sp24, vertical: sp12),
-        shape: const RoundedRectangleBorder(borderRadius: borderMd),
-        textStyle: subtitleStyle.copyWith(color: Colors.white),
+        minimumSize: const Size(0, 52),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
       );
 
-  static ButtonStyle get secondaryButtonStyle => OutlinedButton.styleFrom(
-        foregroundColor: accent,
-        side: const BorderSide(color: inputBorder),
-        minimumSize: const Size(0, 44),
-        padding: const EdgeInsets.symmetric(horizontal: sp16, vertical: sp8),
-        shape: const RoundedRectangleBorder(borderRadius: borderMd),
-        textStyle: bodyStyle.copyWith(fontWeight: FontWeight.w600),
+  static ButtonStyle get secondaryButtonStyle => FilledButton.styleFrom(
+        backgroundColor: MeowStyle.lilac,
+        foregroundColor: textMain,
+        minimumSize: const Size(0, 52),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
       );
 }

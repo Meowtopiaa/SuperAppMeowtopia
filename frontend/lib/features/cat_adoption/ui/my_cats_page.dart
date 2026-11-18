@@ -62,10 +62,18 @@ class _MyCatsPageState extends State<MyCatsPage> {
                   onRefresh: _reload,
                   child: AdoptionPageBody(
                     children: [
+                      const AdoptionHeader(
+                        overline: 'Adopsi saya',
+                        title: 'Kucing saya',
+                        subtitle:
+                            'Kucing yang sedang kamu rawat dan laporan kondisinya.',
+                        icon: Icons.favorite_rounded,
+                      ),
                       if (provider.myActiveAdoptions.isEmpty)
                         AdoptionEmptyState(
                           message: 'Kamu belum mengadopsi kucing',
-                          submessage: 'Kucing muncul di sini setelah kelayakanmu disetujui '
+                          submessage:
+                              'Kucing muncul di sini setelah kelayakanmu disetujui '
                               'dan pengambilan selesai.',
                           action: AdoptionSecondaryButton(
                             label: 'Lihat katalog',
@@ -94,7 +102,8 @@ class _MyCatsPageState extends State<MyCatsPage> {
         children: [
           Expanded(
             child: latest == null
-                ? const Text('Belum ada pengajuan.', style: AdoptionTheme.bodyStyle)
+                ? const Text('Belum ada pengajuan.',
+                    style: AdoptionTheme.bodyStyle)
                 : Align(
                     alignment: Alignment.centerLeft,
                     child: ApplicationStatusBadge(status: latest.status),
@@ -105,7 +114,8 @@ class _MyCatsPageState extends State<MyCatsPage> {
             onPressed: () => latest == null
                 ? context.push('/adoption/apply')
                 : context.push('/adoption/detail/${latest.id}'),
-            child: Text(latest == null ? 'Isi form kelayakan' : 'Lihat rincian'),
+            child:
+                Text(latest == null ? 'Isi form kelayakan' : 'Lihat rincian'),
           ),
         ],
       ),
@@ -122,7 +132,8 @@ class _MyCatsPageState extends State<MyCatsPage> {
       builder: (ctx) {
         final apps = provider.myApplications;
         return Padding(
-          padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.paddingOf(ctx).bottom + 16),
+          padding: EdgeInsets.fromLTRB(
+              20, 8, 20, MediaQuery.paddingOf(ctx).bottom + 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,7 +141,8 @@ class _MyCatsPageState extends State<MyCatsPage> {
               Row(
                 children: [
                   const Expanded(
-                    child: Text('Riwayat pengajuan', style: AdoptionTheme.titleStyle),
+                    child: Text('Riwayat pengajuan',
+                        style: AdoptionTheme.titleStyle),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
@@ -142,7 +154,8 @@ class _MyCatsPageState extends State<MyCatsPage> {
               if (apps.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text('Belum ada pengajuan.', style: AdoptionTheme.bodyStyle),
+                  child: Text('Belum ada pengajuan.',
+                      style: AdoptionTheme.bodyStyle),
                 )
               else
                 Flexible(
@@ -166,7 +179,8 @@ class _MyCatsPageState extends State<MyCatsPage> {
                             child: ApplicationStatusBadge(status: item.status),
                           ),
                         ),
-                        trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                        trailing:
+                            const Icon(Icons.chevron_right_rounded, size: 20),
                         onTap: () {
                           Navigator.pop(ctx);
                           context.push('/adoption/detail/${item.id}');
@@ -210,44 +224,49 @@ class _AdoptionBlock extends StatelessWidget {
                 '${formatAdoptionDate(adoption.nextFollowupDue)}.';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 32),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 88,
-                child: CatPhotoBox(photoUrl: cat?.primaryPhotoUrl),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(catName, style: AdoptionTheme.headlineStyle),
-                    const SizedBox(height: 4),
-                    if (cat != null)
+          Container(
+            padding: AdoptionTheme.padCard,
+            decoration: AdoptionTheme.cardDecoration,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 88,
+                  child: CatPhotoBox(photoUrl: cat?.primaryPhotoUrl),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(catName, style: AdoptionTheme.headlineStyle),
+                      const SizedBox(height: 4),
+                      if (cat != null)
+                        Text(
+                          '${cat.gender == 'male' ? 'Jantan' : 'Betina'}, ${cat.breed}',
+                          style: AdoptionTheme.bodyStyle,
+                        ),
                       Text(
-                        '${cat.gender == 'male' ? 'Jantan' : 'Betina'}, ${cat.breed}',
+                        'Diadopsi sejak ${formatAdoptionDate(adoption.adoptedAt)}',
                         style: AdoptionTheme.bodyStyle,
                       ),
-                    Text(
-                      'Diadopsi sejak ${formatAdoptionDate(adoption.adoptedAt)}',
-                      style: AdoptionTheme.bodyStyle,
-                    ),
-                    const SizedBox(height: 8),
-                    ActiveAdoptionStatusBadge(status: adoption.status),
-                  ],
+                      const SizedBox(height: 8),
+                      ActiveAdoptionStatusBadge(status: adoption.status),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           AdoptionSection(
             title: 'Laporan kondisi',
-            trailing: Text('$done dari $total terkirim', style: AdoptionTheme.captionStyle),
+            trailing: Text('$done dari $total terkirim',
+                style: AdoptionTheme.captionStyle),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -256,7 +275,8 @@ class _AdoptionBlock extends StatelessWidget {
                 Text(
                   dueText,
                   style: AdoptionTheme.bodyStyle.copyWith(
-                    color: isLate ? AdoptionTheme.danger : AdoptionTheme.textMain,
+                    color:
+                        isLate ? AdoptionTheme.danger : AdoptionTheme.textMain,
                   ),
                 ),
                 if (!allDone) ...[
@@ -272,23 +292,29 @@ class _AdoptionBlock extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: AdoptionTheme.divider),
-          _LinkRow(
-            label: 'Laporkan kendala',
-            description: 'Sakit, hilang, meninggal, atau kalung rusak',
-            onTap: () => context.push(
-              '/adoption/issue?adoption_id=${adoption.id}&cat_id=${adoption.catId}&name=$encodedName',
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: AdoptionTheme.cardDecoration,
+            child: Column(
+              children: [
+                _LinkRow(
+                  label: 'Laporkan kendala',
+                  description: 'Sakit, hilang, meninggal, atau kalung rusak',
+                  onTap: () => context.push(
+                    '/adoption/issue?adoption_id=${adoption.id}&cat_id=${adoption.catId}&name=$encodedName',
+                  ),
+                ),
+                const Divider(height: 1, color: AdoptionTheme.divider),
+                _LinkRow(
+                  label: 'Ajukan pengembalian',
+                  description: 'Syarat dan alur pengembalian kucing',
+                  onTap: () => context.push(
+                    '/adoption/return?adoption_id=${adoption.id}&name=$encodedName',
+                  ),
+                ),
+              ],
             ),
           ),
-          const Divider(height: 1, color: AdoptionTheme.divider),
-          _LinkRow(
-            label: 'Ajukan pengembalian',
-            description: 'Syarat dan alur pengembalian kucing',
-            onTap: () => context.push(
-              '/adoption/return?adoption_id=${adoption.id}&name=$encodedName',
-            ),
-          ),
-          const Divider(height: 1, color: AdoptionTheme.divider),
         ],
       ),
     );
@@ -327,7 +353,9 @@ class _FollowupProgress extends StatelessWidget {
               child: Container(
                 height: 6,
                 decoration: BoxDecoration(
-                  color: color,
+                  color: color == AdoptionTheme.divider
+                      ? AdoptionTheme.chipBg
+                      : color,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -373,7 +401,8 @@ class _LinkRow extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: AdoptionTheme.textHint),
+            const Icon(Icons.chevron_right_rounded,
+                color: AdoptionTheme.textHint),
           ],
         ),
       ),

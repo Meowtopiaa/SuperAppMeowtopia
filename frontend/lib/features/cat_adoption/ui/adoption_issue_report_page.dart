@@ -85,8 +85,10 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: AdoptionTheme.cardBg,
-          shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderLg),
-          title: const Text('Laporan tersimpan', style: AdoptionTheme.titleStyle),
+          shape: const RoundedRectangleBorder(
+              borderRadius: AdoptionTheme.borderLg),
+          title:
+              const Text('Laporan tersimpan', style: AdoptionTheme.titleStyle),
           content: Text(
             'Laporan ${_category.labelId.toLowerCase()} untuk ${widget.catName} sudah tercatat. '
             'Pengurus adopsi akan meninjaunya. Adopsimu tetap aktif.',
@@ -94,7 +96,8 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
           ),
           actions: [
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: AdoptionTheme.accent),
+              style:
+                  TextButton.styleFrom(foregroundColor: AdoptionTheme.accent),
               onPressed: () {
                 Navigator.pop(ctx);
                 context.pop();
@@ -130,15 +133,13 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
         key: _formKey,
         child: AdoptionPageBody(
           children: [
-            Text(widget.catName, style: AdoptionTheme.bodyStyle),
-            const SizedBox(height: 4),
-            const Text('Apa yang terjadi?', style: AdoptionTheme.headlineStyle),
-            const SizedBox(height: 4),
-            const Text(
-              'Laporan ini dibaca pengurus adopsi dan tidak menutup adopsimu.',
-              style: AdoptionTheme.bodyStyle,
+            AdoptionHeader(
+              overline: 'Laporan kendala ${widget.catName}',
+              title: 'Apa yang terjadi?',
+              subtitle:
+                  'Laporan ini dibaca pengurus adopsi dan tidak menutup adopsimu.',
+              icon: Icons.report_gmailerrorred_rounded,
             ),
-            const SizedBox(height: 24),
             AdoptionSection(
               title: 'Jenis kendala',
               child: Column(
@@ -159,7 +160,9 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
                                   ? Icons.radio_button_checked
                                   : Icons.radio_button_unchecked,
                               size: 22,
-                              color: selected ? AdoptionTheme.accent : AdoptionTheme.textHint,
+                              color: selected
+                                  ? AdoptionTheme.accent
+                                  : AdoptionTheme.textHint,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -167,7 +170,9 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
                                 cat.labelId,
                                 style: AdoptionTheme.bodyStyle.copyWith(
                                   color: AdoptionTheme.textMain,
-                                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
                                 ),
                               ),
                             ),
@@ -181,11 +186,13 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
             ),
             AdoptionSection(
               title: 'Ceritakan kejadiannya',
-              description: 'Sejak kapan, gejala yang terlihat, dan kondisi kucing sekarang.',
+              description:
+                  'Sejak kapan, gejala yang terlihat, dan kondisi kucing sekarang.',
               child: TextFormField(
                 controller: _descriptionController,
                 maxLines: 4,
-                style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+                style: AdoptionTheme.bodyStyle
+                    .copyWith(color: AdoptionTheme.textMain),
                 decoration: const InputDecoration(
                   contentPadding: EdgeInsets.all(14),
                   border: OutlineInputBorder(
@@ -198,7 +205,8 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: AdoptionTheme.borderMd,
-                    borderSide: BorderSide(color: AdoptionTheme.accent, width: 1.5),
+                    borderSide:
+                        BorderSide(color: AdoptionTheme.accent, width: 1.5),
                   ),
                   filled: true,
                   fillColor: AdoptionTheme.cardBg,
@@ -213,7 +221,8 @@ class _AdoptionIssueReportPageState extends State<AdoptionIssueReportPage> {
             ),
             AdoptionSection(
               title: 'Foto',
-              description: 'Opsional. Lampirkan kalau membantu pengurus memahami kondisinya.',
+              description:
+                  'Opsional. Lampirkan kalau membantu pengurus memahami kondisinya.',
               child: CameraPhotoSlot(
                 localPath: _optionalPhotoPath,
                 hint: 'Ambil foto',

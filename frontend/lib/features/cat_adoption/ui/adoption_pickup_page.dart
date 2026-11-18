@@ -40,7 +40,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
   static const List<Map<String, dynamic>> _stepsMeta = [
     {
       'title': 'Pindai QR kalung',
-      'subtitle': 'Pastikan kucing yang kamu ambil sama dengan kucing yang disetujui.',
+      'subtitle':
+          'Pastikan kucing yang kamu ambil sama dengan kucing yang disetujui.',
     },
     {
       'title': 'Foto kucing berkalung',
@@ -108,7 +109,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AdoptionTheme.cardBg,
-        shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderLg),
+        shape:
+            const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderLg),
         title: const Text('Ketik kode kalung', style: AdoptionTheme.titleStyle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -122,17 +124,20 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
             TextField(
               controller: _qrManualController,
               autofocus: true,
-              style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+              style: AdoptionTheme.bodyStyle
+                  .copyWith(color: AdoptionTheme.textMain),
               decoration: const InputDecoration(
                 hintText: 'Kode kalung',
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: AdoptionTheme.borderMd,
                   borderSide: BorderSide(color: AdoptionTheme.inputBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: AdoptionTheme.borderMd,
-                  borderSide: BorderSide(color: AdoptionTheme.accent, width: 1.5),
+                  borderSide:
+                      BorderSide(color: AdoptionTheme.accent, width: 1.5),
                 ),
               ),
             ),
@@ -358,14 +363,13 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
           ? _buildExpiredState(context)
           : AdoptionPageBody(
               children: [
-                Text(catName, style: AdoptionTheme.bodyStyle),
-                const SizedBox(height: 4),
-                Text(step['title'] as String, style: AdoptionTheme.headlineStyle),
-                const SizedBox(height: 4),
-                Text(step['subtitle'] as String, style: AdoptionTheme.bodyStyle),
-                const SizedBox(height: 16),
-                _buildProgress(),
-                const SizedBox(height: 16),
+                AdoptionHeader(
+                  overline: 'Pengambilan $catName',
+                  title: step['title'] as String,
+                  subtitle: step['subtitle'] as String,
+                  icon: Icons.qr_code_scanner_rounded,
+                  footer: _buildProgress(),
+                ),
                 Text(
                   lock != null
                       ? 'Kucing ditahan untukmu ${lock.remainingTime.inHours} jam '
@@ -373,12 +377,12 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
                       : 'Kucing ditahan untukmu selama 48 jam sejak pengambilan dimulai.',
                   style: AdoptionTheme.captionStyle,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 KeyedSubtree(
                   key: ValueKey<int>(_currentStep),
                   child: _buildCurrentStepContent(),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 _buildActionButtons(provider),
               ],
             ),
@@ -393,11 +397,13 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
           children: List.generate(_stepsMeta.length, (i) {
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: i == _stepsMeta.length - 1 ? 0 : 6),
+                padding:
+                    EdgeInsets.only(right: i == _stepsMeta.length - 1 ? 0 : 6),
                 child: Container(
-                  height: 4,
+                  height: 5,
                   decoration: BoxDecoration(
-                    color: i <= _currentStep ? AdoptionTheme.accent : AdoptionTheme.divider,
+                    color:
+                        i <= _currentStep ? AdoptionTheme.accent : Colors.white,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -434,13 +440,17 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Material(
-          color: scanned ? AdoptionTheme.successLight : AdoptionTheme.cardBg,
+          color: scanned
+              ? AdoptionTheme.successLight
+              : AdoptionTheme.accentSurface,
           shape: RoundedRectangleBorder(
             borderRadius: AdoptionTheme.borderMd,
             side: BorderSide(
               color: scanned
                   ? AdoptionTheme.success
-                  : (_qrErrorMessage != null ? AdoptionTheme.danger : AdoptionTheme.inputBorder),
+                  : (_qrErrorMessage != null
+                      ? AdoptionTheme.danger
+                      : AdoptionTheme.accentLight),
             ),
           ),
           child: InkWell(
@@ -451,9 +461,12 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
               child: Row(
                 children: [
                   Icon(
-                    scanned ? Icons.check_rounded : Icons.qr_code_scanner_rounded,
+                    scanned
+                        ? Icons.check_rounded
+                        : Icons.qr_code_scanner_rounded,
                     size: 22,
-                    color: scanned ? AdoptionTheme.success : AdoptionTheme.accent,
+                    color:
+                        scanned ? AdoptionTheme.success : AdoptionTheme.accent,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -486,14 +499,16 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
           const SizedBox(height: 8),
           Text(
             _qrErrorMessage!,
-            style: AdoptionTheme.captionStyle.copyWith(color: AdoptionTheme.danger),
+            style: AdoptionTheme.captionStyle
+                .copyWith(color: AdoptionTheme.danger),
           ),
         ],
         if (_cameraPermissionDenied) ...[
           const SizedBox(height: 12),
           const AdoptionBanner(
             variant: 'warning',
-            message: 'Kamera tidak bisa dibuka. Kamu bisa mengetik kode yang tercetak di kalung.',
+            message:
+                'Kamera tidak bisa dibuka. Kamu bisa mengetik kode yang tercetak di kalung.',
           ),
         ],
         const SizedBox(height: 8),
@@ -503,7 +518,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
             foregroundColor: AdoptionTheme.accent,
             padding: EdgeInsets.zero,
             minimumSize: const Size(0, 40),
-            textStyle: AdoptionTheme.bodyStyle.copyWith(fontWeight: FontWeight.w600),
+            textStyle:
+                AdoptionTheme.bodyStyle.copyWith(fontWeight: FontWeight.w600),
           ),
           child: const Text('Ketik kode secara manual'),
         ),
@@ -523,7 +539,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AdoptionInfoRow(label: 'QR kalung', value: _scannedQrToken ?? 'Belum dipindai'),
+        AdoptionInfoRow(
+            label: 'QR kalung', value: _scannedQrToken ?? 'Belum dipindai'),
         AdoptionInfoRow(
           label: 'Foto berkalung',
           value: _collarPhotoPath != null ? 'Sudah diambil' : 'Belum diambil',
@@ -531,7 +548,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
         const SizedBox(height: 16),
         CheckboxListTile(
           value: _confirmedResponsibility,
-          onChanged: (val) => setState(() => _confirmedResponsibility = val ?? false),
+          onChanged: (val) =>
+              setState(() => _confirmedResponsibility = val ?? false),
           activeColor: AdoptionTheme.accent,
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
@@ -548,8 +566,9 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
   Widget _buildActionButtons(AdoptionProvider provider) {
     final isLast = _currentStep == 2;
     final busy = provider.isActionLoading;
-    final canComplete =
-        _scannedQrToken != null && _collarPhotoPath != null && _confirmedResponsibility;
+    final canComplete = _scannedQrToken != null &&
+        _collarPhotoPath != null &&
+        _confirmedResponsibility;
 
     return Row(
       children: [
@@ -564,7 +583,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
           child: AdoptionPrimaryButton(
             label: isLast ? 'Selesaikan pengambilan' : 'Lanjut',
             isLoading: busy && isLast,
-            onPressed: isLast && !canComplete ? null : (busy ? null : _onStepNext),
+            onPressed:
+                isLast && !canComplete ? null : (busy ? null : _onStepNext),
           ),
         ),
       ],
@@ -576,7 +596,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
       child: AdoptionEmptyState(
         icon: Icons.timer_off_outlined,
         message: 'Masa penahanan sudah berakhir',
-        submessage: 'Kucing tidak lagi ditahan untukmu. Kalau kucing masih tersedia '
+        submessage:
+            'Kucing tidak lagi ditahan untukmu. Kalau kucing masih tersedia '
             'di katalog, kamu bisa memulai pengambilan lagi.',
         action: AdoptionSecondaryButton(
           label: 'Kembali ke katalog',

@@ -5,8 +5,18 @@ import '../data/adoption_enums.dart';
 import 'adoption_theme.dart';
 
 const _monthsId = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 
 /// Tanggal ringkas berbahasa Indonesia dalam WIB, misalnya "5 Nov 2026".
@@ -41,7 +51,7 @@ class AdoptionPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: minWidth,
-      child: ElevatedButton(
+      child: FilledButton(
         style: AdoptionTheme.primaryButtonStyle,
         onPressed: isLoading ? null : onPressed,
         child: isLoading
@@ -50,7 +60,8 @@ class AdoptionPrimaryButton extends StatelessWidget {
                 width: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AdoptionTheme.textHint),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AdoptionTheme.textHint),
                 ),
               )
             : Row(
@@ -84,7 +95,7 @@ class AdoptionSecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
+    return FilledButton(
       style: AdoptionTheme.secondaryButtonStyle,
       onPressed: onPressed,
       child: Row(
@@ -105,8 +116,7 @@ class AdoptionSecondaryButton extends StatelessWidget {
 // TATA LETAK BAGIAN
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Satu bagian halaman: judul, keterangan opsional, lalu isi.
-/// Dipakai sebagai pengganti "kartu" untuk konten yang tidak bisa diketuk.
+/// Satu bagian halaman dalam kartu kaca: judul, keterangan opsional, lalu isi.
 class AdoptionSection extends StatelessWidget {
   final String title;
   final String? description;
@@ -124,25 +134,29 @@ class AdoptionSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: AdoptionTheme.sp24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Expanded(child: Text(title, style: AdoptionTheme.subtitleStyle)),
-              if (trailing != null) trailing!,
+      padding: const EdgeInsets.only(bottom: AdoptionTheme.sp16),
+      child: Container(
+        width: double.infinity,
+        padding: AdoptionTheme.padCard,
+        decoration: AdoptionTheme.cardDecoration,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                    child: Text(title, style: AdoptionTheme.subtitleStyle)),
+                if (trailing != null) trailing!,
+              ],
+            ),
+            if (description != null) ...[
+              const SizedBox(height: AdoptionTheme.sp4),
+              Text(description!, style: AdoptionTheme.bodyStyle),
             ],
-          ),
-          if (description != null) ...[
-            const SizedBox(height: AdoptionTheme.sp4),
-            Text(description!, style: AdoptionTheme.bodyStyle),
+            const SizedBox(height: AdoptionTheme.sp12),
+            child,
           ],
-          const SizedBox(height: AdoptionTheme.sp12),
-          child,
-        ],
+        ),
       ),
     );
   }
@@ -182,24 +196,177 @@ class AdoptionInfoRow extends StatelessWidget {
   }
 }
 
-/// Pembungkus halaman: membatasi lebar konten agar nyaman dibaca di web.
+/// Latar gradasi peach ke mint, sama dengan MeowPage milik Core.
+class AdoptionBackground extends StatelessWidget {
+  final Widget child;
+
+  const AdoptionBackground({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(gradient: AdoptionTheme.pageGradient),
+      child: SizedBox.expand(child: child),
+    );
+  }
+}
+
+/// Jarak gulir halaman. Bagian bawah ditambah tinggi navigasi melayang dari
+/// shell (MediaQuery.padding.bottom), sama seperti MeowPage.scrollPadding,
+/// supaya tombol dan isi terakhir tidak tertutup navigasi.
+EdgeInsets adoptionScrollPadding(
+  BuildContext context, {
+  double top = 12,
+  double bottom = 28,
+}) {
+  return EdgeInsets.fromLTRB(
+      20, top, 20, bottom + MediaQuery.paddingOf(context).bottom);
+}
+
+/// Pembungkus halaman: latar gradasi, lebar konten dibatasi, dan jarak bawah
+/// yang aman dari navigasi.
 class AdoptionPageBody extends StatelessWidget {
   final List<Widget> children;
-  final EdgeInsets padding;
 
-  const AdoptionPageBody({
+  const AdoptionPageBody({super.key, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return AdoptionBackground(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(maxWidth: AdoptionTheme.maxContentWidth),
+          child: ListView(
+              padding: adoptionScrollPadding(context), children: children),
+        ),
+      ),
+    );
+  }
+}
+
+/// Header halaman adopsi: panel peach dengan jejak kaki kucing samar.
+class AdoptionHeader extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final String? overline;
+  final IconData icon;
+  final Widget? footer;
+
+  const AdoptionHeader({
     super.key,
-    required this.children,
-    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 40),
+    required this.title,
+    this.subtitle,
+    this.overline,
+    this.icon = Icons.pets_rounded,
+    this.footer,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: AdoptionTheme.maxContentWidth),
-        child: ListView(padding: padding, children: children),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AdoptionTheme.sp16),
+      child: ClipRRect(
+        borderRadius: AdoptionTheme.borderLg,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFDFCC), Color(0xFFFFF2EA)],
+            ),
+          ),
+          child: Stack(
+            children: [
+              const Positioned.fill(child: _PawPattern()),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (overline != null) ...[
+                            Text(
+                              overline!,
+                              style: AdoptionTheme.captionStyle.copyWith(
+                                color: AdoptionTheme.accentDark,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          Text(title, style: AdoptionTheme.headlineStyle),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: 6),
+                            Text(subtitle!, style: AdoptionTheme.bodyStyle),
+                          ],
+                          if (footer != null) ...[
+                            const SizedBox(height: 12),
+                            footer!,
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child:
+                          Icon(icon, color: AdoptionTheme.accentDark, size: 22),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Jejak kaki kucing samar sebagai hiasan header. Tidak dibaca pembaca layar.
+class _PawPattern extends StatelessWidget {
+  const _PawPattern();
+
+  // (posisi x 0..1, posisi y 0..1, ukuran, rotasi dalam radian)
+  static const _paws = <(double, double, double, double)>[
+    (0.60, 0.12, 24, -0.4),
+    (0.72, 0.62, 34, 0.3),
+    (0.86, 0.16, 22, 0.6),
+    (0.94, 0.78, 28, -0.2),
+    (0.48, 0.86, 18, 0.5),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: LayoutBuilder(
+        builder: (context, c) => Stack(
+          children: [
+            for (final (x, y, size, angle) in _paws)
+              Positioned(
+                left: c.maxWidth * x - size / 2,
+                top: c.maxHeight * y - size / 2,
+                child: Transform.rotate(
+                  angle: angle,
+                  child: Icon(
+                    Icons.pets_rounded,
+                    size: size,
+                    color: AdoptionTheme.accent.withValues(alpha: 0.10),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -271,13 +438,15 @@ class CameraPhotoSlot extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: hasPhoto ? 'Foto sudah diambil. Ketuk untuk mengambil ulang' : hint,
+      label:
+          hasPhoto ? 'Foto sudah diambil. Ketuk untuk mengambil ulang' : hint,
       child: Material(
-        color: hasPhoto ? AdoptionTheme.successLight : AdoptionTheme.cardBg,
+        color:
+            hasPhoto ? AdoptionTheme.successLight : AdoptionTheme.accentSurface,
         shape: RoundedRectangleBorder(
           borderRadius: AdoptionTheme.borderMd,
           side: BorderSide(
-            color: hasPhoto ? AdoptionTheme.success : AdoptionTheme.inputBorder,
+            color: hasPhoto ? AdoptionTheme.success : AdoptionTheme.accentLight,
           ),
         ),
         child: InkWell(
@@ -290,7 +459,8 @@ class CameraPhotoSlot extends StatelessWidget {
                 Icon(
                   hasPhoto ? Icons.check_rounded : Icons.photo_camera_outlined,
                   size: 22,
-                  color: hasPhoto ? AdoptionTheme.success : AdoptionTheme.accent,
+                  color:
+                      hasPhoto ? AdoptionTheme.success : AdoptionTheme.accent,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -365,10 +535,9 @@ class AdoptionBanner extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: _bg,
-        borderRadius: AdoptionTheme.borderSm,
-        border: Border(left: BorderSide(color: _fg, width: 3)),
+        borderRadius: AdoptionTheme.borderMd,
       ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -384,7 +553,8 @@ class AdoptionBanner extends StatelessWidget {
           ],
           Text(
             message,
-            style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+            style:
+                AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
           ),
           if (action != null) ...[
             const SizedBox(height: 10),
@@ -466,9 +636,11 @@ class AdoptionErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, size: 32, color: AdoptionTheme.textHint),
+            const Icon(Icons.cloud_off_outlined,
+                size: 32, color: AdoptionTheme.textHint),
             const SizedBox(height: AdoptionTheme.sp12),
-            const Text('Data belum bisa dimuat', style: AdoptionTheme.subtitleStyle),
+            const Text('Data belum bisa dimuat',
+                style: AdoptionTheme.subtitleStyle),
             const SizedBox(height: AdoptionTheme.sp4),
             Text(
               message,
@@ -533,10 +705,10 @@ class _StatusLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: AdoptionTheme.borderSm,
+        borderRadius: AdoptionTheme.borderPill,
       ),
       child: Text(
         label,
@@ -674,8 +846,12 @@ class ApplicationStatusTimeline extends StatelessWidget {
                     Text(
                       steps[i],
                       style: AdoptionTheme.captionStyle.copyWith(
-                        color: i == activeIndex ? AdoptionTheme.textMain : AdoptionTheme.textHint,
-                        fontWeight: i == activeIndex ? FontWeight.w700 : FontWeight.w500,
+                        color: i == activeIndex
+                            ? AdoptionTheme.textMain
+                            : AdoptionTheme.textHint,
+                        fontWeight: i == activeIndex
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                     ),
                   ],
@@ -691,7 +867,9 @@ class ApplicationStatusTimeline extends StatelessWidget {
                 ? 'Pemeriksaan otomatis: data lengkap.'
                 : 'Pemeriksaan otomatis: ada syarat yang belum terpenuhi.',
             style: AdoptionTheme.captionStyle.copyWith(
-              color: precheckPassed ? AdoptionTheme.success : AdoptionTheme.warning,
+              color: precheckPassed
+                  ? AdoptionTheme.success
+                  : AdoptionTheme.warning,
             ),
           ),
         ],

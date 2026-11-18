@@ -66,51 +66,53 @@ class _AdoptionCatalogPageState extends State<AdoptionCatalogPage> {
                   message: provider.errorMessage!,
                   onRetry: () => provider.fetchInitialData(),
                 )
-              : RefreshIndicator(
-                  color: AdoptionTheme.accent,
-                  onRefresh: () => provider.fetchInitialData(),
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1080),
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
-                        children: [
-                          _buildIntro(context),
-                          const SizedBox(height: 20),
-                          _buildFilterRow(),
-                          const SizedBox(height: 16),
-                          if (filteredCats.isEmpty)
-                            const AdoptionEmptyState(
-                              message: 'Belum ada kucing yang siap diadopsi',
-                              submessage:
-                                  'Coba ubah filter, atau cek lagi beberapa hari ke depan.',
-                            )
-                          else
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                const gap = 16.0;
-                                final width = constraints.maxWidth;
-                                final columns = width >= 900
-                                    ? 3
-                                    : width >= 560
-                                        ? 2
-                                        : 1;
-                                final itemWidth =
-                                    (width - gap * (columns - 1)) / columns;
-                                return Wrap(
-                                  spacing: gap,
-                                  runSpacing: gap,
-                                  children: filteredCats
-                                      .map((cat) => SizedBox(
-                                            width: itemWidth,
-                                            child: _CatCard(cat: cat),
-                                          ))
-                                      .toList(),
-                                );
-                              },
-                            ),
-                        ],
+              : AdoptionBackground(
+                  child: RefreshIndicator(
+                    color: AdoptionTheme.accent,
+                    onRefresh: () => provider.fetchInitialData(),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1080),
+                        child: ListView(
+                          padding: adoptionScrollPadding(context),
+                          children: [
+                            _buildIntro(context),
+                            const SizedBox(height: 20),
+                            _buildFilterRow(),
+                            const SizedBox(height: 16),
+                            if (filteredCats.isEmpty)
+                              const AdoptionEmptyState(
+                                message: 'Belum ada kucing yang siap diadopsi',
+                                submessage:
+                                    'Coba ubah filter, atau cek lagi beberapa hari ke depan.',
+                              )
+                            else
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  const gap = 16.0;
+                                  final width = constraints.maxWidth;
+                                  final columns = width >= 900
+                                      ? 3
+                                      : width >= 560
+                                          ? 2
+                                          : 1;
+                                  final itemWidth =
+                                      (width - gap * (columns - 1)) / columns;
+                                  return Wrap(
+                                    spacing: gap,
+                                    runSpacing: gap,
+                                    children: filteredCats
+                                        .map((cat) => SizedBox(
+                                              width: itemWidth,
+                                              child: _CatCard(cat: cat),
+                                            ))
+                                        .toList(),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -119,31 +121,25 @@ class _AdoptionCatalogPageState extends State<AdoptionCatalogPage> {
   }
 
   Widget _buildIntro(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Kucing kampus yang mencari rumah',
-          style: AdoptionTheme.headlineStyle,
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Semua kucing di sini sudah diperiksa pengurus adopsi. '
+    return AdoptionHeader(
+      overline: 'Adopsi kucing kampus',
+      title: 'Kucing yang mencari rumah',
+      subtitle: 'Semua kucing di sini sudah diperiksa pengurus adopsi. '
           'Sebelum mengambil kucing, isi dulu form kelayakan.',
-          style: AdoptionTheme.bodyStyle,
-        ),
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: () => context.push('/adoption/apply'),
-          style: TextButton.styleFrom(
-            foregroundColor: AdoptionTheme.accent,
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(0, 36),
-            textStyle: AdoptionTheme.bodyStyle.copyWith(fontWeight: FontWeight.w600),
+      icon: Icons.favorite_rounded,
+      footer: SizedBox(
+        height: 40,
+        child: FilledButton(
+          style: AdoptionTheme.primaryButtonStyle.copyWith(
+            minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
+            padding: const WidgetStatePropertyAll(
+              EdgeInsets.symmetric(horizontal: 18),
+            ),
           ),
+          onPressed: () => context.push('/adoption/apply'),
           child: const Text('Isi form kelayakan'),
         ),
-      ],
+      ),
     );
   }
 
@@ -171,7 +167,8 @@ class _AdoptionCatalogPageState extends State<AdoptionCatalogPage> {
           label: 'Betina',
           selected: _filterGender == 'female',
           onTap: () => setState(
-            () => _filterGender = _filterGender == 'female' ? 'semua' : 'female',
+            () =>
+                _filterGender = _filterGender == 'female' ? 'semua' : 'female',
           ),
         ),
         _FilterChip(
@@ -308,13 +305,13 @@ class _FilterChip extends StatelessWidget {
         color: selected ? Colors.white : AdoptionTheme.textMain,
         fontWeight: FontWeight.w500,
       ),
-      backgroundColor: AdoptionTheme.cardBg,
+      backgroundColor: AdoptionTheme.glassBg,
       selectedColor: AdoptionTheme.accent,
       side: BorderSide(
-        color: selected ? AdoptionTheme.accent : AdoptionTheme.inputBorder,
+        color: selected ? AdoptionTheme.accent : Colors.white,
       ),
-      shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderSm),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      shape: const StadiumBorder(),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
     );
   }
 }
@@ -332,7 +329,8 @@ class _CatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final genderLabel = cat.gender == 'male' ? 'Jantan' : 'Betina';
     final traits = <String>[
-      if (cat.primaryColor != null && cat.primaryColor!.isNotEmpty) cat.primaryColor!,
+      if (cat.primaryColor != null && cat.primaryColor!.isNotEmpty)
+        cat.primaryColor!,
       if (cat.pattern != null && cat.pattern!.isNotEmpty) cat.pattern!,
       if (cat.sterilizationStatus) 'Sudah steril',
     ];
@@ -341,83 +339,84 @@ class _CatCard extends StatelessWidget {
           '/adoption/apply?cat_id=${cat.id}&name=${Uri.encodeComponent(cat.name)}',
         );
 
-    return Material(
-      color: AdoptionTheme.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: AdoptionTheme.borderLg,
-        side: BorderSide(color: AdoptionTheme.cardBorder),
-      ),
+    return Container(
+      decoration: AdoptionTheme.cardDecoration,
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: open,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CatPhotoBox(
-              photoUrl: cat.primaryPhotoUrl,
-              borderRadius: BorderRadius.zero,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    cat.name,
-                    style: AdoptionTheme.titleStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$genderLabel, ${cat.breed}',
-                    style: AdoptionTheme.bodyStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (cat.description != null && cat.description!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: open,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CatPhotoBox(
+                photoUrl: cat.primaryPhotoUrl,
+                borderRadius: BorderRadius.zero,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      cat.description!,
-                      style: AdoptionTheme.bodyStyle.copyWith(
-                        color: AdoptionTheme.textMain,
-                      ),
-                      maxLines: 2,
+                      cat.name,
+                      style: AdoptionTheme.titleStyle,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  if (traits.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: traits.map((t) => _TagChip(label: t)).toList(),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$genderLabel, ${cat.breed}',
+                      style: AdoptionTheme.bodyStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          cat.lastSeenLocationName ?? 'Area kampus',
-                          style: AdoptionTheme.captionStyle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                    if (cat.description != null &&
+                        cat.description!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
                       Text(
-                        'Lihat detail',
+                        cat.description!,
                         style: AdoptionTheme.bodyStyle.copyWith(
-                          color: AdoptionTheme.accent,
-                          fontWeight: FontWeight.w600,
+                          color: AdoptionTheme.textMain,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                  ),
-                ],
+                    if (traits.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children:
+                            traits.map((t) => _TagChip(label: t)).toList(),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            cat.lastSeenLocationName ?? 'Area kampus',
+                            style: AdoptionTheme.captionStyle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          'Lihat detail',
+                          style: AdoptionTheme.bodyStyle.copyWith(
+                            color: AdoptionTheme.accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -435,11 +434,12 @@ class _TagChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: const BoxDecoration(
         color: AdoptionTheme.chipBg,
-        borderRadius: AdoptionTheme.borderSm,
+        borderRadius: AdoptionTheme.borderPill,
       ),
       child: Text(
         label,
-        style: AdoptionTheme.captionStyle.copyWith(color: AdoptionTheme.textSub),
+        style:
+            AdoptionTheme.captionStyle.copyWith(color: AdoptionTheme.textSub),
       ),
     );
   }

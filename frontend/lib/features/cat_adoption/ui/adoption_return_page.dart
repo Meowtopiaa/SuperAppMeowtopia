@@ -158,7 +158,8 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
 
     final bool isEvidencePending =
         activeAdoption != null && activeAdoption.isReturnEvidencePending;
-    final bool isApproved = activeAdoption != null && activeAdoption.isReturnApproved;
+    final bool isApproved =
+        activeAdoption != null && activeAdoption.isReturnApproved;
     final bool isRequested = activeAdoption != null &&
         activeAdoption.status == ActiveAdoptionStatus.RETURN_REQUESTED;
 
@@ -172,19 +173,18 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
       ),
       body: AdoptionPageBody(
         children: [
-          Text(widget.catName, style: AdoptionTheme.bodyStyle),
-          const SizedBox(height: 4),
-          const Text('Mengembalikan kucing', style: AdoptionTheme.headlineStyle),
-          const SizedBox(height: 4),
-          const Text(
-            'Adopsimu tetap aktif sampai pengurus adopsi memeriksa bukti serah terima.',
-            style: AdoptionTheme.bodyStyle,
+          AdoptionHeader(
+            overline: 'Pengembalian ${widget.catName}',
+            title: 'Mengembalikan kucing',
+            subtitle:
+                'Adopsimu tetap aktif sampai pengurus adopsi memeriksa bukti serah terima.',
+            icon: Icons.assignment_return_outlined,
           ),
-          const SizedBox(height: 24),
           if (isEvidencePending)
             const AdoptionBanner(
               title: 'Menunggu pemeriksaan',
-              message: 'Bukti serah terima sudah terkirim. Pengurus adopsi akan memeriksanya '
+              message:
+                  'Bukti serah terima sudah terkirim. Pengurus adopsi akan memeriksanya '
                   'sebelum adopsi ditutup.',
             )
           else if (isApproved)
@@ -192,19 +192,21 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
           else if (isRequested)
             const AdoptionBanner(
               title: 'Permohonan terkirim',
-              message: 'Pengurus adopsi sedang meninjau permohonanmu. Setelah disetujui, '
+              message:
+                  'Pengurus adopsi sedang meninjau permohonanmu. Setelah disetujui, '
                   'kamu diminta mengunggah foto serah terima.',
             )
           else if (!isReturnEnabled)
             const AdoptionBanner(
               variant: 'warning',
               title: 'Belum bisa diajukan lewat aplikasi',
-              message: 'Kebijakan dan titik pengembalian di kampus belum disahkan pengelola. '
+              message:
+                  'Kebijakan dan titik pengembalian di kampus belum disahkan pengelola. '
                   'Kalau kucing butuh bantuan segera, gunakan Laporkan kendala.',
             )
           else
             _buildRequestStep(provider),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
           const AdoptionSection(
             title: 'Ketentuan pengembalian',
             child: Column(
@@ -260,7 +262,8 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
           child: TextFormField(
             controller: _reasonController,
             maxLines: 4,
-            style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+            style:
+                AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.all(14),
               border: OutlineInputBorder(
@@ -296,7 +299,8 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
         const AdoptionBanner(
           variant: 'success',
           title: 'Permohonan disetujui',
-          message: 'Serahkan kucing ke pengurus adopsi, lalu foto saat serah terima.',
+          message:
+              'Serahkan kucing ke pengurus adopsi, lalu foto saat serah terima.',
         ),
         const SizedBox(height: 24),
         AdoptionSection(
@@ -347,7 +351,9 @@ class _ReasonOption extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
                 size: 22,
                 color: selected ? AdoptionTheme.accent : AdoptionTheme.textHint,
               ),
