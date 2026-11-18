@@ -1,8 +1,19 @@
 // ignore_for_file: constant_identifier_names
 
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_constants.dart';
-import '../../../core/theme/meow_style.dart';
+
+// Palet status modul adopsi: lima arti saja. Status selalu tampil dengan
+// teks, bukan hanya warna (NFR-09).
+const Color _neutral = Color(0xFF5F5650);
+const Color _neutralBg = Color(0xFFF1ECE7);
+const Color _waiting = Color(0xFF9A6200);
+const Color _waitingBg = Color(0xFFFBF1DE);
+const Color _info = Color(0xFF35618F);
+const Color _infoBg = Color(0xFFE8EFF6);
+const Color _ok = Color(0xFF2F7D4F);
+const Color _okBg = Color(0xFFE6F2EA);
+const Color _bad = Color(0xFFB3261E);
+const Color _badBg = Color(0xFFFBEAE8);
 
 /// Status Kelayakan Adopter (PRD §4.1, ADP-01..04)
 enum ApplicationStatus {
@@ -21,7 +32,7 @@ enum ApplicationStatus {
       case ApplicationStatus.REVISION_REQUESTED:
         return 'Perlu Revisi';
       case ApplicationStatus.APPROVED:
-        return 'Disetujui (Siap Ambil)';
+        return 'Disetujui';
       case ApplicationStatus.REJECTED:
         return 'Ditolak';
     }
@@ -45,30 +56,30 @@ enum ApplicationStatus {
   Color get color {
     switch (this) {
       case ApplicationStatus.DRAFT:
-        return MeowStyle.slate;
+        return _neutral;
       case ApplicationStatus.SUBMITTED:
-        return MeowStyle.orange;
+        return _info;
       case ApplicationStatus.REVISION_REQUESTED:
-        return const Color(0xFFD97706); // Amber
+        return _waiting;
       case ApplicationStatus.APPROVED:
-        return AppConstants.successColor;
+        return _ok;
       case ApplicationStatus.REJECTED:
-        return AppConstants.dangerColor;
+        return _bad;
     }
   }
 
   Color get backgroundColor {
     switch (this) {
       case ApplicationStatus.DRAFT:
-        return MeowStyle.lavender;
+        return _neutralBg;
       case ApplicationStatus.SUBMITTED:
-        return AppConstants.primaryLight;
+        return _infoBg;
       case ApplicationStatus.REVISION_REQUESTED:
-        return const Color(0xFFFEF3C7);
+        return _waitingBg;
       case ApplicationStatus.APPROVED:
-        return const Color(0xFFD1FAE5);
+        return _okBg;
       case ApplicationStatus.REJECTED:
-        return const Color(0xFFFEE2E2);
+        return _badBg;
     }
   }
 }
@@ -86,13 +97,13 @@ enum ActiveAdoptionStatus {
       case ActiveAdoptionStatus.ACTIVE:
         return 'Adopsi Aktif';
       case ActiveAdoptionStatus.RETURN_REQUESTED:
-        return 'Pengajuan Pengembalian';
+        return 'Pengembalian Diajukan';
       case ActiveAdoptionStatus.RETURN_APPROVED:
         return 'Pengembalian Disetujui';
       case ActiveAdoptionStatus.RETURN_EVIDENCE_PENDING:
-        return 'Bukti Dikumpulkan (Menunggu Verifikasi)';
+        return 'Menunggu Verifikasi Bukti';
       case ActiveAdoptionStatus.CLOSED_RETURNED:
-        return 'Selesai (Kucing Dikembalikan)';
+        return 'Sudah Dikembalikan';
     }
   }
 
@@ -114,30 +125,30 @@ enum ActiveAdoptionStatus {
   Color get color {
     switch (this) {
       case ActiveAdoptionStatus.ACTIVE:
-        return AppConstants.successColor;
+        return _ok;
       case ActiveAdoptionStatus.RETURN_REQUESTED:
-        return const Color(0xFFD97706);
+        return _waiting;
       case ActiveAdoptionStatus.RETURN_APPROVED:
-        return MeowStyle.blue;
+        return _info;
       case ActiveAdoptionStatus.RETURN_EVIDENCE_PENDING:
-        return MeowStyle.violet;
+        return _waiting;
       case ActiveAdoptionStatus.CLOSED_RETURNED:
-        return MeowStyle.slate;
+        return _neutral;
     }
   }
 
   Color get backgroundColor {
     switch (this) {
       case ActiveAdoptionStatus.ACTIVE:
-        return const Color(0xFFD1FAE5);
+        return _okBg;
       case ActiveAdoptionStatus.RETURN_REQUESTED:
-        return const Color(0xFFFEF3C7);
+        return _waitingBg;
       case ActiveAdoptionStatus.RETURN_APPROVED:
-        return const Color(0xFFDBEAFE);
+        return _infoBg;
       case ActiveAdoptionStatus.RETURN_EVIDENCE_PENDING:
-        return const Color(0xFFEDE9FE);
+        return _waitingBg;
       case ActiveAdoptionStatus.CLOSED_RETURNED:
-        return MeowStyle.lavender;
+        return _neutralBg;
     }
   }
 }
@@ -156,9 +167,9 @@ enum FollowupStatus {
       case FollowupStatus.SUBMITTED:
         return 'Laporan Terkirim';
       case FollowupStatus.LATE:
-        return 'Terlambat (Tetap Bisa Kirim)';
+        return 'Terlambat';
       case FollowupStatus.REVIEWED:
-        return 'Terverifikasi Admin';
+        return 'Sudah Diperiksa';
     }
   }
 
@@ -178,13 +189,13 @@ enum FollowupStatus {
   Color get color {
     switch (this) {
       case FollowupStatus.PENDING:
-        return MeowStyle.brown;
+        return _neutral;
       case FollowupStatus.SUBMITTED:
-        return MeowStyle.blue;
+        return _info;
       case FollowupStatus.LATE:
-        return AppConstants.dangerColor;
+        return _bad;
       case FollowupStatus.REVIEWED:
-        return AppConstants.successColor;
+        return _ok;
     }
   }
 }
@@ -206,9 +217,9 @@ enum AdoptionIssueCategory {
       case AdoptionIssueCategory.DECEASED:
         return 'Kucing Meninggal';
       case AdoptionIssueCategory.DAMAGED_QR:
-        return 'Kalung / QR Rusak';
+        return 'Kalung atau QR Rusak';
       case AdoptionIssueCategory.CARE:
-        return 'Perawatan / Kebutuhan Medis';
+        return 'Butuh Perawatan';
     }
   }
 
@@ -236,9 +247,9 @@ enum ReturnReasonType {
   String get labelId {
     switch (this) {
       case ReturnReasonType.NORMAL:
-        return 'Jalur Biasa (Setelah 3 Bulan)';
+        return 'Pengembalian biasa';
       case ReturnReasonType.EMERGENCY:
-        return 'Jalur Darurat (Dalam 3 Bulan, Wajib Alasan Khusus)';
+        return 'Pengembalian darurat';
     }
   }
 }
@@ -252,9 +263,9 @@ enum PickupLockStatus {
   String get labelId {
     switch (this) {
       case PickupLockStatus.HELD:
-        return 'Ditahan (48 Jam)';
+        return 'Ditahan untukmu';
       case PickupLockStatus.RELEASED:
-        return 'Kedaluwarsa / Dilepas';
+        return 'Penahanan berakhir';
       case PickupLockStatus.USED:
         return 'Berhasil Diambil';
     }

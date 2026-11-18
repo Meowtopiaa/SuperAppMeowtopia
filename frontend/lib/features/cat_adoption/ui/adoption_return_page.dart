@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/camera/camera_capture_page.dart';
-import '../../../core/constants/app_constants.dart';
 import '../data/adoption_enums.dart';
 import '../logic/adoption_provider.dart';
 import 'adoption_theme.dart';
 import 'adoption_widgets.dart';
 
-/// Layar 7 — Pengajuan Pengembalian Kucing (Web & Mobile Responsif)
+//// Layar 7: pengembalian kucing (ADP-11, ADP-12).
 class AdoptionReturnPage extends StatefulWidget {
   final int adoptionId;
   final String catName;
@@ -58,8 +57,8 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Foto bukti serah terima berhasil diambil.'),
-            backgroundColor: AppConstants.successColor,
+            content: Text('Foto tersimpan.'),
+            backgroundColor: AdoptionTheme.success,
           ),
         );
       }
@@ -72,8 +71,8 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
     if (_reasonController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Alasan pengembalian wajib diisi.'),
-          backgroundColor: AppConstants.dangerColor,
+          content: Text('Isi alasan pengembalian dulu.'),
+          backgroundColor: AdoptionTheme.danger,
         ),
       );
       return;
@@ -92,16 +91,16 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
         SnackBar(
           content: Text(
             provider.actionSuccessMessage ??
-                'Pengajuan pengembalian berhasil dikirim.',
+                'Permohonan pengembalian terkirim.',
           ),
-          backgroundColor: AppConstants.successColor,
+          backgroundColor: AdoptionTheme.success,
         ),
       );
     } else if (provider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(provider.errorMessage!),
-          backgroundColor: AppConstants.dangerColor,
+          backgroundColor: AdoptionTheme.danger,
         ),
       );
     }
@@ -113,8 +112,8 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
     if (_evidencePhotoPath == null || _evidencePhotoPath!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Foto bukti fisik serah terima wajib dilampirkan.'),
-          backgroundColor: AppConstants.dangerColor,
+          content: Text('Ambil foto serah terima dulu.'),
+          backgroundColor: AdoptionTheme.danger,
         ),
       );
       return;
@@ -132,16 +131,16 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
         SnackBar(
           content: Text(
             provider.actionSuccessMessage ??
-                'Bukti berhasil diunggah. Menunggu verifikasi admin.',
+                'Bukti terkirim. Menunggu pemeriksaan pengurus adopsi.',
           ),
-          backgroundColor: AppConstants.successColor,
+          backgroundColor: AdoptionTheme.success,
         ),
       );
     } else if (provider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(provider.errorMessage!),
-          backgroundColor: AppConstants.dangerColor,
+          backgroundColor: AdoptionTheme.danger,
         ),
       );
     }
@@ -157,10 +156,11 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
           orElse: () => null,
         );
 
-    final isEvidencePending =
+    final bool isEvidencePending =
         activeAdoption != null && activeAdoption.isReturnEvidencePending;
-    final isApproved =
-        activeAdoption != null && activeAdoption.isReturnApproved;
+    final bool isApproved = activeAdoption != null && activeAdoption.isReturnApproved;
+    final bool isRequested = activeAdoption != null &&
+        activeAdoption.status == ActiveAdoptionStatus.RETURN_REQUESTED;
 
     return Scaffold(
       backgroundColor: AdoptionTheme.pageBg,
@@ -168,451 +168,223 @@ class _AdoptionReturnPageState extends State<AdoptionReturnPage> {
         backgroundColor: AdoptionTheme.pageBg,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text('Pengembalian: ${widget.catName}', style: AdoptionTheme.titleStyle),
+        title: const Text('Pengembalian', style: AdoptionTheme.titleStyle),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth >= 960;
-
-          if (isDesktop) {
-            // ── Tampilan Desktop (2 Kolom Seimbang) ─────────────────────
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1140),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Kolom Kiri: Sidebar Kebijakan & Info Kucing
-                        SizedBox(
-                          width: 380,
-                          child: _buildDesktopSidebar(
-                            isReturnEnabled,
-                            isEvidencePending,
-                            isApproved,
-                          ),
-                        ),
-                        const SizedBox(width: 28),
-                        // Kolom Kanan: Formulir Pengembalian & Bukti
-                        Expanded(
-                          child: _buildFormCard(
-                            isReturnEnabled,
-                            isEvidencePending,
-                            isApproved,
-                            provider,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+      body: AdoptionPageBody(
+        children: [
+          Text(widget.catName, style: AdoptionTheme.bodyStyle),
+          const SizedBox(height: 4),
+          const Text('Mengembalikan kucing', style: AdoptionTheme.headlineStyle),
+          const SizedBox(height: 4),
+          const Text(
+            'Adopsimu tetap aktif sampai pengurus adopsi memeriksa bukti serah terima.',
+            style: AdoptionTheme.bodyStyle,
+          ),
+          const SizedBox(height: 24),
+          if (isEvidencePending)
+            const AdoptionBanner(
+              title: 'Menunggu pemeriksaan',
+              message: 'Bukti serah terima sudah terkirim. Pengurus adopsi akan memeriksanya '
+                  'sebelum adopsi ditutup.',
+            )
+          else if (isApproved)
+            _buildEvidenceStep(provider)
+          else if (isRequested)
+            const AdoptionBanner(
+              title: 'Permohonan terkirim',
+              message: 'Pengurus adopsi sedang meninjau permohonanmu. Setelah disetujui, '
+                  'kamu diminta mengunggah foto serah terima.',
+            )
+          else if (!isReturnEnabled)
+            const AdoptionBanner(
+              variant: 'warning',
+              title: 'Belum bisa diajukan lewat aplikasi',
+              message: 'Kebijakan dan titik pengembalian di kampus belum disahkan pengelola. '
+                  'Kalau kucing butuh bantuan segera, gunakan Laporkan kendala.',
+            )
+          else
+            _buildRequestStep(provider),
+          const SizedBox(height: 32),
+          const AdoptionSection(
+            title: 'Ketentuan pengembalian',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _RuleLine(
+                  'Pengembalian biasa bisa diajukan setelah tiga bulan kalender sejak pengambilan.',
                 ),
-              ),
-            );
-          }
-
-          // ── Tampilan Mobile / Tablet (1 Kolom Rapi) ───────────────────
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                children: [
-                  _buildPolicyNoticeBanner(isReturnEnabled, isEvidencePending, isApproved),
-                  const SizedBox(height: 16),
-                  _buildFormCard(
-                    isReturnEnabled,
-                    isEvidencePending,
-                    isApproved,
-                    provider,
-                  ),
-                ],
-              ),
+                _RuleLine(
+                  'Sebelum tiga bulan, pengembalian hanya lewat jalur darurat dengan alasan yang jelas.',
+                ),
+                _RuleLine(
+                  'Setelah pengembalian diverifikasi, ada masa tunggu 30 hari sebelum kamu bisa mengadopsi lagi.',
+                ),
+              ],
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  // ── Banner Kebijakan (Mobile) ─────────────────────────────────────────────
-  Widget _buildPolicyNoticeBanner(
-    bool isReturnEnabled,
-    bool isEvidencePending,
-    bool isApproved,
-  ) {
-    if (isEvidencePending) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEFF6FF),
-          borderRadius: AdoptionTheme.borderMd,
-          border: Border.all(color: AdoptionTheme.info.withValues(alpha: 0.4)),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.hourglass_top_rounded, size: 20, color: AdoptionTheme.info),
-            SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Menunggu verifikasi admin', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1D4ED8))),
-                  Text('Bukti serah terima telah dikirim. Admin sedang meninjau dokumen fisik.', style: TextStyle(fontSize: 11, color: Color(0xFF1D4ED8))),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (isApproved) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
-          borderRadius: AdoptionTheme.borderMd,
-          border: Border.all(color: AdoptionTheme.success.withValues(alpha: 0.4)),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.check_circle_outline_rounded, size: 20, color: AdoptionTheme.success),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Pengajuan disetujui. Silakan serahkan kucing dan unggah bukti foto.',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF166534)),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!isReturnEnabled) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFBEB),
-          borderRadius: AdoptionTheme.borderMd,
-          border: Border.all(color: AdoptionTheme.warning.withValues(alpha: 0.5)),
-        ),
-        child: const Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.info_outline_rounded, size: 20, color: AdoptionTheme.warning),
-            SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Pengembalian ke kampus belum tersedia.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF92400E))),
-                  SizedBox(height: 3),
-                  Text(
-                    'Kebijakannya masih menunggu pengesahan pengelola. Formulir di bawah ini ditampilkan sebagai pratinjau struktur permohonan.',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF92400E), height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
-  // ── Sidebar Desktop ───────────────────────────────────────────────────────
-  Widget _buildDesktopSidebar(
-    bool isReturnEnabled,
-    bool isEvidencePending,
-    bool isApproved,
-  ) {
+  Widget _buildRequestStep(AdoptionProvider provider) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Kartu Identitas Kucing
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: AdoptionTheme.borderLg,
-            border: Border.all(color: AdoptionTheme.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+        AdoptionSection(
+          title: 'Jenis pengembalian',
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: AdoptionTheme.accentLight,
-                      borderRadius: AdoptionTheme.borderSm,
-                    ),
-                    child: const Icon(Icons.pets_rounded, size: 22, color: AdoptionTheme.accent),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.catName, style: AdoptionTheme.subtitleStyle.copyWith(fontSize: 16, fontWeight: FontWeight.w700)),
-                        Text('ID Adopsi #${widget.adoptionId}', style: AdoptionTheme.captionStyle.copyWith(color: AdoptionTheme.textSub)),
-                      ],
-                    ),
-                  ),
-                ],
+              _ReasonOption(
+                title: 'Pengembalian biasa',
+                description: 'Sudah lewat tiga bulan sejak pengambilan.',
+                value: ReturnReasonType.NORMAL,
+                groupValue: _reasonType,
+                onChanged: (v) => setState(() => _reasonType = v),
               ),
-              const SizedBox(height: 16),
-              const Divider(height: 1, color: AdoptionTheme.divider),
-              const SizedBox(height: 14),
-              _buildPolicyNoticeBanner(isReturnEnabled, isEvidencePending, isApproved),
+              _ReasonOption(
+                title: 'Pengembalian darurat',
+                description: 'Belum tiga bulan, ada alasan mendesak.',
+                value: ReturnReasonType.EMERGENCY,
+                groupValue: _reasonType,
+                onChanged: (v) => setState(() => _reasonType = v),
+              ),
             ],
           ),
         ),
-
-        const SizedBox(height: 16),
-
-        // Kartu Ketentuan Pengembalian Sesuai PRD
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AdoptionTheme.accentSurface,
-            borderRadius: AdoptionTheme.borderLg,
-            border: Border.all(color: AdoptionTheme.accent.withValues(alpha: 0.15)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.gavel_rounded, size: 18, color: AdoptionTheme.accent),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Ketentuan Pengembalian',
-                    style: AdoptionTheme.subtitleStyle.copyWith(
-                      color: AdoptionTheme.accent,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+        AdoptionSection(
+          title: 'Alasan',
+          description: _reasonType == ReturnReasonType.EMERGENCY
+              ? 'Ceritakan apa yang terjadi sehingga kucing perlu dikembalikan sekarang.'
+              : 'Ceritakan alasan kamu mengembalikan kucing.',
+          child: TextFormField(
+            controller: _reasonController,
+            maxLines: 4,
+            style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.all(14),
+              border: OutlineInputBorder(
+                borderRadius: AdoptionTheme.borderMd,
+                borderSide: BorderSide(color: AdoptionTheme.inputBorder),
               ),
-              const SizedBox(height: 10),
-              Text(
-                '• Jalur Biasa: Hanya diajukan setelah melewati 3 bulan kalender masa adopsi.\n'
-                '• Jalur Darurat: Sebelum 3 bulan dengan mencantumkan alasan mendesak.\n'
-                '• Status Kuota: Kuota adopsi tetap terikat sampai verifikasi bukti fisik disetujui admin.',
-                style: AdoptionTheme.captionStyle.copyWith(
-                  height: 1.55,
-                  color: AdoptionTheme.textMain,
-                ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: AdoptionTheme.borderMd,
+                borderSide: BorderSide(color: AdoptionTheme.inputBorder),
               ),
-            ],
+              focusedBorder: OutlineInputBorder(
+                borderRadius: AdoptionTheme.borderMd,
+                borderSide: BorderSide(color: AdoptionTheme.accent, width: 1.5),
+              ),
+              filled: true,
+              fillColor: AdoptionTheme.cardBg,
+            ),
           ),
+        ),
+        AdoptionPrimaryButton(
+          label: 'Kirim permohonan',
+          isLoading: provider.isActionLoading,
+          onPressed: provider.isActionLoading ? null : _onRequestReturn,
         ),
       ],
     );
   }
 
-  // ── Kartu Formulir Pengembalian ───────────────────────────────────────────
-  Widget _buildFormCard(
-    bool isReturnEnabled,
-    bool isEvidencePending,
-    bool isApproved,
-    AdoptionProvider provider,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AdoptionTheme.borderLg,
-        border: Border.all(color: AdoptionTheme.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+  Widget _buildEvidenceStep(AdoptionProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AdoptionBanner(
+          variant: 'success',
+          title: 'Permohonan disetujui',
+          message: 'Serahkan kucing ke pengurus adopsi, lalu foto saat serah terima.',
+        ),
+        const SizedBox(height: 24),
+        AdoptionSection(
+          title: 'Foto serah terima',
+          child: CameraPhotoSlot(
+            localPath: _evidencePhotoPath,
+            hint: 'Ambil foto serah terima',
+            onTap: _takeEvidencePhoto,
           ),
-        ],
-      ),
-      padding: const EdgeInsets.all(22),
-      child: Opacity(
-        opacity: isReturnEnabled ? 1.0 : 0.65,
-        child: IgnorePointer(
-          ignoring: !isReturnEnabled,
-          child: Column(
+        ),
+        AdoptionPrimaryButton(
+          label: 'Kirim bukti',
+          isLoading: provider.isActionLoading,
+          onPressed: provider.isActionLoading ? null : _onSubmitEvidence,
+        ),
+      ],
+    );
+  }
+}
+
+class _ReasonOption extends StatelessWidget {
+  final String title;
+  final String description;
+  final ReturnReasonType value;
+  final ReturnReasonType groupValue;
+  final ValueChanged<ReturnReasonType> onChanged;
+
+  const _ReasonOption({
+    required this.title,
+    required this.description,
+    required this.value,
+    required this.groupValue,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = value == groupValue;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: InkWell(
+        onTap: () => onChanged(value),
+        borderRadius: AdoptionTheme.borderMd,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Formulir Permohonan Pengembalian',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                size: 22,
+                color: selected ? AdoptionTheme.accent : AdoptionTheme.textHint,
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Lengkapi jalur dan alasan pengembalian untuk ditinjau oleh pengelola kampus.',
-                style: AdoptionTheme.captionStyle,
-              ),
-              const SizedBox(height: 18),
-              const Divider(height: 1, color: AdoptionTheme.divider),
-              const SizedBox(height: 18),
-
-              // Jalur Pengembalian
-              const Text('Jalur Pengembalian', style: AdoptionTheme.subtitleStyle),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: AdoptionTheme.borderMd,
-                  border: Border.all(color: AdoptionTheme.cardBorder),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<ReturnReasonType>(
-                    value: _reasonType,
-                    isExpanded: true,
-                    icon: const Icon(Icons.arrow_drop_down_rounded),
-                    items: const [
-                      DropdownMenuItem(
-                        value: ReturnReasonType.NORMAL,
-                        child: Text(
-                          'Jalur Biasa (setelah 3 bulan adopsi)',
-                          style: AdoptionTheme.bodyStyle,
-                        ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AdoptionTheme.bodyStyle.copyWith(
+                        color: AdoptionTheme.textMain,
+                        fontWeight: FontWeight.w600,
                       ),
-                      DropdownMenuItem(
-                        value: ReturnReasonType.EMERGENCY,
-                        child: Text(
-                          'Jalur Darurat (wajib alasan)',
-                          style: AdoptionTheme.bodyStyle,
-                        ),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setState(() => _reasonType = val);
-                    },
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // Alasan Pengembalian
-              const Text('Alasan Pengembalian', style: AdoptionTheme.subtitleStyle),
-              const SizedBox(height: 4),
-              Text(
-                _reasonType == ReturnReasonType.EMERGENCY
-                    ? 'Jalur darurat mewajibkan penjelasan alasan secara rinci.'
-                    : 'Jelaskan alasan pengembalian kucing ke kampus.',
-                style: AdoptionTheme.captionStyle,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _reasonController,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  hintText: 'Tuliskan alasan pengembalian di sini...',
-                  hintStyle: AdoptionTheme.captionStyle,
-                  contentPadding: EdgeInsets.all(14),
-                  border: OutlineInputBorder(
-                    borderRadius: AdoptionTheme.borderMd,
-                    borderSide: BorderSide(color: AdoptionTheme.inputBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: AdoptionTheme.borderMd,
-                    borderSide: BorderSide(color: AdoptionTheme.accent, width: 1.5),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Tombol Kirim Pengajuan
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AdoptionTheme.accent,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: AdoptionTheme.sp12),
-                    shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderMd),
-                  ),
-                  onPressed: isReturnEnabled && !provider.isActionLoading
-                      ? _onRequestReturn
-                      : null,
-                  child: provider.isActionLoading
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text(
-                          'Kirim Pengajuan Pengembalian',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-              const Divider(height: 1, color: AdoptionTheme.divider),
-              const SizedBox(height: 20),
-
-              // Bagian Unggah Bukti
-              const Text('Unggah Bukti Serah Terima', style: AdoptionTheme.subtitleStyle),
-              const SizedBox(height: 4),
-              const Text(
-                'Unggah foto bukti serah terima setelah pengajuan disetujui pengelola.',
-                style: AdoptionTheme.captionStyle,
-              ),
-              const SizedBox(height: 12),
-              CameraPhotoSlot(
-                localPath: _evidencePhotoPath,
-                hint: 'Buka kamera untuk foto bukti serah terima (tanpa galeri)',
-                onTap: isApproved && !isEvidencePending ? () => _takeEvidencePhoto() : () {},
-              ),
-
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: isApproved && !isEvidencePending
-                          ? AdoptionTheme.accent
-                          : AdoptionTheme.cardBorder,
                     ),
-                    foregroundColor: isApproved && !isEvidencePending
-                        ? AdoptionTheme.accent
-                        : AdoptionTheme.textHint,
-                    padding: const EdgeInsets.symmetric(vertical: AdoptionTheme.sp12),
-                    shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderMd),
-                  ),
-                  onPressed: isApproved && !isEvidencePending && !provider.isActionLoading
-                      ? _onSubmitEvidence
-                      : null,
-                  child: const Text('Unggah Bukti Pengembalian'),
+                    Text(description, style: AdoptionTheme.captionStyle),
+                  ],
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RuleLine extends StatelessWidget {
+  final String text;
+
+  const _RuleLine(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(text, style: AdoptionTheme.bodyStyle),
     );
   }
 }

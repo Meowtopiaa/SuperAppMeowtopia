@@ -1,14 +1,26 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_constants.dart';
 import '../data/adoption_enums.dart';
 import 'adoption_theme.dart';
+
+const _monthsId = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+];
+
+/// Tanggal ringkas berbahasa Indonesia dalam WIB, misalnya "5 Nov 2026".
+/// Waktu dari server disimpan UTC (PRD 2), jadi dikonversi ke UTC+7 dulu.
+String formatAdoptionDate(DateTime date) {
+  final wib = date.isUtc ? date.add(const Duration(hours: 7)) : date;
+  return '${wib.day} ${_monthsId[wib.month - 1]} ${wib.year}';
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOMBOL
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Tombol utama adopsi — terakota penuh, lebar bebas atau bisa dibatasi.
+/// Tombol utama adopsi.
 class AdoptionPrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -38,7 +50,7 @@ class AdoptionPrimaryButton extends StatelessWidget {
                 width: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(AdoptionTheme.textHint),
                 ),
               )
             : Row(
@@ -46,10 +58,10 @@ class AdoptionPrimaryButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: 17),
-                    const SizedBox(width: 6),
+                    Icon(icon, size: 18),
+                    const SizedBox(width: 8),
                   ],
-                  Text(label),
+                  Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
                 ],
               ),
       ),
@@ -57,7 +69,7 @@ class AdoptionPrimaryButton extends StatelessWidget {
   }
 }
 
-/// Tombol sekunder adopsi — outline terakota, cocok untuk aksi tambahan.
+/// Tombol sekunder adopsi untuk aksi tambahan.
 class AdoptionSecondaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -79,10 +91,10 @@ class AdoptionSecondaryButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 15),
-            const SizedBox(width: 5),
+            Icon(icon, size: 17),
+            const SizedBox(width: 6),
           ],
-          Text(label),
+          Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
@@ -90,11 +102,114 @@ class AdoptionSecondaryButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FOTO KUCING (placeholder & fallback)
+// TATA LETAK BAGIAN
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Widget foto kucing rasio 4:3 dengan placeholder netral dan fallback ikon.
-/// Gunakan [photoUrl] kosong atau null untuk menampilkan placeholder.
+/// Satu bagian halaman: judul, keterangan opsional, lalu isi.
+/// Dipakai sebagai pengganti "kartu" untuk konten yang tidak bisa diketuk.
+class AdoptionSection extends StatelessWidget {
+  final String title;
+  final String? description;
+  final Widget child;
+  final Widget? trailing;
+
+  const AdoptionSection({
+    super.key,
+    required this.title,
+    required this.child,
+    this.description,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AdoptionTheme.sp24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(child: Text(title, style: AdoptionTheme.subtitleStyle)),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          if (description != null) ...[
+            const SizedBox(height: AdoptionTheme.sp4),
+            Text(description!, style: AdoptionTheme.bodyStyle),
+          ],
+          const SizedBox(height: AdoptionTheme.sp12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// Baris label dan nilai untuk ringkasan data (detail, pengambilan, dsb.).
+class AdoptionInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const AdoptionInfoRow({super.key, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 128,
+            child: Text(label, style: AdoptionTheme.bodyStyle),
+          ),
+          const SizedBox(width: AdoptionTheme.sp12),
+          Expanded(
+            child: Text(
+              value,
+              style: AdoptionTheme.bodyStyle.copyWith(
+                color: AdoptionTheme.textMain,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pembungkus halaman: membatasi lebar konten agar nyaman dibaca di web.
+class AdoptionPageBody extends StatelessWidget {
+  final List<Widget> children;
+  final EdgeInsets padding;
+
+  const AdoptionPageBody({
+    super.key,
+    required this.children,
+    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 40),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AdoptionTheme.maxContentWidth),
+        child: ListView(padding: padding, children: children),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FOTO KUCING
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Foto kucing rasio 4:3. [photoUrl] kosong menampilkan latar polos.
 class CatPhotoBox extends StatelessWidget {
   final String? photoUrl;
   final BorderRadius? borderRadius;
@@ -110,33 +225,10 @@ class CatPhotoBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final br = borderRadius ?? AdoptionTheme.borderPhoto;
-    final h = height;
-
-    Widget placeholder = Container(
-      decoration: BoxDecoration(
-        color: AdoptionTheme.accentSurface,
-        borderRadius: br,
-        border: Border.all(color: AdoptionTheme.cardBorder),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.pets_rounded,
-              size: 36,
-              color: AdoptionTheme.accent.withValues(alpha: 0.35),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Foto belum tersedia',
-              style: AdoptionTheme.captionStyle.copyWith(
-                color: AdoptionTheme.textHint,
-              ),
-            ),
-          ],
-        ),
-      ),
+    final placeholder = Container(
+      decoration: BoxDecoration(color: AdoptionTheme.chipBg, borderRadius: br),
+      alignment: Alignment.center,
+      child: const Text('Belum ada foto', style: AdoptionTheme.captionStyle),
     );
 
     final hasUrl = photoUrl != null && photoUrl!.isNotEmpty;
@@ -151,40 +243,16 @@ class CatPhotoBox extends StatelessWidget {
         child: CachedNetworkImage(
           imageUrl: photoUrl!,
           fit: BoxFit.cover,
-          height: h,
-          placeholder: (_, __) => Container(
-            color: AdoptionTheme.accentSurface,
-            child: Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AdoptionTheme.accent.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          errorWidget: (_, __, ___) => Container(
-            color: AdoptionTheme.accentSurface,
-            child: const Center(
-              child: Icon(
-                Icons.broken_image_outlined,
-                size: 36,
-                color: AdoptionTheme.textHint,
-              ),
-            ),
-          ),
+          height: height,
+          placeholder: (_, __) => Container(color: AdoptionTheme.chipBg),
+          errorWidget: (_, __, ___) => placeholder,
         ),
       ),
     );
   }
 }
 
-/// Tempat foto hasil kamera (input kamera — bukan galeri).
-/// Menampilkan pratinjau path lokal atau placeholder "Ambil Foto" bila kosong.
+/// Slot foto dari kamera aplikasi (galeri tidak dipakai, PRD 4.7).
 class CameraPhotoSlot extends StatelessWidget {
   final String? localPath;
   final VoidCallback onTap;
@@ -194,107 +262,62 @@ class CameraPhotoSlot extends StatelessWidget {
     super.key,
     required this.onTap,
     this.localPath,
-    this.hint = 'Ambil foto via kamera',
+    this.hint = 'Ambil foto',
   });
 
   @override
   Widget build(BuildContext context) {
     final hasPhoto = localPath != null && localPath!.isNotEmpty;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 140,
-        decoration: BoxDecoration(
-          color: hasPhoto ? AdoptionTheme.accentLight : Colors.white,
+    return Semantics(
+      button: true,
+      label: hasPhoto ? 'Foto sudah diambil. Ketuk untuk mengambil ulang' : hint,
+      child: Material(
+        color: hasPhoto ? AdoptionTheme.successLight : AdoptionTheme.cardBg,
+        shape: RoundedRectangleBorder(
           borderRadius: AdoptionTheme.borderMd,
-          border: Border.all(
-            color: hasPhoto ? AdoptionTheme.accent : AdoptionTheme.cardBorder,
-            width: hasPhoto ? 1.5 : 1,
+          side: BorderSide(
+            color: hasPhoto ? AdoptionTheme.success : AdoptionTheme.inputBorder,
           ),
         ),
-        child: hasPhoto
-            ? Stack(
-                children: [
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: AdoptionTheme.borderMd,
-                      child: Container(
-                        color: AdoptionTheme.accentSurface,
-                        child: const Center(
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            size: 32,
-                            color: AppConstants.successColor,
-                          ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AdoptionTheme.borderMd,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            child: Row(
+              children: [
+                Icon(
+                  hasPhoto ? Icons.check_rounded : Icons.photo_camera_outlined,
+                  size: 22,
+                  color: hasPhoto ? AdoptionTheme.success : AdoptionTheme.accent,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasPhoto ? 'Foto sudah diambil' : hint,
+                        style: AdoptionTheme.bodyStyle.copyWith(
+                          color: AdoptionTheme.textMain,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 8,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: const BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: AdoptionTheme.borderSm,
-                        ),
-                        child: Text(
-                          '${localPath!.split('/').last}  · Ketuk untuk ganti',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasPhoto
+                            ? 'Ketuk untuk mengambil ulang'
+                            : 'Kamera akan terbuka. Foto dari galeri tidak bisa dipakai.',
+                        style: AdoptionTheme.captionStyle,
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: AdoptionTheme.accentLight,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      size: 22,
-                      color: AdoptionTheme.accent,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    hint,
-                    style: AdoptionTheme.captionStyle.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AdoptionTheme.textMain,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Kamera langsung · Galeri tidak tersedia',
-                    style: AdoptionTheme.captionStyle.copyWith(
-                      fontSize: 11,
-                      color: AdoptionTheme.textHint,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -304,8 +327,8 @@ class CameraPhotoSlot extends StatelessWidget {
 // BANNER INFO
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Banner informasi/peringatan/sukses dengan ikon dan teks.
-/// [variant]: 'info' | 'warning' | 'success' | 'danger'
+/// Pesan sebaris di dalam halaman. [variant]: 'info' | 'warning' | 'success' | 'danger'.
+/// Tampil sebagai blok datar dengan garis warna di kiri.
 class AdoptionBanner extends StatelessWidget {
   final String message;
   final String? title;
@@ -326,64 +349,47 @@ class AdoptionBanner extends StatelessWidget {
         'warning' => AdoptionTheme.warningLight,
         'success' => AdoptionTheme.successLight,
         'danger' => AdoptionTheme.dangerLight,
-        _ => AdoptionTheme.infoLight,
-      };
-
-  Color get _border => switch (variant) {
-        'warning' => AdoptionTheme.warning.withValues(alpha: 0.4),
-        'success' => AdoptionTheme.success.withValues(alpha: 0.4),
-        'danger' => AdoptionTheme.danger.withValues(alpha: 0.4),
-        _ => AdoptionTheme.info.withValues(alpha: 0.4),
+        _ => AdoptionTheme.chipBg,
       };
 
   Color get _fg => switch (variant) {
         'warning' => AdoptionTheme.warning,
         'success' => AdoptionTheme.success,
         'danger' => AdoptionTheme.danger,
-        _ => AdoptionTheme.info,
-      };
-
-  IconData get _icon => icon ??
-      switch (variant) {
-        'warning' => Icons.warning_amber_rounded,
-        'success' => Icons.check_circle_rounded,
-        'danger' => Icons.error_rounded,
-        _ => Icons.info_rounded,
+        _ => AdoptionTheme.textSub,
       };
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: AdoptionTheme.padCard,
+      width: double.infinity,
       decoration: BoxDecoration(
         color: _bg,
-        borderRadius: AdoptionTheme.borderMd,
-        border: Border.all(color: _border),
+        borderRadius: AdoptionTheme.borderSm,
+        border: Border(left: BorderSide(color: _fg, width: 3)),
       ),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(_icon, color: _fg, size: 20),
-          const SizedBox(width: AdoptionTheme.sp12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (title != null) ...[
-                  Text(
-                    title!,
-                    style: AdoptionTheme.subtitleStyle.copyWith(color: _fg),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                Text(message, style: AdoptionTheme.bodyStyle),
-                if (action != null) ...[
-                  const SizedBox(height: 8),
-                  action!,
-                ],
-              ],
+          if (title != null) ...[
+            Text(
+              title!,
+              style: AdoptionTheme.bodyStyle.copyWith(
+                color: _fg,
+                fontWeight: FontWeight.w700,
+              ),
             ),
+            const SizedBox(height: 2),
+          ],
+          Text(
+            message,
+            style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
           ),
+          if (action != null) ...[
+            const SizedBox(height: 10),
+            action!,
+          ],
         ],
       ),
     );
@@ -394,7 +400,7 @@ class AdoptionBanner extends StatelessWidget {
 // STATE KOSONG & STATE GAGAL
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// State kosong — tampil ketika tidak ada data sama sekali.
+/// State kosong: kalimat yang menjelaskan keadaan dan langkah berikutnya.
 class AdoptionEmptyState extends StatelessWidget {
   final String message;
   final String? submessage;
@@ -405,54 +411,43 @@ class AdoptionEmptyState extends StatelessWidget {
     super.key,
     required this.message,
     this.submessage,
-    this.icon = Icons.pets_rounded,
+    this.icon = Icons.pets_outlined,
     this.action,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AdoptionTheme.sp32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AdoptionTheme.accentSurface,
-                shape: BoxShape.circle,
-                border: Border.all(color: AdoptionTheme.cardBorder),
-              ),
-              child: Icon(icon, size: 36, color: AdoptionTheme.textHint),
-            ),
-            const SizedBox(height: AdoptionTheme.sp16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 32, color: AdoptionTheme.textHint),
+          const SizedBox(height: AdoptionTheme.sp12),
+          Text(
+            message,
+            style: AdoptionTheme.subtitleStyle,
+            textAlign: TextAlign.center,
+          ),
+          if (submessage != null) ...[
+            const SizedBox(height: AdoptionTheme.sp4),
             Text(
-              message,
-              style: AdoptionTheme.subtitleStyle,
+              submessage!,
+              style: AdoptionTheme.bodyStyle,
               textAlign: TextAlign.center,
             ),
-            if (submessage != null) ...[
-              const SizedBox(height: AdoptionTheme.sp8),
-              Text(
-                submessage!,
-                style: AdoptionTheme.bodyStyle,
-                textAlign: TextAlign.center,
-              ),
-            ],
-            if (action != null) ...[
-              const SizedBox(height: AdoptionTheme.sp24),
-              action!,
-            ],
           ],
-        ),
+          if (action != null) ...[
+            const SizedBox(height: AdoptionTheme.sp16),
+            action!,
+          ],
+        ],
       ),
     );
   }
 }
 
-/// State gagal — tampil ketika terjadi error jaringan atau server.
+/// State gagal muat (jaringan atau server).
 class AdoptionErrorState extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
@@ -471,37 +466,21 @@ class AdoptionErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: const BoxDecoration(
-                color: AdoptionTheme.dangerLight,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.cloud_off_rounded,
-                size: 36,
-                color: AppConstants.dangerColor,
-              ),
-            ),
-            const SizedBox(height: AdoptionTheme.sp16),
-            const Text(
-              'Gagal Memuat Data',
-              style: AdoptionTheme.subtitleStyle,
-            ),
-            const SizedBox(height: AdoptionTheme.sp8),
+            const Icon(Icons.cloud_off_outlined, size: 32, color: AdoptionTheme.textHint),
+            const SizedBox(height: AdoptionTheme.sp12),
+            const Text('Data belum bisa dimuat', style: AdoptionTheme.subtitleStyle),
+            const SizedBox(height: AdoptionTheme.sp4),
             Text(
               message,
               style: AdoptionTheme.bodyStyle,
               textAlign: TextAlign.center,
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: AdoptionTheme.sp24),
-              AdoptionPrimaryButton(
-                label: 'Coba Lagi',
+              const SizedBox(height: AdoptionTheme.sp16),
+              AdoptionSecondaryButton(
+                label: 'Coba lagi',
                 onPressed: onRetry,
                 icon: Icons.refresh_rounded,
-                minWidth: 160,
               ),
             ],
           ],
@@ -512,11 +491,10 @@ class AdoptionErrorState extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BADGE STATUS (teks + ikon) — generik, selain ApplicationStatusBadge
+// LABEL STATUS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Badge status ringkas dengan teks dan ikon; cocok untuk status adopsi,
-/// follow-up, pengembalian, dsb.
+/// Label status ringkas: teks berwarna di latar lembut, tanpa garis tepi.
 class AdoptionStatusChip extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -533,40 +511,45 @@ class AdoptionStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? color.withValues(alpha: 0.12);
+    return _StatusLabel(
+      label: label,
+      color: color,
+      background: backgroundColor ?? color.withValues(alpha: 0.1),
+    );
+  }
+}
+
+class _StatusLabel extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color background;
+
+  const _StatusLabel({
+    required this.label,
+    required this.color,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AdoptionTheme.sp8,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: bg,
+        color: background,
         borderRadius: AdoptionTheme.borderSm,
-        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: AdoptionTheme.captionStyle.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        style: AdoptionTheme.captionStyle.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// BADGE STATUS YANG SUDAH ADA (tidak diubah, hanya ditambah di bawah)
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// Badge status kelayakan adopter (ADP-01..04)
+/// Label status kelayakan adopter (ADP-01..04).
 class ApplicationStatusBadge extends StatelessWidget {
   final ApplicationStatus status;
 
@@ -574,34 +557,15 @@ class ApplicationStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: status.backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: status.color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(status.icon, size: 14, color: status.color),
-          const SizedBox(width: 5),
-          Text(
-            status.labelId,
-            style: TextStyle(
-              color: status.color,
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-              fontFamily: 'Inter',
-            ),
-          ),
-        ],
-      ),
+    return _StatusLabel(
+      label: status.labelId,
+      color: status.color,
+      background: status.backgroundColor,
     );
   }
 }
 
-/// Badge status adopsi aktif (ADP-08)
+/// Label status adopsi aktif (ADP-08).
 class ActiveAdoptionStatusBadge extends StatelessWidget {
   final ActiveAdoptionStatus status;
 
@@ -609,34 +573,16 @@ class ActiveAdoptionStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: status.backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: status.color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(status.icon, size: 14, color: status.color),
-          const SizedBox(width: 5),
-          Text(
-            status.labelId,
-            style: TextStyle(
-              color: status.color,
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-              fontFamily: 'Inter',
-            ),
-          ),
-        ],
-      ),
+    return _StatusLabel(
+      label: status.labelId,
+      color: status.color,
+      background: status.backgroundColor,
     );
   }
 }
 
-/// Banner Peringatan Mahasiswa Only (ADP-01)
+/// Pemberitahuan bahwa adopsi hanya untuk mahasiswa (ADP-01).
+/// Tombol ganti tipe akun hanya muncul di mode debug untuk uji data tiruan.
 class StudentRequirementBanner extends StatelessWidget {
   final String currentUserType;
   final VoidCallback? onSwitchToStudent;
@@ -652,69 +598,31 @@ class StudentRequirementBanner extends StatelessWidget {
     final isStudent = currentUserType.toLowerCase() == 'mahasiswa';
     if (isStudent) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppConstants.dangerColor.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.gpp_bad_rounded,
-            color: AppConstants.dangerColor,
-            size: 26,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'NOT_STUDENT — Hak Akses Dibatasi',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppConstants.dangerColor,
-                    fontSize: 13,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AdoptionTheme.sp16),
+      child: AdoptionBanner(
+        variant: 'danger',
+        title: 'Adopsi hanya untuk mahasiswa',
+        message:
+            'Akunmu terdaftar sebagai $currentUserType. Pengajuan adopsi hanya bisa dibuat '
+            'dengan akun mahasiswa yang emailnya sudah terverifikasi.',
+        action: (kDebugMode && onSwitchToStudent != null)
+            ? TextButton(
+                onPressed: onSwitchToStudent,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 32),
+                  foregroundColor: AdoptionTheme.accent,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Saat ini akun Anda bertipe "$currentUserType". Sesuai ketentuan PRD (ADP-01), hanya mahasiswa dengan email kampus aktif yang dapat mengajukan adopsi kucing.',
-                  style: const TextStyle(
-                    color: Color(0xFF7F1D1D),
-                    fontSize: 12,
-                    height: 1.3,
-                  ),
-                ),
-                if (onSwitchToStudent != null) ...[
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: onSwitchToStudent,
-                    child: const Text(
-                      '⚡ Beralih ke Mahasiswa (Mode Uji Coba)',
-                      style: TextStyle(
-                        color: AppConstants.primaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
+                child: const Text('Uji sebagai mahasiswa (debug)'),
+              )
+            : null,
       ),
     );
   }
 }
 
-/// Visual Timeline Status Pengajuan (DRAFT -> SUBMITTED -> DECISION)
+/// Tahapan pengajuan: Draf, Dikirim, Keputusan admin.
 class ApplicationStatusTimeline extends StatelessWidget {
   final ApplicationStatus currentStatus;
   final bool precheckPassed;
@@ -727,154 +635,67 @@ class ApplicationStatusTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final steps = [
-      {'title': 'Draf', 'status': ApplicationStatus.DRAFT},
-      {'title': 'Diajukan', 'status': ApplicationStatus.SUBMITTED},
-      {
-        'title': currentStatus == ApplicationStatus.REVISION_REQUESTED
-            ? 'Perlu Revisi'
-            : (currentStatus == ApplicationStatus.REJECTED
-                ? 'Ditolak'
-                : 'Persetujuan Admin'),
-        'status': currentStatus,
-      },
-    ];
+    final decisionLabel = switch (currentStatus) {
+      ApplicationStatus.REVISION_REQUESTED => 'Perlu revisi',
+      ApplicationStatus.REJECTED => 'Ditolak',
+      ApplicationStatus.APPROVED => 'Disetujui',
+      _ => 'Keputusan admin',
+    };
+    final steps = ['Draf', 'Dikirim', decisionLabel];
+    final activeIndex = switch (currentStatus) {
+      ApplicationStatus.DRAFT => 0,
+      ApplicationStatus.SUBMITTED => 1,
+      _ => 2,
+    };
 
-    int activeIndex = 0;
-    if (currentStatus == ApplicationStatus.DRAFT) {
-      activeIndex = 0;
-    } else if (currentStatus == ApplicationStatus.SUBMITTED) {
-      activeIndex = 1;
-    } else {
-      activeIndex = 2;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Alur Pengajuan',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: precheckPassed
-                      ? const Color(0xFFD1FAE5)
-                      : const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: List.generate(steps.length, (i) {
+            final reached = i <= activeIndex;
+            final color = i == activeIndex && activeIndex == 2
+                ? currentStatus.color
+                : (reached ? AdoptionTheme.accent : AdoptionTheme.divider);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: i == steps.length - 1 ? 0 : 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      precheckPassed
-                          ? Icons.check_circle_rounded
-                          : Icons.hourglass_empty_rounded,
-                      size: 12,
-                      color: precheckPassed
-                          ? AppConstants.successColor
-                          : const Color(0xFFD97706),
+                    Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(height: 8),
                     Text(
-                      precheckPassed
-                          ? 'Precheck: Lolos'
-                          : 'Precheck: Belum Lolos',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: precheckPassed
-                            ? AppConstants.successColor
-                            : const Color(0xFFD97706),
+                      steps[i],
+                      style: AdoptionTheme.captionStyle.copyWith(
+                        color: i == activeIndex ? AdoptionTheme.textMain : AdoptionTheme.textHint,
+                        fontWeight: i == activeIndex ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: List.generate(steps.length * 2 - 1, (index) {
-              if (index.isOdd) {
-                final lineIndex = index ~/ 2;
-                final isDone = lineIndex < activeIndex;
-                return Expanded(
-                  child: Container(
-                    height: 2.5,
-                    color: isDone ? AppConstants.primaryColor : Colors.grey.shade200,
-                  ),
-                );
-              }
-
-              final stepIndex = index ~/ 2;
-              final isCurrent = stepIndex == activeIndex;
-              final isPassed = stepIndex < activeIndex;
-              final step = steps[stepIndex];
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isPassed
-                          ? AppConstants.primaryColor
-                          : (isCurrent
-                              ? currentStatus.color
-                              : Colors.grey.shade200),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        isPassed
-                            ? Icons.check
-                            : (isCurrent
-                                ? (step['status'] as ApplicationStatus).icon
-                                : Icons.circle),
-                        size: 14,
-                        color: (isPassed || isCurrent)
-                            ? Colors.white
-                            : Colors.grey.shade400,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    step['title'] as String,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                      color: isCurrent
-                          ? currentStatus.color
-                          : AppConstants.textSecondary,
-                    ),
-                  ),
-                ],
-              );
-            }),
+            );
+          }),
+        ),
+        if (currentStatus != ApplicationStatus.DRAFT) ...[
+          const SizedBox(height: AdoptionTheme.sp12),
+          Text(
+            precheckPassed
+                ? 'Pemeriksaan otomatis: data lengkap.'
+                : 'Pemeriksaan otomatis: ada syarat yang belum terpenuhi.',
+            style: AdoptionTheme.captionStyle.copyWith(
+              color: precheckPassed ? AdoptionTheme.success : AdoptionTheme.warning,
+            ),
           ),
         ],
-      ),
+      ],
     );
   }
 }
-

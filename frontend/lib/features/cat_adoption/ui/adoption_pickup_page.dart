@@ -1,16 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/camera/camera_capture_page.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/scanner/scanner_page.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../logic/adoption_provider.dart';
 import 'adoption_theme.dart';
 import 'adoption_widgets.dart';
 
-/// Layar 4 — Pengambilan Kucing & Serah Terima (Web & Mobile Responsif)
+/// Layar 4: pengambilan kucing dan serah terima (ADP-06, ADP-07).
 class AdoptionPickupPage extends StatefulWidget {
   final int applicationId;
   final int catId;
@@ -39,22 +39,16 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
 
   static const List<Map<String, dynamic>> _stepsMeta = [
     {
-      'title': 'Pindai QR Kalung Kucing',
-      'shortTitle': 'Pindai QR',
-      'subtitle': 'Verifikasi token liontin fisik yang terpasang pada kalung kucing.',
-      'icon': Icons.qr_code_scanner_rounded,
+      'title': 'Pindai QR kalung',
+      'subtitle': 'Pastikan kucing yang kamu ambil sama dengan kucing yang disetujui.',
     },
     {
-      'title': 'Foto Kucing Berkalung',
-      'shortTitle': 'Foto Kalung',
-      'subtitle': 'Ambil foto kucing yang telah dipasangi kalung sebagai bukti serah terima.',
-      'icon': Icons.camera_alt_rounded,
+      'title': 'Foto kucing berkalung',
+      'subtitle': 'Foto ini menjadi bukti serah terima.',
     },
     {
-      'title': 'Konfirmasi Serah Terima',
-      'shortTitle': 'Konfirmasi',
-      'subtitle': 'Pernyataan tanggung jawab adopter untuk mengaktifkan status adopsi.',
-      'icon': Icons.verified_rounded,
+      'title': 'Konfirmasi',
+      'subtitle': 'Periksa lagi, lalu nyatakan tanggung jawabmu.',
     },
   ];
 
@@ -109,28 +103,28 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
   }
 
   void _showManualCodeDialog() {
-    const defaultToken = 'MTP1.C.BONI103';
+    const sampleToken = 'MTP1.C.BONI103';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AdoptionTheme.cardBg,
         shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderLg),
-        title: const Text('Masukkan Kode QR Manual', style: AdoptionTheme.subtitleStyle),
+        title: const Text('Ketik kode kalung', style: AdoptionTheme.titleStyle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Jika pemindai kamera tidak dapat digunakan, masukkan kode token kalung identitas:',
-              style: AdoptionTheme.captionStyle,
+              'Kode tercetak di bawah QR pada kalung kucing.',
+              style: AdoptionTheme.bodyStyle,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _qrManualController,
+              autofocus: true,
+              style: AdoptionTheme.bodyStyle.copyWith(color: AdoptionTheme.textMain),
               decoration: const InputDecoration(
-                hintText: 'Contoh: MTP1.C.BONI103',
-                hintStyle: AdoptionTheme.captionStyle,
-                prefixIcon: Icon(Icons.qr_code_rounded, size: 18),
+                hintText: 'Kode kalung',
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: AdoptionTheme.borderMd,
@@ -145,31 +139,25 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
           ],
         ),
         actions: [
+          if (kDebugMode)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _scannedQrToken = sampleToken;
+                  _qrManualController.text = sampleToken;
+                  _qrErrorMessage = null;
+                  if (_currentStep == 0) _currentStep = 1;
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text('Pakai kode contoh (debug)'),
+            ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _scannedQrToken = defaultToken;
-                _qrManualController.text = defaultToken;
-                _qrErrorMessage = null;
-                if (_currentStep == 0) _currentStep = 1;
-              });
-              Navigator.pop(ctx);
-            },
-            child: Text(
-              'Gunakan Kode Contoh',
-              style: AdoptionTheme.captionStyle.copyWith(
-                color: AdoptionTheme.accent,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AdoptionTheme.accent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderMd),
-            ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AdoptionTheme.accent),
             onPressed: () {
               final text = _qrManualController.text.trim();
               if (text.isNotEmpty) {
@@ -181,7 +169,7 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
               }
               Navigator.pop(ctx);
             },
-            child: const Text('Simpan'),
+            child: const Text('Pakai kode'),
           ),
         ],
       ),
@@ -216,8 +204,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Foto kucing berkalung berhasil diambil.'),
-            backgroundColor: AppConstants.successColor,
+            content: Text('Foto tersimpan.'),
+            backgroundColor: AdoptionTheme.success,
           ),
         );
       }
@@ -230,7 +218,7 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
     if (_scannedQrToken == null || _scannedQrToken!.isEmpty) {
       setState(() {
         _currentStep = 0;
-        _qrErrorMessage = 'Wajib memindai kode QR kalung kucing terlebih dahulu.';
+        _qrErrorMessage = 'Pindai QR di kalung kucing dulu.';
       });
       return;
     }
@@ -241,8 +229,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Wajib mengambil foto kucing mengenakan kalung identitas.'),
-          backgroundColor: AppConstants.dangerColor,
+          content: Text('Ambil foto kucing yang memakai kalung dulu.'),
+          backgroundColor: AdoptionTheme.danger,
         ),
       );
       return;
@@ -254,8 +242,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Centang pernyataan serah terima tanggung jawab.'),
-          backgroundColor: AppConstants.dangerColor,
+          content: Text('Centang pernyataan tanggung jawab dulu.'),
+          backgroundColor: AdoptionTheme.danger,
         ),
       );
       return;
@@ -276,9 +264,9 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
         SnackBar(
           content: Text(
             provider.actionSuccessMessage ??
-                'Pengambilan selesai! Kucing resmi menjadi adopsi aktif Anda.',
+                'Pengambilan tercatat. Adopsimu sudah aktif.',
           ),
-          backgroundColor: AppConstants.successColor,
+          backgroundColor: AdoptionTheme.success,
         ),
       );
       context.go('/adoption/my-cats');
@@ -294,7 +282,7 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(provider.errorMessage!),
-          backgroundColor: AppConstants.dangerColor,
+          backgroundColor: AdoptionTheme.danger,
         ),
       );
     }
@@ -304,7 +292,7 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
     if (_currentStep == 0) {
       if (_scannedQrToken == null || _scannedQrToken!.isEmpty) {
         setState(() {
-          _qrErrorMessage = 'Wajib memindai kode QR kalung kucing terlebih dahulu.';
+          _qrErrorMessage = 'Pindai QR di kalung kucing dulu.';
         });
         return;
       }
@@ -313,8 +301,8 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
       if (_collarPhotoPath == null || _collarPhotoPath!.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Wajib mengambil foto kucing berkalung.'),
-            backgroundColor: AppConstants.dangerColor,
+            content: Text('Ambil foto kucing yang memakai kalung dulu.'),
+            backgroundColor: AdoptionTheme.danger,
           ),
         );
         return;
@@ -336,15 +324,18 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
     final provider = context.watch<AdoptionProvider>();
     final lock = provider.currentPickupLock;
 
+    final appBar = AppBar(
+      backgroundColor: AdoptionTheme.pageBg,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      title: const Text('Pengambilan kucing', style: AdoptionTheme.titleStyle),
+    );
+
     if (provider.isLoading && lock == null) {
       return Scaffold(
         backgroundColor: AdoptionTheme.pageBg,
-        appBar: AppBar(
-          backgroundColor: AdoptionTheme.pageBg,
-          elevation: 0,
-          title: const Text('Pengambilan Kucing', style: AdoptionTheme.titleStyle),
-        ),
-        body: const LoadingIndicator(message: 'Memeriksa data penahanan...'),
+        appBar: appBar,
+        body: const LoadingIndicator(message: 'Memeriksa penahanan...'),
       );
     }
 
@@ -357,456 +348,69 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
           (c) => c.id == widget.catId,
           orElse: () => null,
         );
-    final catName = app?.catName ?? cat?.name ?? 'Kucing #${widget.catId}';
+    final String catName = app?.catName ?? cat?.name ?? 'Kucing pilihanmu';
+    final step = _stepsMeta[_currentStep];
 
     return Scaffold(
       backgroundColor: AdoptionTheme.pageBg,
-      appBar: AppBar(
-        backgroundColor: AdoptionTheme.pageBg,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: const Text('Pengambilan Kucing', style: AdoptionTheme.titleStyle),
-      ),
+      appBar: appBar,
       body: isExpired
           ? _buildExpiredState(context)
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth >= 960;
-
-                if (isDesktop) {
-                  // ── Tampilan Desktop (2 Kolom Seimbang) ─────────────────
-                  return Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1140),
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Kolom Kiri: Sidebar Informasi, Kucing, & Penahanan
-                              SizedBox(
-                                width: 380,
-                                child: _buildDesktopSidebar(lock, catName),
-                              ),
-                              const SizedBox(width: 28),
-                              // Kolom Kanan: Stepper Header & Kartu Langkah Aktif
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    _buildProgressHeader(),
-                                    const SizedBox(height: 16),
-                                    _buildStepCard(provider),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                // ── Tampilan Mobile / Tablet (1 Kolom Rapi) ───────────────
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 640),
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                      children: [
-                        _buildRetentionBanner(lock),
-                        const SizedBox(height: 14),
-                        _buildProgressHeader(),
-                        const SizedBox(height: 16),
-                        _buildStepCard(provider),
-                      ],
-                    ),
-                  ),
-                );
-              },
+          : AdoptionPageBody(
+              children: [
+                Text(catName, style: AdoptionTheme.bodyStyle),
+                const SizedBox(height: 4),
+                Text(step['title'] as String, style: AdoptionTheme.headlineStyle),
+                const SizedBox(height: 4),
+                Text(step['subtitle'] as String, style: AdoptionTheme.bodyStyle),
+                const SizedBox(height: 16),
+                _buildProgress(),
+                const SizedBox(height: 16),
+                Text(
+                  lock != null
+                      ? 'Kucing ditahan untukmu ${lock.remainingTime.inHours} jam '
+                          '${lock.remainingTime.inMinutes % 60} menit lagi.'
+                      : 'Kucing ditahan untukmu selama 48 jam sejak pengambilan dimulai.',
+                  style: AdoptionTheme.captionStyle,
+                ),
+                const SizedBox(height: 24),
+                KeyedSubtree(
+                  key: ValueKey<int>(_currentStep),
+                  child: _buildCurrentStepContent(),
+                ),
+                const SizedBox(height: 32),
+                _buildActionButtons(provider),
+              ],
             ),
     );
   }
 
-  // ── Banner Penahanan Kucing 48 Jam (Mobile) ───────────────────────────────
-  Widget _buildRetentionBanner(dynamic lock) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
-        borderRadius: AdoptionTheme.borderMd,
-        border: Border.all(
-          color: AdoptionTheme.success.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.access_time_rounded,
-              size: 18, color: AdoptionTheme.success),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              lock != null
-                  ? 'Kucing ditahan untuk Anda selama 48 jam (sisa: ${lock.remainingTime.inHours}j ${lock.remainingTime.inMinutes % 60}m).'
-                  : 'Kucing ditahan untuk Anda selama 48 jam.',
-              style: AdoptionTheme.captionStyle.copyWith(
-                color: const Color(0xFF166534),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Sidebar Desktop (Informasi & Panduan Penjemputan) ─────────────────────
-  Widget _buildDesktopSidebar(dynamic lock, String catName) {
+  Widget _buildProgress() {
     return Column(
-      children: [
-        // Kartu Status Penahanan Kucing
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: AdoptionTheme.borderLg,
-            border: Border.all(color: AdoptionTheme.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: AdoptionTheme.accentLight,
-                      borderRadius: AdoptionTheme.borderSm,
-                    ),
-                    child: const Icon(
-                      Icons.pets_rounded,
-                      size: 22,
-                      color: AdoptionTheme.accent,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          catName,
-                          style: AdoptionTheme.subtitleStyle.copyWith(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          'ID Pengajuan #${widget.applicationId}',
-                          style: AdoptionTheme.captionStyle.copyWith(
-                            color: AdoptionTheme.textSub,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1, color: AdoptionTheme.divider),
-              const SizedBox(height: 14),
-              // Badge Waktu Sisa Penahanan
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: AdoptionTheme.borderMd,
-                  border: Border.all(color: AdoptionTheme.success.withValues(alpha: 0.25)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.timer_rounded, size: 18, color: AdoptionTheme.success),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        lock != null
-                            ? 'Masa tahan: ${lock.remainingTime.inHours}j ${lock.remainingTime.inMinutes % 60}m lagi'
-                            : 'Masa tahan 48 jam aktif',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF166534),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildSidebarItem(
-                Icons.pin_drop_outlined,
-                'Lokasi Serah Terima',
-                'Pos Relawan Meowtopia di Kampus.',
-              ),
-              const SizedBox(height: 12),
-              _buildSidebarItem(
-                Icons.shopping_bag_outlined,
-                'Perlengkapan Wajib',
-                'Bawa pet carrier / keranjang hewan aman saat penjemputan.',
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Kartu Alur Pengambilan
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AdoptionTheme.accentSurface,
-            borderRadius: AdoptionTheme.borderLg,
-            border: Border.all(color: AdoptionTheme.accent.withValues(alpha: 0.15)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.checklist_rounded, size: 18, color: AdoptionTheme.accent),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Tahapan Penjemputan',
-                    style: AdoptionTheme.subtitleStyle.copyWith(
-                      color: AdoptionTheme.accent,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '1. Temui petugas dan cocokkan kucing.\n'
-                '2. Pindai liontin QR kalung kucing.\n'
-                '3. Ambil foto kucing mengenakan kalung.\n'
-                '4. Konfirmasi serah terima untuk aktivasi.',
-                style: AdoptionTheme.captionStyle.copyWith(
-                  height: 1.55,
-                  color: AdoptionTheme.textMain,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSidebarItem(IconData icon, String title, String subtitle) {
-    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: AdoptionTheme.accent),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: AdoptionTheme.captionStyle.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AdoptionTheme.textMain,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: AdoptionTheme.captionStyle.copyWith(
-                  fontSize: 11,
-                  color: AdoptionTheme.textSub,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Stepper Header Progress Indicator ─────────────────────────────────────
-  Widget _buildProgressHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AdoptionTheme.borderMd,
-        border: Border.all(color: AdoptionTheme.cardBorder),
-      ),
-      child: Row(
-        children: [
-          for (int i = 0; i < _stepsMeta.length; i++) ...[
-            Expanded(
-              child: InkWell(
-                onTap: i < _currentStep ? () => setState(() => _currentStep = i) : null,
-                borderRadius: AdoptionTheme.borderSm,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: i < _currentStep
-                            ? AdoptionTheme.accentLight
-                            : (i == _currentStep
-                                ? AdoptionTheme.accent
-                                : AdoptionTheme.chipBg),
-                        border: Border.all(
-                          color: i == _currentStep
-                              ? AdoptionTheme.accent
-                              : (i < _currentStep
-                                  ? AdoptionTheme.accent
-                                  : AdoptionTheme.cardBorder),
-                        ),
-                      ),
-                      child: Center(
-                        child: i < _currentStep
-                            ? const Icon(
-                                Icons.check_rounded,
-                                size: 16,
-                                color: AdoptionTheme.accent,
-                              )
-                            : Text(
-                                '${i + 1}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: i == _currentStep
-                                      ? Colors.white
-                                      : AdoptionTheme.textHint,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _stepsMeta[i]['shortTitle'] as String,
-                        style: AdoptionTheme.captionStyle.copyWith(
-                          fontWeight: i == _currentStep
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: i == _currentStep
-                              ? AdoptionTheme.textMain
-                              : (i < _currentStep
-                                  ? AdoptionTheme.textMain
-                                  : AdoptionTheme.textHint),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (i < _stepsMeta.length - 1)
-              Container(
-                width: 16,
-                height: 2,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                color: i < _currentStep
-                    ? AdoptionTheme.accent
-                    : AdoptionTheme.divider,
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ── Kartu Langkah Aktif ───────────────────────────────────────────────────
-  Widget _buildStepCard(AdoptionProvider provider) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AdoptionTheme.borderLg,
-        border: Border.all(color: AdoptionTheme.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header dalam kartu
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AdoptionTheme.accentLight,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Langkah ${_currentStep + 1} dari 3',
-                  style: AdoptionTheme.captionStyle.copyWith(
-                    color: AdoptionTheme.accent,
-                    fontWeight: FontWeight.w700,
+        Row(
+          children: List.generate(_stepsMeta.length, (i) {
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: i == _stepsMeta.length - 1 ? 0 : 6),
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: i <= _currentStep ? AdoptionTheme.accent : AdoptionTheme.divider,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _stepsMeta[_currentStep]['title'] as String,
-            style: AdoptionTheme.titleStyle.copyWith(fontSize: 18),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _stepsMeta[_currentStep]['subtitle'] as String,
-            style: AdoptionTheme.captionStyle.copyWith(
-              color: AdoptionTheme.textSub,
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Divider(height: 1, color: AdoptionTheme.divider),
-          const SizedBox(height: 20),
-
-          // Konten sesuai langkah
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: KeyedSubtree(
-              key: ValueKey<int>(_currentStep),
-              child: _buildCurrentStepContent(),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          const Divider(height: 1, color: AdoptionTheme.divider),
-          const SizedBox(height: 20),
-
-          // Tombol Aksi
-          _buildActionButtons(provider),
-        ],
-      ),
+            );
+          }),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Langkah ${_currentStep + 1} dari ${_stepsMeta.length}',
+          style: AdoptionTheme.captionStyle,
+        ),
+      ],
     );
   }
 
@@ -823,284 +427,144 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
     }
   }
 
-  // ── Langkah 1: Pindai QR Kalung ───────────────────────────────────────────
   Widget _buildStepScanQr() {
+    final scanned = _scannedQrToken != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Pindai liontin QR pada kalung kucing untuk memastikan identitas fisik kucing yang diambil sesuai.',
-          style: AdoptionTheme.bodyStyle,
-        ),
-        const SizedBox(height: 14),
-
-        // Bingkai pemindai representatif
-        GestureDetector(
-          onTap: _scanCatQr,
-          child: Container(
-            width: double.infinity,
-            height: 150,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: AdoptionTheme.borderMd,
-              border: Border.all(
-                color: _scannedQrToken != null
-                    ? AdoptionTheme.success
-                    : (_qrErrorMessage != null
-                        ? AdoptionTheme.danger
-                        : AdoptionTheme.cardBorder),
-                width: _scannedQrToken != null ? 1.5 : 1,
-              ),
+        Material(
+          color: scanned ? AdoptionTheme.successLight : AdoptionTheme.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: AdoptionTheme.borderMd,
+            side: BorderSide(
+              color: scanned
+                  ? AdoptionTheme.success
+                  : (_qrErrorMessage != null ? AdoptionTheme.danger : AdoptionTheme.inputBorder),
             ),
-            child: _scannedQrToken != null
-                ? Center(
+          ),
+          child: InkWell(
+            onTap: _scanCatQr,
+            borderRadius: AdoptionTheme.borderMd,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              child: Row(
+                children: [
+                  Icon(
+                    scanned ? Icons.check_rounded : Icons.qr_code_scanner_rounded,
+                    size: 22,
+                    color: scanned ? AdoptionTheme.success : AdoptionTheme.accent,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.check_circle_rounded,
-                            size: 36, color: AdoptionTheme.success),
-                        const SizedBox(height: 8),
                         Text(
-                          'Kode terverifikasi: $_scannedQrToken',
-                          style: AdoptionTheme.subtitleStyle.copyWith(
-                            color: const Color(0xFF166534),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Ketuk untuk pindai ulang',
-                          style: AdoptionTheme.captionStyle,
-                        ),
-                      ],
-                    ),
-                  )
-                : Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.qr_code_scanner_rounded,
-                          size: 40,
-                          color: AdoptionTheme.accent.withValues(alpha: 0.7),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Buka Pemindai Kamera',
-                          style: AdoptionTheme.subtitleStyle.copyWith(
-                            color: AdoptionTheme.accent,
+                          scanned ? 'Kode terbaca' : 'Pindai QR di kalung',
+                          style: AdoptionTheme.bodyStyle.copyWith(
+                            color: AdoptionTheme.textMain,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
-                          'Arahkan kamera ke QR kalung kucing',
+                        Text(
+                          scanned
+                              ? '$_scannedQrToken. Ketuk untuk memindai ulang.'
+                              : 'Kode dicocokkan dengan data kucing saat pengambilan dikirim.',
                           style: AdoptionTheme.captionStyle,
                         ),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
           ),
         ),
-
         if (_qrErrorMessage != null) ...[
           const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.error_outline_rounded,
-                  size: 14, color: AppConstants.dangerColor),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  _qrErrorMessage!,
-                  style: AdoptionTheme.captionStyle.copyWith(
-                    color: AppConstants.dangerColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-
-        if (_cameraPermissionDenied) ...[
-          const SizedBox(height: 8),
           Text(
-            'Izin kamera tidak tersedia atau ditolak. Kamera diperlukan untuk memindai kode QR fisik secara langsung.',
-            style: AdoptionTheme.captionStyle.copyWith(
-              color: AdoptionTheme.warning,
-            ),
+            _qrErrorMessage!,
+            style: AdoptionTheme.captionStyle.copyWith(color: AdoptionTheme.danger),
           ),
         ],
-
-        const SizedBox(height: 12),
-
-        // Opsi masukkan kode manual
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _showManualCodeDialog,
-            icon: const Icon(Icons.keyboard_outlined, size: 16),
-            label: const Text('Masukkan kode token manual'),
-            style: TextButton.styleFrom(
-              foregroundColor: AdoptionTheme.accent,
-              textStyle: AdoptionTheme.captionStyle.copyWith(fontWeight: FontWeight.bold),
-            ),
+        if (_cameraPermissionDenied) ...[
+          const SizedBox(height: 12),
+          const AdoptionBanner(
+            variant: 'warning',
+            message: 'Kamera tidak bisa dibuka. Kamu bisa mengetik kode yang tercetak di kalung.',
           ),
+        ],
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _showManualCodeDialog,
+          style: TextButton.styleFrom(
+            foregroundColor: AdoptionTheme.accent,
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 40),
+            textStyle: AdoptionTheme.bodyStyle.copyWith(fontWeight: FontWeight.w600),
+          ),
+          child: const Text('Ketik kode secara manual'),
         ),
       ],
     );
   }
 
-  // ── Langkah 2: Foto Kucing Berkalung ──────────────────────────────────────
   Widget _buildStepCollarPhoto() {
+    return CameraPhotoSlot(
+      localPath: _collarPhotoPath,
+      hint: 'Foto kucing yang memakai kalung',
+      onTap: _takeCollarPhoto,
+    );
+  }
+
+  Widget _buildStepConfirm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Ambil foto kucing yang telah dipasangi kalung identitas menggunakan kamera sebagai bukti serah terima.',
-          style: AdoptionTheme.bodyStyle,
+        AdoptionInfoRow(label: 'QR kalung', value: _scannedQrToken ?? 'Belum dipindai'),
+        AdoptionInfoRow(
+          label: 'Foto berkalung',
+          value: _collarPhotoPath != null ? 'Sudah diambil' : 'Belum diambil',
         ),
-        const SizedBox(height: 14),
-        CameraPhotoSlot(
-          localPath: _collarPhotoPath,
-          hint: 'Buka kamera untuk foto kucing berkalung (tanpa galeri)',
-          onTap: _takeCollarPhoto,
+        const SizedBox(height: 16),
+        CheckboxListTile(
+          value: _confirmedResponsibility,
+          onChanged: (val) => setState(() => _confirmedResponsibility = val ?? false),
+          activeColor: AdoptionTheme.accent,
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Saya bertanggung jawab merawat kucing ini dan mengirim laporan kondisinya '
+            'setiap 14 hari selama tiga bulan pertama.',
+            style: AdoptionTheme.bodyStyle,
+          ),
         ),
       ],
     );
   }
 
-  // ── Langkah 3: Konfirmasi Tanggung Jawab ───────────────────────────────────
-  Widget _buildStepConfirm() {
-    return Container(
-      padding: AdoptionTheme.padCard,
-      decoration: BoxDecoration(
-        color: _confirmedResponsibility
-            ? AdoptionTheme.accentLight.withValues(alpha: 0.3)
-            : const Color(0xFFFAF9F7),
-        borderRadius: AdoptionTheme.borderMd,
-        border: Border.all(
-          color: _confirmedResponsibility
-              ? AdoptionTheme.accent.withValues(alpha: 0.4)
-              : AdoptionTheme.cardBorder,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Checkbox(
-            value: _confirmedResponsibility,
-            activeColor: AdoptionTheme.accent,
-            shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderSm),
-            onChanged: (val) {
-              setState(() => _confirmedResponsibility = val ?? false);
-            },
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: GestureDetector(
-                onTap: () {
-                  setState(
-                    () => _confirmedResponsibility = !_confirmedResponsibility,
-                  );
-                },
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Konfirmasi Serah Terima Fisik',
-                      style: AdoptionTheme.subtitleStyle,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Saya menyatakan telah menerima kucing dalam keadaan sehat dan bertanggung jawab penuh untuk merawatnya serta mengirimkan laporan berkala setiap 14 hari.',
-                      style: AdoptionTheme.captionStyle.copyWith(height: 1.45),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Tombol Navigasi Bawah ─────────────────────────────────────────────────
   Widget _buildActionButtons(AdoptionProvider provider) {
     final isLast = _currentStep == 2;
-    final canComplete = _scannedQrToken != null &&
-        _collarPhotoPath != null &&
-        _confirmedResponsibility;
+    final busy = provider.isActionLoading;
+    final canComplete =
+        _scannedQrToken != null && _collarPhotoPath != null && _confirmedResponsibility;
 
     return Row(
       children: [
         if (_currentStep > 0) ...[
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AdoptionTheme.cardBorder),
-              foregroundColor: AdoptionTheme.textSub,
-              padding: const EdgeInsets.symmetric(
-                vertical: AdoptionTheme.sp12,
-                horizontal: 16,
-              ),
-              shape: const RoundedRectangleBorder(
-                borderRadius: AdoptionTheme.borderMd,
-              ),
-            ),
-            onPressed: provider.isActionLoading ? null : _onStepPrev,
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.arrow_back_rounded, size: 16),
-                SizedBox(width: 6),
-                Text('Sebelumnya'),
-              ],
-            ),
+          AdoptionSecondaryButton(
+            label: 'Kembali',
+            onPressed: busy ? null : _onStepPrev,
           ),
           const SizedBox(width: 12),
         ],
         Expanded(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isLast && !canComplete
-                  ? AdoptionTheme.accent.withValues(alpha: 0.4)
-                  : AdoptionTheme.accent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(
-                vertical: AdoptionTheme.sp12,
-              ),
-              shape: const RoundedRectangleBorder(
-                borderRadius: AdoptionTheme.borderMd,
-              ),
-            ),
-            onPressed: isLast && !canComplete
-                ? null
-                : (provider.isActionLoading ? null : _onStepNext),
-            child: provider.isActionLoading && isLast
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        isLast
-                            ? 'Selesaikan Pengambilan & Aktifkan Adopsi'
-                            : 'Lanjut',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      if (!isLast) ...[
-                        const SizedBox(width: 6),
-                        const Icon(Icons.arrow_forward_rounded, size: 16),
-                      ],
-                    ],
-                  ),
+          child: AdoptionPrimaryButton(
+            label: isLast ? 'Selesaikan pengambilan' : 'Lanjut',
+            isLoading: busy && isLast,
+            onPressed: isLast && !canComplete ? null : (busy ? null : _onStepNext),
           ),
         ),
       ],
@@ -1108,19 +572,16 @@ class _AdoptionPickupPageState extends State<AdoptionPickupPage> {
   }
 
   Widget _buildExpiredState(BuildContext context) {
-    return AdoptionEmptyState(
-      icon: Icons.timer_off_outlined,
-      message: 'Masa Penahanan Berakhir',
-      submessage:
-          'Batas waktu 48 jam pengambilan kucing telah terlewati. Silakan ajukan kelayakan kembali melalui katalog.',
-      action: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AdoptionTheme.accent,
-          foregroundColor: Colors.white,
-          shape: const RoundedRectangleBorder(borderRadius: AdoptionTheme.borderMd),
+    return Center(
+      child: AdoptionEmptyState(
+        icon: Icons.timer_off_outlined,
+        message: 'Masa penahanan sudah berakhir',
+        submessage: 'Kucing tidak lagi ditahan untukmu. Kalau kucing masih tersedia '
+            'di katalog, kamu bisa memulai pengambilan lagi.',
+        action: AdoptionSecondaryButton(
+          label: 'Kembali ke katalog',
+          onPressed: () => context.go('/adoption'),
         ),
-        onPressed: () => context.go('/adoption'),
-        child: const Text('Kembali ke Katalog'),
       ),
     );
   }
