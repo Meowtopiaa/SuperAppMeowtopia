@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\CatAdoption\Controllers\AdminAdoptionController;
 use App\Modules\CatAdoption\Controllers\AdoptionApplicationController;
 use App\Modules\CatAdoption\Controllers\AdoptionController;
 use App\Modules\CatAdoption\Middleware\EnsureVerifiedStudent;
@@ -15,4 +16,9 @@ Route::prefix('adoption')->middleware(['auth:sanctum', EnsureVerifiedStudent::cl
     Route::get('applications/mine', [AdoptionApplicationController::class, 'mine']);
     Route::put('applications/{id}', [AdoptionApplicationController::class, 'update']);
     Route::post('applications/{id}/submit', [AdoptionApplicationController::class, 'submit'])->middleware(RequireIdempotencyKey::class);
+});
+
+// Admin adopsi: izin per aksi dicek di controller (permission Spatie).
+Route::prefix('admin/adoption')->middleware('auth:sanctum')->group(function () {
+    Route::post('cats/{catId}/set-ready', [AdminAdoptionController::class, 'setReady']);
 });
