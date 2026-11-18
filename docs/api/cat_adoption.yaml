@@ -1,10 +1,11 @@
 openapi: 3.0.3
 info:
   title: Meowtopia Adoption API
-  version: 0.1.0-draft
-  description: Draft EN-7 berdasarkan PRD v1.1 §8.6 dan §6.5. Nama field, nilai enum keputusan, pemetaan permission
-    admin, dan bentuk data yang tidak dirinci PRD adalah usulan untuk review. Kontrak target, implementasi branch
-    bisa berbeda.
+  version: 0.2.0-draft
+  description: Draft EN-7 berdasarkan PRD v1.1 §8.6 dan §6.5, diselaraskan dengan implementasi Sprint 1 (EN-11,
+    EN-13, EN-14, EN-15, EN-17) di branch team/enigma. Endpoint yang belum diimplementasikan masih rancangan.
+    Nama field, nilai enum keputusan, pemetaan permission admin, dan bentuk data yang tidak dirinci PRD adalah
+    usulan untuk review.
 servers:
 - url: /api/v1
 security:
@@ -63,7 +64,8 @@ paths:
     post:
       operationId: createApplicationDraft
       summary: Buat draf kelayakan tanpa memilih kucing.
-      description: Mahasiswa dengan email terverifikasi. Buat draf kelayakan tanpa memilih kucing.
+      description: Mahasiswa dengan email terverifikasi. Buat draf kelayakan tanpa memilih kucing. Ditolak 409
+        CONFLICT bila masih ada pengajuan berjalan atau kelayakan APPROVED yang masih berlaku.
       tags:
       - Adopsi
       responses:
@@ -81,22 +83,7 @@ paths:
                   message:
                     type: string
                   data:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
-                      status:
-                        type: string
-                      precheck_passed:
-                        type: boolean
-                        nullable: true
-                      admin_note:
-                        type: string
-                        nullable: true
-                    required:
-                    - id
-                    - status
+                    $ref: '#/components/schemas/ApplicationDetail'
                   meta:
                     type: object
                     additionalProperties: true
@@ -119,24 +106,13 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                answers:
-                  type: object
-                  additionalProperties: true
-                housing_media_id:
-                  type: string
-                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
-                commitment_version:
-                  type: string
-                commitment_accepted:
-                  type: boolean
+              $ref: '#/components/schemas/ApplicationDraftInput'
   /adoption/applications/{id}:
     put:
       operationId: saveApplicationDraft
       summary: Simpan draf kelayakan milik pengguna.
       description: Mahasiswa dengan email terverifikasi. Hanya pemilik pengajuan. Simpan draf kelayakan milik
-        pengguna.
+        pengguna. Hanya status DRAFT atau REVISION_REQUESTED yang dapat diubah; selain itu 409 CONFLICT.
       tags:
       - Adopsi
       responses:
@@ -154,22 +130,7 @@ paths:
                   message:
                     type: string
                   data:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
-                      status:
-                        type: string
-                      precheck_passed:
-                        type: boolean
-                        nullable: true
-                      admin_note:
-                        type: string
-                        nullable: true
-                    required:
-                    - id
-                    - status
+                    $ref: '#/components/schemas/ApplicationDetail'
                   meta:
                     type: object
                     additionalProperties: true
@@ -199,25 +160,15 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                answers:
-                  type: object
-                  additionalProperties: true
-                housing_media_id:
-                  type: string
-                  pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
-                commitment_version:
-                  type: string
-                commitment_accepted:
-                  type: boolean
+              $ref: '#/components/schemas/ApplicationDraftInput'
   /adoption/applications/{id}/submit:
     post:
       operationId: submitApplication
       summary: Ajukan kelayakan dan jalankan precheck
-      description: Mahasiswa dengan email terverifikasi. Hanya pemilik pengajuan. Ajukan kelayakan dan jalankan
-        precheck. Draf harus punya jawaban wajib, foto tempat tinggal dari kamera aplikasi, dan persetujuan komitmen
-        versi berlaku. Hasil precheck terpisah dari keputusan admin.
+      description: 'Mahasiswa dengan email terverifikasi. Hanya pemilik pengajuan. Draf wajib berisi housing_type,
+        owner_permission, can_afford, long_term_plan, foto tempat tinggal, dan persetujuan komitmen versi berlaku;
+        bila kurang, 422 VALIDATION_ERROR dengan errors per field. Precheck: izin tempat tinggal, adopsi berjalan,
+        masa tunggu. Hasil precheck terpisah dari keputusan admin.'
       tags:
       - Adopsi
       responses:
@@ -235,25 +186,20 @@ paths:
                   message:
                     type: string
                   data:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                        pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
-                      status:
-                        type: string
-                      precheck_passed:
-                        type: boolean
-                        nullable: true
-                      admin_note:
-                        type: string
-                        nullable: true
-                    required:
-                    - id
-                    - status
+                    $ref: '#/components/schemas/ApplicationDetail'
                   meta:
                     type: object
-                    additionalProperties: true
+                    properties:
+                      precheck_failures:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                          - NO_OWNER_PERMISSION
+                          - ALREADY_ADOPTING
+                          - COOLDOWN_ACTIVE
+                        description: Alasan precheck yang gagal (ADP-03). Pengajuan tetap SUBMITTED dengan precheck_passed=false;
+                          keputusan tetap di admin. NO_OWNER_PERMISSION adalah alasan precheck, bukan kode error.
                 required:
                 - success
                 - message
@@ -280,8 +226,8 @@ paths:
     get:
       operationId: getMyApplications
       summary: Lihat status pengajuan kelayakan dan catatan admin
-      description: Mahasiswa dengan email terverifikasi. Lihat status pengajuan kelayakan dan catatan admin. Bentuk
-        daftar adalah usulan.
+      description: Mahasiswa dengan email terverifikasi. Daftar pengajuan milik sendiri, terbaru lebih dulu, beserta
+        catatan admin.
       tags:
       - Adopsi
       responses:
@@ -301,22 +247,7 @@ paths:
                   data:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
-                        status:
-                          type: string
-                        precheck_passed:
-                          type: boolean
-                          nullable: true
-                        admin_note:
-                          type: string
-                          nullable: true
-                      required:
-                      - id
-                      - status
+                      $ref: '#/components/schemas/ApplicationDetail'
                   meta:
                     type: object
                     additionalProperties: true
@@ -332,10 +263,13 @@ paths:
     post:
       operationId: startPickup
       summary: Mulai pengambilan lewat QR kalung
-      description: Mahasiswa dengan email terverifikasi. Kelayakan APPROVED dan masih berlaku. Mulai pengambilan
-        lewat QR kalung. Server memeriksa kelayakan, status READY, dan kuota aktif. Lock default 48 jam. Detail
-        mutasi status saat start perlu dikonfirmasi karena §8.6 menyebut pengaturan adoption_status dan §5 menyimpan
-        reservasi di adoption_pickup_locks.
+      description: 'Mahasiswa dengan email terverifikasi dan kelayakan APPROVED yang masih berlaku (30 hari, OQ-09).
+        Server memeriksa QR kucing, kelayakan, adopsi berjalan, masa tunggu, status READY, presence ON_CAMPUS,
+        dan lock lain. Penahanan disimpan di adoption_pickup_locks (HELD, default 48 jam); adoption_status kucing
+        tetap READY sampai confirm (PRD §5.1, §5.3). Redaksi "mengatur adoption_status" di §8.6 diajukan untuk
+        direvisi PM utama. Bila pengguna sudah menahan kucing yang sama, lock yang ada dikembalikan. Kode error:
+        403 FORBIDDEN (kelayakan tidak berlaku); 409 ALREADY_ADOPTING, COOLDOWN_ACTIVE, CAT_NOT_AVAILABLE, CONFLICT
+        (menahan kucing lain); 422 VALIDATION_ERROR, QR_INVALID, QR_REVOKED, QR_WRONG_TYPE.'
       tags:
       - Adopsi
       responses:
@@ -364,6 +298,10 @@ paths:
                       expires_at:
                         type: string
                         format: date-time
+                    required:
+                    - pickup_lock_id
+                    - cat_id
+                    - expires_at
                   meta:
                     type: object
                     additionalProperties: true
@@ -468,18 +406,22 @@ paths:
                   pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
                 location:
                   type: object
+                  description: Konvensi koordinat PRD §8.1.
                   properties:
-                    latitude:
+                    lat:
                       type: number
                       minimum: -90
                       maximum: 90
-                    longitude:
+                    lng:
                       type: number
                       minimum: -180
                       maximum: 180
+                    accuracy_m:
+                      type: number
+                      minimum: 0
                   required:
-                  - latitude
-                  - longitude
+                  - lat
+                  - lng
                 responsibility_confirmed:
                   type: boolean
                   enum:
@@ -672,8 +614,12 @@ paths:
               properties:
                 reason:
                   type: string
-                emergency:
-                  type: boolean
+                type:
+                  type: string
+                  enum:
+                  - REGULAR
+                  - EMERGENCY
+                  description: Sesuai kolom adoption_returns.type (PRD §7.4).
               required:
               - reason
   /adoption/{id}/issues:
@@ -881,8 +827,10 @@ paths:
     post:
       operationId: setCatReadyForAdoption
       summary: Tetapkan status READY lewat CatStatusService dengan alasan dan riwayat.
-      description: Admin dengan permission adoption.set_ready. Pemetaan izin per operasi di bawah adalah usulan.
-        Tetapkan status READY lewat CatStatusService dengan alasan dan riwayat.
+      description: 'Admin dengan permission adoption.set_ready. Tetapkan READY lewat CatStatusService dengan alasan;
+        riwayat di cat_status_logs. Hanya kucing presence ON_CAMPUS dengan adoption_status UNREVIEWED atau RETURNED_REVIEW.
+        Kode error: 403 FORBIDDEN, 404 NOT_FOUND, 409 CAT_NOT_AVAILABLE atau CONFLICT, 422 VALIDATION_ERROR. Pencabutan
+        READY belum tersedia (menunggu keputusan PM utama).'
       tags:
       - Admin Adopsi
       responses:
@@ -1257,6 +1205,111 @@ components:
       - code
       - message
       - request_id
+    ApplicationStatus:
+      type: string
+      enum:
+      - DRAFT
+      - SUBMITTED
+      - REVISION_REQUESTED
+      - APPROVED
+      - REJECTED
+      description: Status kelayakan adopter (PRD §5.2).
+    ApplicationDraftInput:
+      type: object
+      description: Semua field boleh kosong saat draf (ADP-02). cat_id dilarang; kucing dipilih saat pengambilan
+        (FIX-06). Field yang dikirim null pada PUT dikosongkan.
+      properties:
+        housing_type:
+          type: string
+          maxLength: 50
+          nullable: true
+        owner_permission:
+          type: boolean
+          nullable: true
+          description: Izin pemilik/pengelola tempat tinggal.
+        can_afford:
+          type: boolean
+          nullable: true
+        long_term_plan:
+          type: string
+          maxLength: 2000
+          nullable: true
+        answers:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Jawaban tambahan opsional.
+        housing_media_id:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+          nullable: true
+          description: Foto tempat tinggal, diunggah lebih dulu lewat POST /media milik pengguna sendiri. Purpose
+            sementara adoption_evidence sampai Core menyediakan purpose khusus.
+        commitment_accepted:
+          type: boolean
+          nullable: true
+        commitment_version:
+          type: string
+          nullable: true
+          description: Wajib bila commitment_accepted true. Versi berlaku 1.0 (konstanta sementara).
+    ApplicationDetail:
+      type: object
+      description: Data privat; hanya untuk pemilik pengajuan dan adoption_admin.
+      properties:
+        id:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+        status:
+          $ref: '#/components/schemas/ApplicationStatus'
+        precheck_passed:
+          type: boolean
+          nullable: true
+        admin_note:
+          type: string
+          nullable: true
+          description: Diisi dari kolom review_note.
+        housing_type:
+          type: string
+          nullable: true
+        owner_permission:
+          type: boolean
+          nullable: true
+        can_afford:
+          type: boolean
+          nullable: true
+        long_term_plan:
+          type: string
+          nullable: true
+        answers:
+          type: object
+          additionalProperties: true
+          nullable: true
+        housing_media_id:
+          type: string
+          pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
+          nullable: true
+        commitment_version:
+          type: string
+          nullable: true
+        commitment_accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - id
+      - status
   responses:
     Error401:
       description: Token login diperlukan atau tidak valid.
@@ -1265,14 +1318,15 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     Error403:
-      description: Akses ditolak, misalnya NOT_STUDENT, email belum terverifikasi, bukan pemilik, atau permission
-        kurang.
+      description: 'Akses ditolak: NOT_STUDENT, EMAIL_NOT_VERIFIED, FORBIDDEN (bukan pemilik, permission kurang,
+        atau kelayakan tidak berlaku).'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
     Error404:
-      description: Resource tidak ditemukan.
+      description: Resource tidak ditemukan (kode NOT_FOUND; penambahan kode domain ini menunggu persetujuan PM
+        utama).
       content:
         application/json:
           schema:
