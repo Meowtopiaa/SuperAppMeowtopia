@@ -43,6 +43,9 @@ class AdoptionApplication extends Model
     /** Masa berlaku kelayakan APPROVED (PRD OQ-09). shortcut: konstanta, pindah ke pengaturan adopsi bila tabelnya ada. */
     public const ELIGIBILITY_VALID_DAYS = 30;
 
+    /** Versi komitmen adopter yang berlaku (ADP-02). shortcut: konstanta, pindah ke pengaturan adopsi bila tabelnya ada. */
+    public const COMMITMENT_VERSION = '1.0';
+
     protected $keyType = 'string';
     public $incrementing = false;
 

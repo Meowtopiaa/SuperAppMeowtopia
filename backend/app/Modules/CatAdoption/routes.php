@@ -13,4 +13,6 @@ Route::prefix('adoption')->middleware(['auth:sanctum', EnsureVerifiedStudent::cl
 
     Route::post('applications', [AdoptionApplicationController::class, 'store'])->middleware(RequireIdempotencyKey::class);
     Route::get('applications/mine', [AdoptionApplicationController::class, 'mine']);
+    Route::put('applications/{id}', [AdoptionApplicationController::class, 'update']);
+    Route::post('applications/{id}/submit', [AdoptionApplicationController::class, 'submit'])->middleware(RequireIdempotencyKey::class);
 });
