@@ -14,9 +14,28 @@ paths:
     get:
       operationId: listReadyCats
       summary: Lihat katalog kucing READY tanpa adopsi aktif.
-      description: Mahasiswa dengan email terverifikasi. Lihat katalog kucing READY tanpa adopsi aktif.
+      description: Mahasiswa dengan email terverifikasi (EN-12, ADP-05, CAT-09). Hanya kucing adoption_status
+        READY, presence_status ON_CAMPUS, tanpa adopsi terbuka, dan tanpa lock pengambilan HELD. Respons hanya
+        memuat field publik di bawah; koordinat, unique_code, token QR, traits, territory, dan waktu perjumpaan
+        tidak pernah dikirim.
       tags:
       - Adopsi
+      parameters:
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
       responses:
         '200':
           description: Permintaan berhasil diproses.
@@ -35,22 +54,64 @@ paths:
                     type: array
                     items:
                       type: object
+                      additionalProperties: false
                       properties:
                         id:
                           type: string
                           pattern: ^[0-7][0-9A-HJKMNP-TV-Z]{25}$
                         name:
                           type: string
+                        gender:
+                          type: string
+                          nullable: true
+                          enum:
+                          - MALE
+                          - FEMALE
+                          - UNKNOWN
+                          - null
+                        color_pattern:
+                          type: string
+                          nullable: true
+                        age_group:
+                          type: string
+                          nullable: true
+                          enum:
+                          - KITTEN
+                          - ADULT
+                          - SENIOR
+                          - UNKNOWN
+                          - null
+                        is_sterilized:
+                          type: boolean
+                          nullable: true
+                        description:
+                          type: string
+                          nullable: true
+                        primary_photo_media_id:
+                          type: string
+                          nullable: true
+                          description: ULID media. URL foto diambil lewat GET /media/{id}/url.
                         adoption_status:
                           type: string
                           enum:
                           - READY
                       required:
                       - id
+                      - name
                       - adoption_status
                   meta:
                     type: object
-                    additionalProperties: true
+                    properties:
+                      current_page:
+                        type: integer
+                      per_page:
+                        type: integer
+                      total:
+                        type: integer
+                      last_page:
+                        type: integer
+                      has_more:
+                        type: boolean
                 required:
                 - success
                 - message
@@ -59,6 +120,8 @@ paths:
           $ref: '#/components/responses/Error401'
         '403':
           $ref: '#/components/responses/Error403'
+        '422':
+          $ref: '#/components/responses/Error422'
   /adoption/applications:
     post:
       operationId: createApplicationDraft

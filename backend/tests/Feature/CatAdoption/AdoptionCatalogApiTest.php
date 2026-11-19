@@ -69,4 +69,30 @@ class AdoptionCatalogApiTest extends TestCase
     {
         $this->getJson('/api/v1/adoption/cats')->assertUnauthorized();
     }
+
+    /** EN-12, CAT-09, IT-17: respons katalog hanya berisi field publik. */
+    public function test_catalog_returns_only_public_fields(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->makeCat([
+            'adoption_status' => 'READY',
+            'gender' => 'FEMALE',
+            'age_group' => 'ADULT',
+            'color_pattern' => 'Calico',
+            'is_sterilized' => true,
+            'description' => 'Tenang dan suka dielus.',
+            'traits' => ['catatan_internal' => 'jangan tampil'],
+            'last_seen_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/adoption/cats')->assertOk();
+
+        $cat = $response->json('data.0');
+        $this->assertEqualsCanonicalizing(
+            ['id', 'name', 'gender', 'color_pattern', 'age_group', 'is_sterilized', 'description', 'primary_photo_media_id', 'adoption_status'],
+            array_keys($cat),
+        );
+        $this->assertStringNotContainsString('jangan tampil', $response->getContent());
+    }
 }

@@ -13,7 +13,16 @@ use Illuminate\Support\Facades\Validator;
 class AdoptionController extends Controller
 {
     /**
-     * Katalog: kucing READY di kampus, tanpa adopsi terbuka dan tanpa lock HELD (FIX-05).
+     * Kolom yang boleh tampil di katalog publik (CAT-09, NFR-04). Tidak ada koordinat,
+     * unique_code, token QR, traits, territory, atau waktu perjumpaan.
+     */
+    public const CATALOG_COLUMNS = [
+        'id', 'name', 'gender', 'color_pattern', 'age_group',
+        'is_sterilized', 'description', 'primary_photo_media_id', 'adoption_status',
+    ];
+
+    /**
+     * EN-12: katalog kucing READY di kampus, tanpa adopsi terbuka dan tanpa lock HELD (FIX-05).
      * unique_code tidak dikirim agar pengambilan tetap lewat pindai QR kalung (ADP-06).
      */
     public function cats(Request $request)
@@ -29,7 +38,7 @@ class AdoptionController extends Controller
             ->whereNotIn('id', Adoption::open()->select('cat_id'))
             ->whereNotIn('id', AdoptionPickupLock::active()->select('cat_id'))
             ->orderBy('name')
-            ->select(['id', 'name', 'gender', 'color_pattern', 'age_group', 'is_sterilized', 'description', 'primary_photo_media_id', 'adoption_status'])
+            ->select(self::CATALOG_COLUMNS)
             ->paginate($request->integer('per_page', 20));
 
         return ApiResponse::paginated($cats, 'Kucing siap diadopsi.');

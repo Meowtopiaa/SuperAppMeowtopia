@@ -3,12 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/widgets/loading_indicator.dart';
-import '../../cat/data/cat_model.dart';
+import '../data/adoption_catalog_model.dart';
 import '../logic/adoption_provider.dart';
 import 'adoption_theme.dart';
 import 'adoption_widgets.dart';
 
-/// Layar 1 — Katalog Kucing Siap Adopsi
+/// Layar 1: katalog kucing READY tanpa data pribadi (EN-12, ADP-05, CAT-09).
 class AdoptionCatalogPage extends StatefulWidget {
   const AdoptionCatalogPage({super.key});
 
@@ -17,25 +17,20 @@ class AdoptionCatalogPage extends StatefulWidget {
 }
 
 class _AdoptionCatalogPageState extends State<AdoptionCatalogPage> {
-  String _filterGender = 'semua'; // 'semua' | 'male' | 'female'
-  String _filterAge = 'semua'; // 'semua' | 'kitten' | 'adult'
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdoptionProvider>().fetchInitialData();
+      final provider = context.read<AdoptionProvider>();
+      provider.fetchCatalog();
+      provider.fetchMyApplications();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AdoptionProvider>();
-
-    final filteredCats = provider.readyCats.where((cat) {
-      final genderOk = _filterGender == 'semua' || cat.gender == _filterGender;
-      return genderOk;
-    }).toList();
+    final cats = provider.catalogCats;
 
     return Scaffold(
       backgroundColor: AdoptionTheme.pageBg,
@@ -59,64 +54,70 @@ class _AdoptionCatalogPageState extends State<AdoptionCatalogPage> {
           const SizedBox(width: 4),
         ],
       ),
-      body: provider.isLoading
-          ? const LoadingIndicator(message: 'Memuat kucing...')
-          : provider.errorMessage != null
-              ? AdoptionErrorState(
-                  message: provider.errorMessage!,
-                  onRetry: () => provider.fetchInitialData(),
-                )
-              : AdoptionBackground(
-                  child: RefreshIndicator(
-                    color: AdoptionTheme.accent,
-                    onRefresh: () => provider.fetchInitialData(),
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1080),
-                        child: ListView(
-                          padding: adoptionScrollPadding(context),
-                          children: [
-                            _buildIntro(context),
-                            const SizedBox(height: 20),
-                            _buildFilterRow(),
-                            const SizedBox(height: 16),
-                            if (filteredCats.isEmpty)
-                              const AdoptionEmptyState(
-                                message: 'Belum ada kucing yang siap diadopsi',
-                                submessage:
-                                    'Coba ubah filter, atau cek lagi beberapa hari ke depan.',
-                              )
-                            else
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  const gap = 16.0;
-                                  final width = constraints.maxWidth;
-                                  final columns = width >= 900
-                                      ? 3
-                                      : width >= 560
-                                          ? 2
-                                          : 1;
-                                  final itemWidth =
-                                      (width - gap * (columns - 1)) / columns;
-                                  return Wrap(
-                                    spacing: gap,
-                                    runSpacing: gap,
-                                    children: filteredCats
-                                        .map((cat) => SizedBox(
-                                              width: itemWidth,
-                                              child: _CatCard(cat: cat),
-                                            ))
-                                        .toList(),
-                                  );
-                                },
-                              ),
-                          ],
-                        ),
-                      ),
+      body: AdoptionBackground(
+        child: RefreshIndicator(
+          color: AdoptionTheme.accent,
+          onRefresh: () => provider.fetchCatalog(),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: ListView(
+                padding: adoptionScrollPadding(context),
+                children: [
+                  _buildIntro(context),
+                  const SizedBox(height: 4),
+                  _buildFilterRow(provider),
+                  const SizedBox(height: 16),
+                  if (provider.isCatalogLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48),
+                      child: LoadingIndicator(message: 'Memuat kucing...'),
+                    )
+                  else if (provider.catalogError != null)
+                    AdoptionErrorState(
+                      message: provider.catalogError!,
+                      onRetry: () => provider.fetchCatalog(),
+                    )
+                  else if (cats.isEmpty)
+                    AdoptionEmptyState(
+                      message: provider.catalogFilter.isEmpty
+                          ? 'Belum ada kucing yang siap diadopsi'
+                          : 'Tidak ada kucing yang cocok dengan filter ini',
+                      submessage: provider.catalogFilter.isEmpty
+                          ? 'Cek lagi beberapa hari ke depan.'
+                          : 'Coba hapus filter untuk melihat semua kucing.',
+                    )
+                  else
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        const gap = 16.0;
+                        final width = constraints.maxWidth;
+                        final columns = width >= 900
+                            ? 3
+                            : width >= 560
+                                ? 2
+                                : 1;
+                        final itemWidth =
+                            (width - gap * (columns - 1)) / columns;
+                        return Wrap(
+                          spacing: gap,
+                          runSpacing: gap,
+                          children: cats
+                              .map((cat) => SizedBox(
+                                    width: itemWidth,
+                                    child: _CatCard(cat: cat),
+                                  ))
+                              .toList(),
+                        );
+                      },
                     ),
-                  ),
-                ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -143,48 +144,48 @@ class _AdoptionCatalogPageState extends State<AdoptionCatalogPage> {
     );
   }
 
-  Widget _buildFilterRow() {
+  /// Filter di aplikasi. Mengetuk filter yang aktif akan mematikannya.
+  Widget _buildFilterRow(AdoptionProvider provider) {
+    final current = provider.catalogFilter;
+
+    void apply({String? gender, String? ageGroup}) {
+      provider.setCatalogFilter(
+        AdoptionCatalogFilter(gender: gender, ageGroup: ageGroup),
+      );
+    }
+
+    Widget genderChip(String label, String value) => _FilterChip(
+          label: label,
+          selected: current.gender == value,
+          onTap: () => apply(
+            gender: current.gender == value ? null : value,
+            ageGroup: current.ageGroup,
+          ),
+        );
+
+    Widget ageChip(String label, String value) => _FilterChip(
+          label: label,
+          selected: current.ageGroup == value,
+          onTap: () => apply(
+            gender: current.gender,
+            ageGroup: current.ageGroup == value ? null : value,
+          ),
+        );
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         _FilterChip(
           label: 'Semua',
-          selected: _filterGender == 'semua' && _filterAge == 'semua',
-          onTap: () => setState(() {
-            _filterGender = 'semua';
-            _filterAge = 'semua';
-          }),
+          selected: current.isEmpty,
+          onTap: () => apply(),
         ),
-        _FilterChip(
-          label: 'Jantan',
-          selected: _filterGender == 'male',
-          onTap: () => setState(
-            () => _filterGender = _filterGender == 'male' ? 'semua' : 'male',
-          ),
-        ),
-        _FilterChip(
-          label: 'Betina',
-          selected: _filterGender == 'female',
-          onTap: () => setState(
-            () =>
-                _filterGender = _filterGender == 'female' ? 'semua' : 'female',
-          ),
-        ),
-        _FilterChip(
-          label: 'Anak',
-          selected: _filterAge == 'kitten',
-          onTap: () => setState(
-            () => _filterAge = _filterAge == 'kitten' ? 'semua' : 'kitten',
-          ),
-        ),
-        _FilterChip(
-          label: 'Dewasa',
-          selected: _filterAge == 'adult',
-          onTap: () => setState(
-            () => _filterAge = _filterAge == 'adult' ? 'semua' : 'adult',
-          ),
-        ),
+        genderChip('Jantan', 'MALE'),
+        genderChip('Betina', 'FEMALE'),
+        ageChip('Anak', 'KITTEN'),
+        ageChip('Dewasa', 'ADULT'),
+        ageChip('Lansia', 'SENIOR'),
       ],
     );
   }
@@ -321,22 +322,23 @@ class _FilterChip extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CatCard extends StatelessWidget {
-  final CatModel cat;
+  final AdoptionCatalogCat cat;
 
   const _CatCard({required this.cat});
 
   @override
   Widget build(BuildContext context) {
-    final genderLabel = cat.gender == 'male' ? 'Jantan' : 'Betina';
+    final meta =
+        [cat.genderLabel, if (cat.ageLabel != null) cat.ageLabel!].join(', ');
     final traits = <String>[
-      if (cat.primaryColor != null && cat.primaryColor!.isNotEmpty)
-        cat.primaryColor!,
-      if (cat.pattern != null && cat.pattern!.isNotEmpty) cat.pattern!,
-      if (cat.sterilizationStatus) 'Sudah steril',
+      if (cat.colorPattern != null) cat.colorPattern!,
+      if (cat.isSterilized == true) 'Sudah steril',
     ];
 
+    // Kartu membuka form kelayakan dengan nama kucing sebagai konteks.
+    // Kelayakan tidak mengikat kucing (ADP-02); kucing dipilih saat pindai QR pengambilan.
     void open() => context.push(
-          '/adoption/apply?cat_id=${cat.id}&name=${Uri.encodeComponent(cat.name)}',
+          '/adoption/apply?cat_id=${Uri.encodeComponent(cat.id)}&name=${Uri.encodeComponent(cat.name)}',
         );
 
     return Container(
@@ -350,7 +352,7 @@ class _CatCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CatPhotoBox(
-                photoUrl: cat.primaryPhotoUrl,
+                photoUrl: cat.photoUrl,
                 borderRadius: BorderRadius.zero,
               ),
               Padding(
@@ -366,13 +368,12 @@ class _CatCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$genderLabel, ${cat.breed}',
+                      meta,
                       style: AdoptionTheme.bodyStyle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (cat.description != null &&
-                        cat.description!.isNotEmpty) ...[
+                    if (cat.description != null) ...[
                       const SizedBox(height: 8),
                       Text(
                         cat.description!,
@@ -393,24 +394,15 @@ class _CatCard extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            cat.lastSeenLocationName ?? 'Area kampus',
-                            style: AdoptionTheme.captionStyle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'Ajukan adopsi',
+                        style: AdoptionTheme.bodyStyle.copyWith(
+                          color: AdoptionTheme.accentDark,
+                          fontWeight: FontWeight.w600,
                         ),
-                        Text(
-                          'Lihat detail',
-                          style: AdoptionTheme.bodyStyle.copyWith(
-                            color: AdoptionTheme.accent,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),

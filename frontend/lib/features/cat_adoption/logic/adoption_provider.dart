@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../cat/data/cat_model.dart';
+import '../data/adoption_catalog_model.dart';
+import '../data/adoption_catalog_repository.dart';
 import '../data/adoption_constants.dart';
 import '../data/adoption_enums.dart';
 import '../data/adoption_model.dart';
@@ -19,6 +22,13 @@ class AdoptionProvider extends ChangeNotifier {
   List<AdoptionFollowupModel> _currentFollowups = [];
   AdoptionPickupLockModel? _currentPickupLock;
 
+  // Katalog adopsi (EN-12): sumber data dan state terpisah dari data tiruan lain.
+  late final AdoptionCatalogRepository _catalogRepository;
+  List<AdoptionCatalogCat> _catalogCats = [];
+  AdoptionCatalogFilter _catalogFilter = const AdoptionCatalogFilter();
+  bool _isCatalogLoading = false;
+  String? _catalogError;
+
   // Loading & error states
   bool _isLoading = false;
   bool _isActionLoading = false;
@@ -33,12 +43,52 @@ class AdoptionProvider extends ChangeNotifier {
   AdoptionProvider({
     AdoptionService? service,
     AdoptionRepository? repository,
+    AdoptionCatalogRepository? catalogRepository,
   }) : _service = service ??
             AdoptionService(
               repository: repository ?? MockAdoptionRepository(),
             ) {
+    _catalogRepository = catalogRepository ?? _defaultCatalogRepository();
     // Muat data awal secara otomatis
     fetchInitialData();
+  }
+
+  /// Mode demo memakai data tiruan; selain itu katalog diambil dari API.
+  AdoptionCatalogRepository _defaultCatalogRepository() {
+    final source = _service.repository;
+    if (AppConstants.demoMode && source is MockAdoptionRepository) {
+      return MockAdoptionCatalogRepository(source);
+    }
+    return ApiAdoptionCatalogRepository();
+  }
+
+  /// Kucing katalog setelah filter aplikasi diterapkan.
+  List<AdoptionCatalogCat> get catalogCats =>
+      List.unmodifiable(_catalogCats.where(_catalogFilter.matches));
+  AdoptionCatalogFilter get catalogFilter => _catalogFilter;
+  bool get isCatalogLoading => _isCatalogLoading;
+  String? get catalogError => _catalogError;
+
+  /// Mengganti filter katalog. Penyaringan dilakukan di aplikasi, tanpa memuat ulang.
+  void setCatalogFilter(AdoptionCatalogFilter filter) {
+    _catalogFilter = filter;
+    notifyListeners();
+  }
+
+  /// Memuat katalog kucing READY dari server atau data tiruan (EN-12).
+  Future<void> fetchCatalog() async {
+    _isCatalogLoading = true;
+    _catalogError = null;
+    notifyListeners();
+
+    try {
+      _catalogCats = await _catalogRepository.getCatalog();
+    } catch (e) {
+      _catalogError = e.toString().replaceAll('Exception: ', '');
+    } finally {
+      _isCatalogLoading = false;
+      notifyListeners();
+    }
   }
 
   // Getters
@@ -273,7 +323,8 @@ class AdoptionProvider extends ChangeNotifier {
 
       _myApplications = await _service.getMyApplications();
       _isActionLoading = false;
-      _actionSuccessMessage = 'Perbaikan formulir berhasil dikirim ulang ke admin.';
+      _actionSuccessMessage =
+          'Perbaikan formulir berhasil dikirim ulang ke admin.';
       notifyListeners();
       return updated;
     } catch (e) {
