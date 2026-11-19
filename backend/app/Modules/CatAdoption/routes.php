@@ -23,5 +23,7 @@ Route::prefix('adoption')->middleware(['auth:sanctum', EnsureVerifiedStudent::cl
 
 // Admin adopsi: izin per aksi dicek di controller (permission Spatie).
 Route::prefix('admin/adoption')->middleware('auth:sanctum')->group(function () {
+    Route::get('applications', [AdminAdoptionController::class, 'applications']);
+    Route::post('applications/{id}/decision', [AdminAdoptionController::class, 'decide']);
     Route::post('cats/{catId}/set-ready', [AdminAdoptionController::class, 'setReady']);
 });
