@@ -669,7 +669,7 @@
         </div>
 
         <nav class="sidebar-nav">
-            <a href="/api/v1/feeding/admin-preview?tab=spots" class="nav-item" data-tooltip="Lokasi Feeding Spot" aria-label="Lokasi Feeding Spot">
+            <a href="/admin/feeding?tab=spots" class="nav-item" data-tooltip="Lokasi Feeding Spot" aria-label="Lokasi Feeding Spot">
                 <span class="nav-item-label">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
@@ -678,7 +678,7 @@
                     <span class="nav-item-text">Lokasi Feeding Spot</span>
                 </span>
             </a>
-            <a href="/api/v1/feeding/admin-preview?tab=reviews" class="nav-item active" data-tooltip="Antrean Review" aria-label="Antrean Review">
+            <a href="/admin/feeding?tab=reviews" class="nav-item active" data-tooltip="Antrean Review" aria-label="Antrean Review">
                 <span class="nav-item-label">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
@@ -688,7 +688,7 @@
                     <span class="nav-item-text">Antrean Review</span>
                 </span>
             </a>
-            <a href="/api/v1/feeding/admin-preview?tab=audit" class="nav-item" data-tooltip="Riwayat Audit" aria-label="Riwayat Audit">
+            <a href="/admin/feeding?tab=audit" class="nav-item" data-tooltip="Riwayat Audit" aria-label="Riwayat Audit">
                 <span class="nav-item-label">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -716,9 +716,13 @@
                     <span class="status-label status-rejected">Ditolak</span>
                 @endif
             </div>
-            <a href="{{ $backUrl ?? '/api/v1/feeding/admin-preview?tab=reviews' }}" class="btn btn-neutral btn-sm">
-                Kembali ke Antrean
-            </a>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <a href="{{ $backUrl ?? '/admin/feeding?tab=reviews' }}" class="btn btn-neutral btn-sm">Kembali ke Antrean</a>
+                <form method="POST" action="/admin/feeding/logout">
+                    @csrf
+                    <button type="submit" class="btn btn-neutral btn-sm">Keluar</button>
+                </form>
+            </div>
         </header>
 
         <main class="page-content">

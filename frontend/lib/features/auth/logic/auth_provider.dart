@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/storage/token_storage.dart';
 import '../data/auth_service.dart';
 import '../data/user_model.dart';
@@ -39,17 +41,90 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await _authService.login(email, password);
-      final token = result['token'] as String;
-      _user = result['user'] as UserModel;
+      return await _completeLogin(_authService.login(email, password));
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = _messageFor(e);
+      notifyListeners();
+      return false;
+    }
+  }
 
-      await _tokenStorage.saveToken(token);
+  Future<bool> requestEmailOtp(String email) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _authService.requestEmailOtp(email);
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString();
+      _errorMessage = _messageFor(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> loginWithEmailOtp(String email, String otp) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      return await _completeLogin(_authService.loginWithEmailOtp(email, otp));
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = _messageFor(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> loginWithGoogle(String idToken) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      return await _completeLogin(_authService.loginWithGoogle(idToken));
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = _messageFor(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifyEmailOtp(String otp) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _authService.verifyEmailOtp(otp);
+      _user = await _authService.getProfile();
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = _messageFor(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> resendEmailOtp() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _authService.resendEmailOtp();
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = _messageFor(e);
       notifyListeners();
       return false;
     }
@@ -75,15 +150,14 @@ class AuthProvider extends ChangeNotifier {
         phone: phone,
       );
       final token = result['token'] as String;
-      _user = result['user'] as UserModel;
-
       await _tokenStorage.saveToken(token);
+      _user = result['user'] as UserModel;
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString();
+      _errorMessage = _messageFor(e);
       notifyListeners();
       return false;
     }
@@ -96,5 +170,31 @@ class AuthProvider extends ChangeNotifier {
     await _tokenStorage.deleteToken();
     _user = null;
     notifyListeners();
+  }
+
+  String _messageFor(Object error) {
+    if (error is DioException) {
+      if (error.response == null) {
+        return 'Belum bisa terhubung ke server. Periksa koneksi dan coba lagi.';
+      }
+      final detail = error.error;
+      if (detail is ApiException && (detail.statusCode ?? 500) < 500) {
+        return detail.message;
+      }
+      if (detail is ApiException && detail.statusCode == 503) {
+        return detail.message;
+      }
+    }
+    return 'Proses belum berhasil. Coba lagi beberapa saat.';
+  }
+
+  Future<bool> _completeLogin(Future<Map<String, dynamic>> request) async {
+    final result = await request;
+    final token = result['token'] as String;
+    await _tokenStorage.saveToken(token);
+    _user = result['user'] as UserModel;
+    _isLoading = false;
+    notifyListeners();
+    return true;
   }
 }

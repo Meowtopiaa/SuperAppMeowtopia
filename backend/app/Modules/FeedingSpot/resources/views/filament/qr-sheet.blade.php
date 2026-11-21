@@ -265,13 +265,13 @@
 @endphp
 
     <div class="toolbar no-print">
-        <a href="/api/v1/feeding/admin-preview?tab=spots" class="btn btn-neutral">Kembali ke Dashboard</a>
+        <a href="/admin/feeding?tab=spots" class="btn btn-neutral">Kembali ke Dashboard</a>
         <div class="toolbar-actions">
             @if(count($items) === 1 && !empty($items[0]['spot']))
-                <a href="/api/v1/feeding/admin-preview/spots/{{ $items[0]['spot']->id }}/qr-download?format=png" class="btn btn-secondary">
+                <a href="/admin/feeding/spots/{{ $items[0]['spot']->id }}/qr-download?format=png" class="btn btn-secondary">
                     Unduh QR (PNG)
                 </a>
-                <a href="/api/v1/feeding/admin-preview/spots/{{ $items[0]['spot']->id }}/qr-download?format=svg" class="btn btn-neutral">
+                <a href="/admin/feeding/spots/{{ $items[0]['spot']->id }}/qr-download?format=svg" class="btn btn-neutral">
                     Unduh QR (SVG)
                 </a>
             @endif
@@ -316,10 +316,10 @@
 
                 @if(count($items) > 1)
                     <div class="card-actions no-print">
-                        <a href="/api/v1/feeding/admin-preview/spots/{{ $s->id }}/qr-download?format=png" class="btn btn-secondary">
+                        <a href="/admin/feeding/spots/{{ $s->id }}/qr-download?format=png" class="btn btn-secondary">
                             Unduh PNG ({{ $s->code }})
                         </a>
-                        <a href="/api/v1/feeding/admin-preview/spots/{{ $s->id }}/qr-download?format=svg" class="btn btn-neutral">
+                        <a href="/admin/feeding/spots/{{ $s->id }}/qr-download?format=svg" class="btn btn-neutral">
                             Unduh SVG ({{ $s->code }})
                         </a>
                     </div>

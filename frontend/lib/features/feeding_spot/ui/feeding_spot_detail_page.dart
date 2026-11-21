@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/meow_style.dart';
 import '../../../core/utils/date_labels.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../logic/feeding_spot_provider.dart';
 import 'feeding_widgets.dart';
@@ -35,7 +36,7 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingIndicator()
               : FeedingMessage(
                   provider.errorMessage ??
                       'Spot tidak ditemukan atau sudah dinonaktifkan.',

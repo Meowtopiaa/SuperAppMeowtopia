@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/meow_style.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../logic/feeding_spot_provider.dart';
 import 'feeding_widgets.dart';
@@ -248,8 +249,8 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
             const SizedBox(height: 14),
             if (provider.isLoading)
               const Padding(
-                padding: EdgeInsets.all(28),
-                child: Center(child: CircularProgressIndicator()),
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: LoadingIndicator(),
               ),
             if (provider.errorMessage != null)
               FeedingMessage(

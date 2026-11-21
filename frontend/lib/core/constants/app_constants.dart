@@ -15,6 +15,12 @@ class AppConstants {
     'MEOWTOPIA_DEMO',
     defaultValue: true,
   );
+  static const String googleClientId = String.fromEnvironment(
+    'MEOWTOPIA_GOOGLE_CLIENT_ID',
+  );
+  static const String googleServerClientId = String.fromEnvironment(
+    'MEOWTOPIA_GOOGLE_SERVER_CLIENT_ID',
+  );
 
   // Storage Keys
   static const String keyAuthToken = 'meowtopia_auth_token';

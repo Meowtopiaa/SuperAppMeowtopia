@@ -119,7 +119,12 @@ class _CameraCapturePageState extends State<CameraCapturePage> {
           if (_isUploading)
             Container(
               color: Colors.black54,
-              child: const Center(child: LoadingIndicator(message: 'Mengunggah foto...')),
+              child: const Center(
+                child: LoadingIndicator(
+                  message: 'Mengunggah foto...',
+                  onDark: true,
+                ),
+              ),
             ),
           Positioned(
             bottom: 30,

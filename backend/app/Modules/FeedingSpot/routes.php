@@ -25,19 +25,8 @@ Route::prefix('feeding')->group(function () {
     Route::get('/spots/{id}/photo', [FeedingSpotController::class, 'serveSpotPhoto'])->name('feeding.spots.photo');
     Route::get('/heatmap', [FeedingSpotController::class, 'heatmap']);
 
-    // Panel Admin Filament Browser Preview & CRUD (MEOW-21 & MEOW-22)
+    // Public logo asset used by the browser admin panel.
     Route::get('/assets/logo.jpg', [AdminFeedingSpotController::class, 'serveLogoAsset']);
-    Route::get('/admin-preview', [AdminFeedingSpotController::class, 'adminPreviewPanel']);
-    Route::post('/admin-preview/spots', [AdminFeedingSpotController::class, 'adminPreviewStoreSpot']);
-    Route::post('/admin-preview/spots/{id}/update', [AdminFeedingSpotController::class, 'adminPreviewUpdateSpot']);
-    Route::post('/admin-preview/spots/{id}/qr', [AdminFeedingSpotController::class, 'adminPreviewRegenerateQr']);
-    Route::post('/admin-preview/spots/{id}/cats', [AdminFeedingSpotController::class, 'adminPreviewAttachCat']);
-    Route::post('/admin-preview/spots/{id}/cats/{catId}/detach', [AdminFeedingSpotController::class, 'adminPreviewDetachCat']);
-    Route::get('/admin-preview/reviews/{id}', [AdminFeedingSpotController::class, 'adminPreviewReview']);
-    Route::post('/admin-preview/activities/{id}/review', [AdminFeedingSpotController::class, 'adminPreviewSubmitReview']);
-    Route::get('/admin-preview/qr-sheet', [AdminFeedingSpotController::class, 'adminPreviewAllQrSheets']);
-    Route::get('/admin-preview/spots/{id}/qr-sheet', [AdminFeedingSpotController::class, 'adminPreviewQrSheet']);
-    Route::get('/admin-preview/spots/{id}/qr-download', [AdminFeedingSpotController::class, 'downloadSpotQr']);
 
     // Authenticated User Endpoints
     Route::middleware('auth:sanctum')->group(function () {

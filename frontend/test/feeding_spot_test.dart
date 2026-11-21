@@ -1,5 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:meowtopia/core/scanner/qr_parser.dart';
+import 'package:meowtopia/core/widgets/loading_indicator.dart';
+import 'package:meowtopia/core/widgets/page_transition_overlay.dart';
+import 'package:meowtopia/core/widgets/walking_cat_loader.dart';
 import 'package:meowtopia/features/feeding_spot/data/feeding_spot_model.dart';
 import 'package:meowtopia/features/feeding_spot/logic/feeding_spot_provider.dart';
 
@@ -110,6 +115,230 @@ void main() {
         session.spot.locationName,
         'Telkom University Landmark Tower (TULT)',
       );
+    });
+  });
+
+  group('WalkingCatLoader 2.5D Animation Tests', () {
+    testWidgets('Merender animasi kucing berjalan dan teks Memuat...', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: Center(child: WalkingCatLoader())),
+        ),
+      );
+
+      expect(find.byType(WalkingCatLoader), findsOneWidget);
+      expect(find.text('Memuat'), findsOneWidget);
+      expect(find.text('.'), findsNWidgets(3));
+      expect(
+        find.descendant(
+          of: find.byType(WalkingCatLoader),
+          matching: find.byType(CustomPaint),
+        ),
+        findsOneWidget,
+      );
+
+      // Pastikan animasi melangkah mulus melewati beberapa frame tanpa error
+      await tester.pump(const Duration(milliseconds: 550));
+      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pump(const Duration(milliseconds: 2200));
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Mendukung mode latar gelap (onDark) dan compact', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: WalkingCatLoader(onDark: true, compact: true, size: 120),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.text('Memuat'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('LoadingIndicator global merender WalkingCatLoader dan merapikan titik akhir pesan', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: LoadingIndicator(message: 'Memuat katalog adopsi...'),
+          ),
+        ),
+      );
+
+      expect(find.byType(WalkingCatLoader), findsOneWidget);
+      expect(find.text('Memuat katalog adopsi'), findsOneWidget);
+      expect(find.text('.'), findsNWidgets(3));
+
+      await tester.pump(const Duration(milliseconds: 900));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('PageTransitionLoaderHost langsung pindah tanpa loading jika halaman cepat, dan tampil tanpa background jika melewati showDelay', (
+      tester,
+    ) async {
+      final transitionNotifier = ValueNotifier<int>(0);
+      final router = GoRouter(
+        initialLocation: '/a',
+        observers: [
+          PageTransitionTracker(onTransition: () => transitionNotifier.value++),
+        ],
+        routes: [
+          GoRoute(
+            path: '/a',
+            builder: (_, __) => const Scaffold(body: Text('Halaman A')),
+          ),
+          GoRoute(
+            path: '/b',
+            builder: (_, __) => const Scaffold(body: Text('Halaman B')),
+          ),
+        ],
+      );
+
+      // 1. Skenario cepat (halaman langsung selesai render < showDelay): tidak menampilkan overlay
+      await tester.pumpWidget(
+        MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => PageTransitionLoaderHost(
+            router: router,
+            transitionListenable: transitionNotifier,
+            showDelay: const Duration(milliseconds: 120),
+            minVisibleDuration: const Duration(milliseconds: 200),
+            fadeOutDuration: const Duration(milliseconds: 120),
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(WalkingCatLoader), findsNothing);
+      expect(find.text('Halaman A'), findsOneWidget);
+
+      router.go('/b');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byType(WalkingCatLoader), findsNothing);
+      expect(find.text('Halaman B'), findsOneWidget);
+
+      // 2. Skenario lag (showDelay = 0 mensimulasikan frame belum selesai saat threshold tercapai)
+      await tester.pumpWidget(
+        MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => PageTransitionLoaderHost(
+            router: router,
+            transitionListenable: transitionNotifier,
+            showDelay: Duration.zero,
+            minVisibleDuration: const Duration(milliseconds: 200),
+            fadeOutDuration: const Duration(milliseconds: 120),
+            showOnInitialLoad: false,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+      );
+
+      router.go('/a');
+      await tester.pump(const Duration(milliseconds: 10));
+      expect(find.byType(WalkingCatLoader), findsOneWidget);
+      expect(find.text('Memuat'), findsOneWidget);
+
+      // Setelah selesai render + minVisibleDuration + fade-out, overlay unmount bersih
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byType(WalkingCatLoader), findsNothing);
+      expect(find.text('Halaman A'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      router.dispose();
+      transitionNotifier.dispose();
+    });
+
+    testWidgets('Pindah branch StatefulShellRoute (/home -> /feeding -> /profile) cepat dan bebas error', (
+      tester,
+    ) async {
+      final transitionNotifier = ValueNotifier<int>(0);
+      final router = GoRouter(
+        initialLocation: '/home',
+        observers: [
+          PageTransitionTracker(onTransition: () => transitionNotifier.value++),
+        ],
+        routes: [
+          StatefulShellRoute.indexedStack(
+            builder: (context, state, shell) => Scaffold(body: shell),
+            branches: [
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: '/home',
+                    builder: (_, __) => const Center(child: Text('Tab Home')),
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: '/feeding',
+                    builder: (_, __) =>
+                        const Center(child: Text('Tab Feeding')),
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: '/profile',
+                    builder: (_, __) =>
+                        const Center(child: Text('Tab Profile')),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => PageTransitionLoaderHost(
+            router: router,
+            transitionListenable: transitionNotifier,
+            showDelay: const Duration(milliseconds: 120),
+            minVisibleDuration: const Duration(milliseconds: 200),
+            fadeOutDuration: const Duration(milliseconds: 120),
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(find.byType(WalkingCatLoader), findsNothing);
+      expect(find.text('Tab Home'), findsOneWidget);
+
+      // Pindah /home -> /feeding langsung tampil tanpa jeda loading buatan
+      router.go('/feeding');
+      await tester.pump();
+      expect(find.byType(WalkingCatLoader), findsNothing);
+      expect(find.text('Tab Feeding'), findsOneWidget);
+
+      // Pindah /feeding -> /profile langsung tampil tanpa jeda loading buatan
+      router.go('/profile');
+      await tester.pump();
+      expect(find.byType(WalkingCatLoader), findsNothing);
+      expect(find.text('Tab Profile'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      router.dispose();
+      transitionNotifier.dispose();
     });
   });
 }

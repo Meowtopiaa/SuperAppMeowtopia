@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/meow_style.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../data/feeding_session.dart';
 
@@ -133,7 +134,7 @@ class _CaptureEvidencePageState extends State<CaptureEvidencePage>
                 child: _camera?.value.isInitialized == true
                     ? CameraPreview(_camera!)
                     : _error == null
-                    ? const CircularProgressIndicator(color: MeowStyle.orange)
+                    ? const LoadingIndicator(onDark: true)
                     : Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(

@@ -7,8 +7,11 @@ use App\Modules\Core\Middleware\RequireIdempotencyKey;
 
 // Public Auth Endpoints
 Route::prefix('auth')->group(function () {
-    Route::post('register', [AuthController::class, 'register']);
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::post('email/otp/request', [AuthController::class, 'requestEmailOtp'])->middleware('throttle:5,1');
+    Route::post('email/otp/login', [AuthController::class, 'loginWithEmailOtp'])->middleware('throttle:10,1');
+    Route::post('google', [AuthController::class, 'loginWithGoogle'])->middleware('throttle:10,1');
 
     // Authenticated Auth Endpoints
     Route::middleware('auth:sanctum')->group(function () {

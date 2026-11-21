@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use App\Modules\FeedingSpot\Database\Seeders\FeedingSettingSeeder;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -131,10 +132,11 @@ class DatabaseSeeder extends Seeder
             $user->assignRole($u['role']);
 
             // Initialize Point Balance Cache
-            DB::table('point_balances')->updateOrInsert(
-                ['user_id' => $user->id],
-                ['total_points' => 0, 'updated_at' => now()]
-            );
+            DB::table('point_balances')->insertOrIgnore([
+                'user_id' => $user->id,
+                'total_points' => 0,
+                'updated_at' => now(),
+            ]);
         }
 
         // 4. Seed Initial Point Rules (Section 9.4)
@@ -198,10 +200,12 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($pointRules as $pr) {
-            DB::table('point_rules')->updateOrInsert(
-                ['rule_key' => $pr['rule_key']],
-                array_merge($pr, ['id' => (string) Str::ulid(), 'is_active' => true, 'created_at' => now(), 'updated_at' => now()])
-            );
+            DB::table('point_rules')->insertOrIgnore(array_merge($pr, [
+                'id' => (string) Str::ulid(),
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
         }
 
         // 5. Seed Campus Territories (Sesuai Denah Resmi Telkom University)
@@ -215,7 +219,8 @@ class DatabaseSeeder extends Seeder
 
         $territoryIds = [];
         foreach ($territories as $t) {
-            $id = (string) Str::ulid();
+            $id = DB::table('territories')->where('code', $t['code'])->value('id')
+                ?? (string) Str::ulid();
             DB::table('territories')->updateOrInsert(
                 ['code' => $t['code']],
                 ['id' => $id, 'name' => $t['name'], 'created_at' => now(), 'updated_at' => now()]
@@ -232,14 +237,15 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($catNames as $index => $name) {
-            $catId = (string) Str::ulid();
             $uniqueCode = 'CAT' . str_pad((string)($index + 1), 3, '0', STR_PAD_LEFT);
             $tCode = array_keys($territoryIds)[$index % count($territoryIds)];
+            $cat = DB::table('cats')->where('unique_code', $uniqueCode)->first();
+            $catId = $cat->id ?? (string) Str::ulid();
 
-            DB::table('cats')->updateOrInsert(
-                ['unique_code' => $uniqueCode],
-                [
+            if (!$cat) {
+                DB::table('cats')->insert([
                     'id' => $catId,
+                    'unique_code' => $uniqueCode,
                     'name' => $name,
                     'gender' => $index % 2 === 0 ? 'MALE' : 'FEMALE',
                     'color_pattern' => $index % 3 === 0 ? 'Orange Tabby' : ($index % 3 === 1 ? 'Calico' : 'Tuxedo'),
@@ -253,20 +259,20 @@ class DatabaseSeeder extends Seeder
                     'territory_id' => $territoryIds[$tCode],
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]
-            );
+                ]);
+            }
 
-            // Active QR Token for collar
-            $rawToken = Str::random(32);
-            DB::table('cat_qr_tokens')->insert([
-                'id' => (string) Str::ulid(),
-                'cat_id' => $catId,
-                'token' => $rawToken,
-                'status' => 'ACTIVE',
-                'issued_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            if (!DB::table('cat_qr_tokens')->where('cat_id', $catId)->where('status', 'ACTIVE')->exists()) {
+                DB::table('cat_qr_tokens')->insert([
+                    'id' => (string) Str::ulid(),
+                    'cat_id' => $catId,
+                    'token' => Str::random(32),
+                    'status' => 'ACTIVE',
+                    'issued_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
 
         // 7. Seed 3 Sample Feeding Spots (Koordinat & nama sesuai Denah Telkom University)
@@ -298,24 +304,23 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($spots as $s) {
-            $spotId = (string) Str::ulid();
-            $qrToken = Str::random(32);
-
-            DB::table('feeding_spots')->updateOrInsert(
-                ['code' => $s['code']],
-                [
-                    'id' => $spotId,
+            if (!DB::table('feeding_spots')->where('code', $s['code'])->exists()) {
+                DB::table('feeding_spots')->insert([
+                    'id' => (string) Str::ulid(),
+                    'code' => $s['code'],
                     'name' => $s['name'],
                     'description' => $s['description'],
                     'latitude' => $s['latitude'],
                     'longitude' => $s['longitude'],
                     'territory_id' => $territoryIds[$s['t_code']],
-                    'qr_token' => $qrToken,
+                    'qr_token' => Str::random(32),
                     'status' => 'ACTIVE',
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]
-            );
+                ]);
+            }
         }
+
+        $this->call(FeedingSettingSeeder::class);
     }
 }

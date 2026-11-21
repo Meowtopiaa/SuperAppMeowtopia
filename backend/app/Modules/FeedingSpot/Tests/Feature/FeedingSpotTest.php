@@ -1573,13 +1573,22 @@ class FeedingSpotTest extends TestCase
             'status' => 'VERIFIED',
         ]);
 
-        // Dashboard Admin Web (/api/v1/feeding/admin-preview) merender sidebar, logo Meowtopia, toggle panah "<"
+        // Dashboard Admin Web (/admin/feeding) membutuhkan sesi admin.
+        $this->app['auth']->forgetGuards();
+        $this->get('/admin/feeding')->assertRedirect('/admin/login');
+        $this->get('/admin/login')->assertOk()->assertSee('Masuk sebagai admin');
+        $this->post('/admin/login', [
+            'email' => $this->spotAdmin->email,
+            'password' => 'password',
+        ])->assertRedirect('/admin/feeding');
+
+        // Dashboard merender sidebar, logo Meowtopia, toggle panah "<"
         // yang menempel langsung pada sisi sidebar (sidebar-edge-toggle), statistic cards, tombol submit Tambah Feeding Spot,
         // tabel antrean review sederhana tanpa kolom Indikator Pemeriksaan, serta tab Riwayat Audit.
         $logoResp = $this->get('/api/v1/feeding/assets/logo.jpg');
         $logoResp->assertStatus(200);
 
-        $webDashboardResp = $this->get('/api/v1/feeding/admin-preview');
+        $webDashboardResp = $this->get('/admin/feeding');
         $webDashboardResp->assertStatus(200)
             ->assertSee('Meowtopia')
             ->assertSee('MEOWTOPIA')
@@ -1615,7 +1624,7 @@ class FeedingSpotTest extends TestCase
 
         // 7. Uji Geofence Poligon Kampus Telkom University pada Form Web Admin:
         //    a) Titik di luar wilayah kampus Telkom University ditolak
-        $outsideResp = $this->post('/api/v1/feeding/admin-preview/spots', [
+        $outsideResp = $this->post('/admin/feeding/spots', [
             'code' => 'SPOT-OUTSIDE-01',
             'name' => 'Spot Luar Kampus',
             'latitude' => -6.9600000,
@@ -1626,7 +1635,7 @@ class FeedingSpotTest extends TestCase
         $this->assertDatabaseMissing('feeding_spots', ['code' => 'SPOT-OUTSIDE-01']);
 
         //    b) Titik di dalam wilayah kampus Telkom University berhasil disimpan
-        $insideResp = $this->post('/api/v1/feeding/admin-preview/spots', [
+        $insideResp = $this->post('/admin/feeding/spots', [
             'code' => 'SPOT-INSIDE-01',
             'name' => 'Spot Dalam Kampus Tel-U',
             'description' => 'Dekat Danau Galau',
@@ -1664,7 +1673,7 @@ class FeedingSpotTest extends TestCase
         ]);
 
         // Halaman detail antrean menampilkan indikator pemeriksaan lengkap (flags & feeding_rule_results)
-        $detailPageResp = $this->get("/api/v1/feeding/admin-preview/reviews/{$pendingReviewActivity->id}");
+        $detailPageResp = $this->get("/admin/feeding/reviews/{$pendingReviewActivity->id}");
         $detailPageResp->assertStatus(200)
             ->assertSee('#0B192C')
             ->assertSee('MEOWTOPIA')
@@ -1678,7 +1687,7 @@ class FeedingSpotTest extends TestCase
 
         // Admin menolak (REJECTED) pengajuan dari halaman detail antrean
         $rejectReason = 'Ditolak karena foto bukti terindikasi duplikat dari sesi sebelumnya.';
-        $rejectResp = $this->post("/api/v1/feeding/admin-preview/activities/{$pendingReviewActivity->id}/review", [
+        $rejectResp = $this->post("/admin/feeding/activities/{$pendingReviewActivity->id}/review", [
             'decision' => 'REJECTED',
             'reason' => $rejectReason,
         ]);
@@ -1704,17 +1713,22 @@ class FeedingSpotTest extends TestCase
         ]);
 
         // Pastikan item yang ditolak tidak lagi ada di query antrean aktif (UNDER_REVIEW),
-        // tetapi tampil lengkap beserta alasan penolakannya di Riwayat Audit pada dashboard!
+        // tetapi tetap tersimpan di tabel Riwayat Keputusan Review.
         $activeQueueIds = \App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource::getEloquentQuery($this->spotAdmin)
             ->pluck('id')
             ->all();
         $this->assertNotContains($pendingReviewActivity->id, $activeQueueIds);
 
-        $afterRejectDashboard = $this->get('/api/v1/feeding/admin-preview?tab=audit');
+        $afterRejectQueue = $this->get('/admin/feeding?tab=reviews');
+        $afterRejectQueue->assertStatus(200)->assertDontSee('REF-TEST-REJECT-001');
+
+        $afterRejectDashboard = $this->get('/admin/feeding?tab=audit');
         $afterRejectDashboard->assertStatus(200)
+            ->assertSee('SPOT-INSIDE-01')
             ->assertSee('REF-TEST-REJECT-001')
-            ->assertSee('DITOLAK (REJECTED)')
-            ->assertSee('FEEDING_REVIEW_REJECTED')
+            ->assertSee('Riwayat Lokasi Spot')
+            ->assertSee('Riwayat Keputusan Review')
+            ->assertSee('Ditolak')
             ->assertSee($rejectReason);
     }
 
@@ -1918,8 +1932,8 @@ class FeedingSpotTest extends TestCase
             "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
         );
 
-        $updateResp = $this->actingAs($this->spotAdmin, 'sanctum')
-            ->post("/api/v1/feeding/admin-preview/spots/{$spotId}/update", [
+        $updateResp = $this->actingAs($this->spotAdmin, 'web')
+            ->post("/admin/feeding/spots/{$spotId}/update", [
                 'name' => 'Spot GKU Foto Diperbarui',
                 'photo' => $photo2,
             ]);

@@ -7,6 +7,7 @@ import '../../../core/theme/meow_style.dart';
 import '../../../core/widgets/cinematic_card.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/feature_shortcuts.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../feeding_spot/logic/feeding_spot_provider.dart';
@@ -26,7 +27,7 @@ class _ActivityPageState extends State<ActivityPage> {
   final List<ActivityEntry> _examples = previewActivities(DateTime.now());
   Future<List<ActivityEntry>>? _request;
   AppFeature? _filter;
-  int? _userId;
+  String? _userId;
 
   @override
   void didChangeDependencies() {
@@ -126,7 +127,10 @@ class _ActivityPageState extends State<ActivityPage> {
                   )
                 else if (snapshot.connectionState == ConnectionState.waiting &&
                     !feeding.isDemo)
-                  const Center(child: CircularProgressIndicator())
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 28),
+                    child: LoadingIndicator(),
+                  )
                 else if (snapshot.hasError && !feeding.isDemo)
                   GlassCard(
                     child: Column(

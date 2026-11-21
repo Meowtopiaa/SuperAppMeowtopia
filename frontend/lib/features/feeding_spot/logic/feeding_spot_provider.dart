@@ -31,6 +31,7 @@ class FeedingSpotProvider extends ChangeNotifier {
   final Map<String, DateTime> _lastSubmitted = {};
   FeedingSession? session;
   bool _isLoading = false;
+  bool _isLoadingHistory = false;
   bool _loaded = false;
   String? _errorMessage;
 
@@ -39,6 +40,7 @@ class FeedingSpotProvider extends ChangeNotifier {
   );
   List<FeedingSubmission> get history => List.unmodifiable(_history);
   bool get isLoading => _isLoading;
+  bool get isLoadingHistory => _isLoadingHistory;
   String? get errorMessage => _errorMessage;
   int get pendingCount =>
       _history.where((s) => s.status == FeedingStatus.underReview).length;
@@ -100,16 +102,20 @@ class FeedingSpotProvider extends ChangeNotifier {
   }
 
   Future<void> fetchMyActivities() async {
-    if (isDemo) return;
+    if (isDemo || _isLoadingHistory) return;
+    _isLoadingHistory = true;
+    notifyListeners();
     try {
       final spotsMap = {for (final s in _spots) s.id: s};
       final items = await _service.getMyActivities(spotsMap);
       _history
         ..clear()
         ..addAll(items);
-      notifyListeners();
     } catch (_) {
       // Abaikan jika pengguna belum login saat melihat daftar spot publik
+    } finally {
+      _isLoadingHistory = false;
+      notifyListeners();
     }
   }
 

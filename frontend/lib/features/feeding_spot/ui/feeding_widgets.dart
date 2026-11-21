@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../../core/theme/meow_style.dart';
 import '../../../core/widgets/cinematic_card.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../data/feeding_spot_model.dart';
 
@@ -47,6 +48,14 @@ class SpotPhoto extends StatelessWidget {
               height: height,
               width: double.infinity,
               fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return SizedBox(
+                  height: height,
+                  width: double.infinity,
+                  child: const LoadingIndicator(size: 88, compact: true),
+                );
+              },
               errorBuilder: (_, __, ___) => fallback,
             ),
     );

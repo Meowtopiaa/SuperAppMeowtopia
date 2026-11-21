@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/meow_style.dart';
 import '../../../core/utils/date_labels.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../data/feeding_session.dart';
 import '../logic/feeding_spot_provider.dart';
@@ -129,7 +130,12 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
             ),
           ),
           const SizedBox(height: 20),
-          if (items.isEmpty)
+          if (provider.isLoadingHistory && items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: LoadingIndicator(),
+            )
+          else if (items.isEmpty)
             const FeedingMessage(
               'Belum ada kegiatan dalam kategori ini. Kegiatan baru akan muncul setelah bukti dikirim.',
             ),

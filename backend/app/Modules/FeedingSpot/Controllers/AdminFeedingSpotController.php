@@ -8,6 +8,8 @@ use App\Modules\FeedingSpot\Filament\Resources\FeedingReviewQueueResource;
 use App\Modules\FeedingSpot\Filament\Resources\FeedingSpotResource;
 use App\Modules\FeedingSpot\Models\FeedingActivity;
 use App\Modules\FeedingSpot\Models\FeedingSpot;
+use App\Modules\FeedingSpot\Models\FeedingSpotHistory;
+use App\Modules\FeedingSpot\Models\FeedingReview;
 use App\Modules\FeedingSpot\Services\FeedingReviewService;
 use App\Modules\FeedingSpot\Services\FeedingSpotManagementService;
 use App\Modules\FeedingSpot\Services\FeedingSpotQrCodeService;
@@ -15,6 +17,7 @@ use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -25,6 +28,56 @@ class AdminFeedingSpotController extends Controller
         private readonly FeedingSpotManagementService $spotService,
         private readonly FeedingSpotQrCodeService $qrService,
     ) {}
+
+    public function adminLogin()
+    {
+        Auth::shouldUse('web');
+        if (Auth::guard('web')->check() && $this->canAccessAdminPanel(Auth::guard('web')->user())) {
+            return redirect('/admin/feeding');
+        }
+
+        return view('feeding-spot::filament.admin-login');
+    }
+
+    public function adminAuthenticate(Request $request)
+    {
+        Auth::shouldUse('web');
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+        $credentials['is_active'] = true;
+
+        if (!Auth::guard('web')->attempt($credentials)) {
+            return back()->withErrors(['email' => 'Email atau kata sandi tidak sesuai.'])->onlyInput('email');
+        }
+
+        $request->session()->regenerate();
+        if (!$this->canAccessAdminPanel(Auth::guard('web')->user())) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors(['email' => 'Akun ini tidak memiliki akses ke panel admin.'])->onlyInput('email');
+        }
+
+        return redirect()->intended('/admin/feeding');
+    }
+
+    public function adminLogout(Request $request)
+    {
+        Auth::shouldUse('web');
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect('/admin/login');
+    }
+
+    private function canAccessAdminPanel(?User $user): bool
+    {
+        return $user !== null && ($user->can('spot.manage') || $user->can('feeding.review'));
+    }
 
     /**
      * GET /api/v1/admin/feeding/spots
@@ -401,7 +454,7 @@ class AdminFeedingSpotController extends Controller
 
     /**
      * GET /api/v1/admin/feeding/spots/{id}/qr-download?format=png|svg
-     * GET /api/v1/feeding/admin-preview/spots/{id}/qr-download?format=png|svg
+     * GET /admin/feeding/spots/{id}/qr-download?format=png|svg
      * Unduh berkas gambar QR Code spot dalam format PNG atau SVG siap cetak (MEOW-21, MEOW-28).
      */
     public function downloadSpotQr(Request $request, string $id)
@@ -508,28 +561,36 @@ class AdminFeedingSpotController extends Controller
     }
 
     /**
-     * GET /api/v1/feeding/admin-preview
+     * GET /admin/feeding
      * Halaman web Dashboard Admin (MEOW-21 & MEOW-22) dengan CRUD Lokasi Spot,
      * filter status, pencarian nama, paginasi, audit log, dan antrean review.
      */
     public function adminPreviewPanel(Request $request)
     {
-        $reviewer = User::where('email', 'spotadmin@telkomuniversity.ac.id')->first();
-        $pendingActivities = FeedingReviewQueueResource::getEloquentQuery($reviewer)
+        $actor = $request->user();
+        abort_unless($this->canAccessAdminPanel($actor), 403);
+        $canManageSpots = $actor->can('spot.manage');
+        $canReview = $actor->can('feeding.review');
+        $defaultTab = $canManageSpots ? 'spots' : 'reviews';
+        $activeTab = $request->query('tab', $defaultTab);
+        if (($activeTab === 'spots' && !$canManageSpots) || ($activeTab === 'reviews' && !$canReview)) {
+            $activeTab = $defaultTab;
+        }
+        $pendingActivities = $canReview ? FeedingReviewQueueResource::getEloquentQuery($actor)
             ->orderByDesc('finalized_at')
-            ->get();
+            ->get() : collect();
 
-        $reviewedActivities = FeedingActivity::query()
-            ->whereIn('status', ['VERIFIED', 'REJECTED'])
-            ->with([
-                'user:id,name,user_type',
-                'spot:id,code,name',
-                'latestReview.reviewer:id,name',
-                'reviews.reviewer:id,name',
-            ])
-            ->orderByDesc('updated_at')
-            ->limit(30)
-            ->get();
+        $reviewHistoryCount = $canReview ? FeedingReview::query()->count() : 0;
+        $reviewHistory = $canReview && $activeTab === 'audit' ? FeedingReview::with([
+            'activity.user:id,name,user_type',
+            'activity.spot:id,code,name',
+            'reviewer:id,name',
+        ])->latest()->limit(50)->get() : collect();
+        $spotHistoryCount = $canManageSpots ? FeedingSpotHistory::query()->count() : 0;
+        $spotHistory = $canManageSpots && $activeTab === 'audit' ? FeedingSpotHistory::with([
+            'spot:id,code,name',
+            'actor:id,name',
+        ])->latest()->limit(50)->get() : collect();
 
         $filters = [
             'status' => $request->query('status', ''),
@@ -537,37 +598,42 @@ class AdminFeedingSpotController extends Controller
         ];
         $perPage = (int) $request->query('per_page', 10);
 
-        $spotsPaginator = FeedingSpotResource::paginateRecords($filters, $perPage);
+        $spotsPaginator = $canManageSpots
+            ? FeedingSpotResource::paginateRecords($filters, $perPage)
+            : FeedingSpot::query()->whereRaw('1 = 0')->paginate($perPage);
         $spotsPaginator->appends($request->query());
 
-        $statusCounts = FeedingSpot::query()
+        $statusCounts = $canManageSpots ? FeedingSpot::query()
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status')
-            ->all();
+            ->all() : [];
 
         $allSpotsCount = array_sum($statusCounts);
-        $auditLogs = $this->spotService->getSpotAuditLogs(null, 40);
-        $existingSpotCodes = FeedingSpot::query()->pluck('code')->all();
-        $availableCats = DB::table('cats')
+        $existingSpotCodes = $canManageSpots ? FeedingSpot::query()->pluck('code')->all() : [];
+        $availableCats = $canManageSpots ? DB::table('cats')
             ->select(['id', 'unique_code', 'name', 'presence_status', 'health_status'])
             ->orderBy('name')
-            ->get();
+            ->get() : collect();
 
         return view('feeding-spot::filament.admin-panel', [
             'pendingActivities' => $pendingActivities,
-            'reviewedActivities' => $reviewedActivities,
+            'reviewHistory' => $reviewHistory,
+            'reviewHistoryCount' => $reviewHistoryCount,
             'spots' => collect($spotsPaginator->items()),
             'spotsPaginator' => $spotsPaginator,
             'statusCounts' => $statusCounts,
             'allSpotsCount' => $allSpotsCount,
-            'auditLogs' => $auditLogs,
+            'spotHistory' => $spotHistory,
+            'spotHistoryCount' => $spotHistoryCount,
             'existingSpotCodes' => $existingSpotCodes,
             'availableCats' => $availableCats,
             'telkomBoundary' => FeedingSpotManagementService::TELKOM_BOUNDARY,
             'campusLocations' => FeedingSpotManagementService::CAMPUS_LOCATIONS,
             'filters' => $filters,
-            'activeTab' => $request->query('tab', 'spots'),
+            'activeTab' => $activeTab,
+            'canManageSpots' => $canManageSpots,
+            'canReview' => $canReview,
         ]);
     }
 
@@ -589,12 +655,12 @@ class AdminFeedingSpotController extends Controller
     }
 
     /**
-     * POST /api/v1/feeding/admin-preview/spots
+     * POST /admin/feeding/spots
      * Buat spot baru melalui Dashboard Admin Web dengan validasi poligon wilayah Telkom University.
      */
     public function adminPreviewStoreSpot(Request $request)
     {
-        $actor = User::where('email', 'spotadmin@telkomuniversity.ac.id')->first();
+        $actor = $request->user();
 
         try {
             $validated = $request->validate([
@@ -614,7 +680,7 @@ class AdminFeedingSpotController extends Controller
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $msg = collect($e->errors())->flatten()->implode(' ');
-            return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode($msg));
+            return redirect('/admin/feeding?tab=spots&error=' . urlencode($msg));
         }
 
         if ($request->hasFile('photo')) {
@@ -622,7 +688,7 @@ class AdminFeedingSpotController extends Controller
         }
 
         if (!FeedingSpotManagementService::isPointInsideTelkomCampus((float) $validated['latitude'], (float) $validated['longitude'])) {
-            return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode('Titik lokasi ditolak: Koordinat berada di luar batas wilayah Kampus Telkom University.'));
+            return redirect('/admin/feeding?tab=spots&error=' . urlencode('Titik lokasi ditolak: Koordinat berada di luar batas wilayah Kampus Telkom University.'));
         }
 
         // Jika kode tidak diisi atau sudah terpakai, hasilkan otomatis di backend (MEOW-29)
@@ -652,17 +718,17 @@ class AdminFeedingSpotController extends Controller
             }
         }
 
-        return redirect('/api/v1/feeding/admin-preview?tab=spots&notice=' . urlencode("Spot {$spot->code} ({$spot->name}) berhasil ditambahkan."));
+        return redirect('/admin/feeding?tab=spots&notice=' . urlencode("Spot {$spot->code} ({$spot->name}) berhasil ditambahkan."));
     }
 
     /**
-     * POST /api/v1/feeding/admin-preview/spots/{id}/update
+     * POST /admin/feeding/spots/{id}/update
      * Perbarui spot atau nonaktifkan ke INACTIVE melalui Dashboard Admin Web.
      */
     public function adminPreviewUpdateSpot(Request $request, string $id)
     {
         $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->firstOrFail();
-        $actor = User::where('email', 'spotadmin@telkomuniversity.ac.id')->first();
+        $actor = $request->user();
 
         try {
             $validated = $request->validate([
@@ -686,7 +752,7 @@ class AdminFeedingSpotController extends Controller
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $msg = collect($e->errors())->flatten()->implode(' ');
-            return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode($msg));
+            return redirect('/admin/feeding?tab=spots&error=' . urlencode($msg));
         }
 
         if ($request->hasFile('photo')) {
@@ -698,7 +764,7 @@ class AdminFeedingSpotController extends Controller
 
         if (isset($validated['latitude'], $validated['longitude'])) {
             if (!FeedingSpotManagementService::isPointInsideTelkomCampus((float) $validated['latitude'], (float) $validated['longitude'])) {
-                return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode('Titik lokasi ditolak: Koordinat berada di luar batas wilayah Kampus Telkom University.'));
+                return redirect('/admin/feeding?tab=spots&error=' . urlencode('Titik lokasi ditolak: Koordinat berada di luar batas wilayah Kampus Telkom University.'));
             }
         }
 
@@ -722,11 +788,11 @@ class AdminFeedingSpotController extends Controller
             }
         }
 
-        return redirect('/api/v1/feeding/admin-preview?tab=spots&notice=' . urlencode("Spot {$updated->code} berhasil diperbarui."));
+        return redirect('/admin/feeding?tab=spots&notice=' . urlencode("Spot {$updated->code} berhasil diperbarui."));
     }
 
     /**
-     * POST /api/v1/feeding/admin-preview/spots/{id}/cats
+     * POST /admin/feeding/spots/{id}/cats
      * Simpan pilihan dropdown informasi kucing pada spot pakan (MEOW-23).
      */
     public function adminPreviewAttachCat(Request $request, string $id)
@@ -739,14 +805,14 @@ class AdminFeedingSpotController extends Controller
             if ($request->expectsJson()) {
                 return ApiResponse::success(['spot_id' => $spot->id, 'cat_id' => null], 'Pilihan kucing pada spot dikosongkan.');
             }
-            return redirect('/api/v1/feeding/admin-preview?tab=spots&notice=' . urlencode("Informasi kucing pada spot {$spot->code} diperbarui."));
+            return redirect('/admin/feeding?tab=spots&notice=' . urlencode("Informasi kucing pada spot {$spot->code} diperbarui."));
         }
 
         if (!DB::table('cats')->where('id', $catId)->exists()) {
             if ($request->expectsJson()) {
                 return ApiResponse::error('Pilih data kucing kampus yang valid.', 422, 'INVALID_CAT');
             }
-            return redirect('/api/v1/feeding/admin-preview?tab=spots&error=' . urlencode('Pilih data kucing kampus yang valid.'));
+            return redirect('/admin/feeding?tab=spots&error=' . urlencode('Pilih data kucing kampus yang valid.'));
         }
 
         $spot->cats()->sync([$catId]);
@@ -755,11 +821,11 @@ class AdminFeedingSpotController extends Controller
             return ApiResponse::success(['spot_id' => $spot->id, 'cat_id' => $catId], 'Informasi kucing pada spot berhasil diperbarui.');
         }
 
-        return redirect('/api/v1/feeding/admin-preview?tab=spots&notice=' . urlencode("Informasi kucing pada spot {$spot->code} berhasil diperbarui."));
+        return redirect('/admin/feeding?tab=spots&notice=' . urlencode("Informasi kucing pada spot {$spot->code} berhasil diperbarui."));
     }
 
     /**
-     * POST /api/v1/feeding/admin-preview/spots/{id}/cats/{catId}/detach
+     * POST /admin/feeding/spots/{id}/cats/{catId}/detach
      * Lepas asosiasi kucing dari spot pakan melalui Dashboard Admin Web (MEOW-23).
      */
     public function adminPreviewDetachCat(string $id, string $catId)
@@ -767,28 +833,28 @@ class AdminFeedingSpotController extends Controller
         $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->firstOrFail();
         $spot->cats()->detach($catId);
 
-        return redirect('/api/v1/feeding/admin-preview?tab=spots&notice=' . urlencode("Asosiasi kucing pada spot {$spot->code} berhasil dilepas."));
+        return redirect('/admin/feeding?tab=spots&notice=' . urlencode("Asosiasi kucing pada spot {$spot->code} berhasil dilepas."));
     }
 
     /**
-     * POST /api/v1/feeding/admin-preview/spots/{id}/qr
+     * POST /admin/feeding/spots/{id}/qr
      * Regenerasi token QR spot dari Dashboard Admin Web.
      */
-    public function adminPreviewRegenerateQr(string $id)
+    public function adminPreviewRegenerateQr(Request $request, string $id)
     {
         $spot = FeedingSpot::where('id', $id)->orWhere('code', $id)->firstOrFail();
-        $actor = User::where('email', 'spotadmin@telkomuniversity.ac.id')->first();
+        $actor = $request->user();
 
         $updated = FeedingSpotResource::regenerateQrToken($spot, $actor);
 
-        return redirect('/api/v1/feeding/admin-preview?tab=spots&regenerated_spot=' . urlencode($updated->id) . '&notice=' . urlencode("Token QR untuk {$updated->code} ({$updated->name}) berhasil diganti. QR Code sebelumnya telah dinonaktifkan."));
+        return redirect('/admin/feeding?tab=spots&regenerated_spot=' . urlencode($updated->id) . '&notice=' . urlencode("Token QR untuk {$updated->code} ({$updated->name}) berhasil diganti. QR Code sebelumnya telah dinonaktifkan."));
     }
 
     /**
-     * GET /api/v1/feeding/admin-preview/reviews/{id}
+     * GET /admin/feeding/reviews/{id}
      * Halaman web inspeksi bukti foto dari Panel Admin browser.
      */
-    public function adminPreviewReview(string $id)
+    public function adminPreviewReview(Request $request, string $id)
     {
         $activity = FeedingActivity::with([
             'user:id,name,user_type',
@@ -803,15 +869,16 @@ class AdminFeedingSpotController extends Controller
             ->orWhere('feeding_record_ref', $id)
             ->firstOrFail();
 
+        abort_unless($request->user()->can('feeding.review'), 403);
         return view('feeding-spot::filament.review-evidence', [
             'activity' => $activity,
-            'backUrl' => '/api/v1/feeding/admin-preview?tab=reviews',
-            'reviewActionUrl' => "/api/v1/feeding/admin-preview/activities/{$activity->id}/review",
+            'backUrl' => '/admin/feeding?tab=reviews',
+            'reviewActionUrl' => "/admin/feeding/activities/{$activity->id}/review",
         ]);
     }
 
     /**
-     * POST /api/v1/feeding/admin-preview/activities/{id}/review
+     * POST /admin/feeding/activities/{id}/review
      * Submit keputusan VERIFIED / REJECTED dari Panel Admin browser.
      */
     public function adminPreviewSubmitReview(Request $request, string $id)
@@ -824,23 +891,14 @@ class AdminFeedingSpotController extends Controller
         }
 
         $activity = FeedingActivity::with(['user', 'spot'])->findOrFail($id);
-        $reviewer = User::where('email', 'spotadmin@telkomuniversity.ac.id')->firstOrFail();
-
-        if (!$reviewer->can('feeding.review')) {
-            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'feeding.review', 'guard_name' => 'web']);
-            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'feeding.review', 'guard_name' => 'sanctum']);
-            $roleWeb = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'spot_admin', 'guard_name' => 'web']);
-            $roleWeb->givePermissionTo('feeding.review');
-            $reviewer->assignRole($roleWeb);
-            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-            $reviewer->unsetRelation('roles')->unsetRelation('permissions');
-        }
+        $reviewer = $request->user();
+        abort_unless($reviewer->can('feeding.review'), 403);
 
         $decision = strtoupper(trim((string) $request->input('decision', 'VERIFIED')));
         $reason = trim((string) ($request->input('reason') ?? $request->input('notes') ?? ''));
 
         if ($reason === '') {
-            return redirect("/api/v1/feeding/admin-preview/reviews/{$activity->id}?error=" . urlencode('Alasan keputusan review wajib diisi sebelum menyetujui atau menolak pengajuan.'));
+            return redirect("/admin/feeding/reviews/{$activity->id}?error=" . urlencode('Alasan keputusan review wajib diisi sebelum menyetujui atau menolak pengajuan.'));
         }
 
         try {
@@ -852,9 +910,9 @@ class AdminFeedingSpotController extends Controller
             );
         } catch (\Illuminate\Validation\ValidationException $e) {
             $msg = collect($e->errors())->flatten()->implode(' ');
-            return redirect("/api/v1/feeding/admin-preview/reviews/{$activity->id}?error=" . urlencode($msg));
+            return redirect("/admin/feeding/reviews/{$activity->id}?error=" . urlencode($msg));
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect("/api/v1/feeding/admin-preview/reviews/{$activity->id}?error=" . urlencode($e->getMessage()));
+            return redirect("/admin/feeding/reviews/{$activity->id}?error=" . urlencode($e->getMessage()));
         }
 
         if ($decision === 'REJECTED') {
@@ -864,11 +922,11 @@ class AdminFeedingSpotController extends Controller
             $notice = "Pengajuan {$activity->feeding_record_ref} berhasil DISETUJUI (VERIFIED, +{$pts} poin), dikeluarkan dari Antrean Review aktif, dan tercatat di Riwayat Audit.";
         }
 
-        return redirect('/api/v1/feeding/admin-preview?tab=reviews&notice=' . urlencode($notice));
+        return redirect('/admin/feeding?tab=reviews&notice=' . urlencode($notice));
     }
 
     /**
-     * GET /api/v1/feeding/admin-preview/spots/{id}/qr-sheet
+     * GET /admin/feeding/spots/{id}/qr-sheet
      * Lembar cetak QR dari Panel Admin browser.
      */
     public function adminPreviewQrSheet(string $id)
@@ -877,7 +935,7 @@ class AdminFeedingSpotController extends Controller
     }
 
     /**
-     * GET /api/v1/feeding/admin-preview/qr-sheet
+     * GET /admin/feeding/qr-sheet
      * Lembar cetak seluruh QR spot aktif dari Panel Admin browser.
      */
     public function adminPreviewAllQrSheets(Request $request)

@@ -898,9 +898,14 @@
     $tempCount = (int) ($statusCounts['TEMPORARILY_UNAVAILABLE'] ?? 0);
     $inactiveCount = (int) ($statusCounts['INACTIVE'] ?? 0);
     $pendingCount = $pendingActivities->count();
-    $reviewedList = $reviewedActivities ?? collect();
 
     $actionLabels = [
+        'CREATED' => 'Spot Ditambahkan',
+        'UPDATED' => 'Spot Diperbarui',
+        'DEACTIVATED' => 'Spot Dinonaktifkan',
+        'REACTIVATED' => 'Spot Diaktifkan Kembali',
+        'MARKED_UNAVAILABLE' => 'Spot Ditutup Sementara',
+        'QR_REGENERATED' => 'Token QR Diperbarui',
         'SPOT_CREATED' => 'Spot Ditambahkan',
         'SPOT_UPDATED' => 'Spot Diperbarui',
         'SPOT_STATUS_CHANGED' => 'Status Spot Diubah',
@@ -923,6 +928,7 @@
         </div>
 
         <nav class="sidebar-nav">
+            @if($canManageSpots)
             <button type="button" class="nav-item {{ $activeTab === 'spots' ? 'active' : '' }}" id="navBtn-spots" onclick="switchTab('spots')" data-tooltip="Lokasi Feeding Spot ({{ $allSpotsCount }})" aria-label="Lokasi Feeding Spot">
                 <span class="nav-item-label">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -933,7 +939,9 @@
                 </span>
                 <span class="nav-count">{{ $allSpotsCount }}</span>
             </button>
+            @endif
 
+            @if($canReview)
             <button type="button" class="nav-item {{ $activeTab === 'reviews' ? 'active' : '' }}" id="navBtn-reviews" onclick="switchTab('reviews')" data-tooltip="Antrean Review ({{ $pendingCount }})" aria-label="Antrean Review">
                 <span class="nav-item-label">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -945,17 +953,18 @@
                 </span>
                 <span class="nav-count">{{ $pendingCount }}</span>
             </button>
+            @endif
 
-            <button type="button" class="nav-item {{ $activeTab === 'audit' ? 'active' : '' }}" id="navBtn-audit" onclick="switchTab('audit')" data-tooltip="Riwayat Audit ({{ count($auditLogs) }})" aria-label="Riwayat Audit">
+            <button type="button" class="nav-item {{ $activeTab === 'audit' ? 'active' : '' }}" id="navBtn-audit" onclick="switchTab('audit')" data-tooltip="Riwayat Spot & Review" aria-label="Riwayat Spot dan Review">
                 <span class="nav-item-label">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                         <path d="M3 3v5h5"/>
                         <path d="M12 7v5l4 2"/>
                     </svg>
-                    <span class="nav-item-text">Riwayat Audit</span>
+                    <span class="nav-item-text">Riwayat Spot &amp; Review</span>
                 </span>
-                <span class="nav-count">{{ count($auditLogs) }}</span>
+                <span class="nav-count">{{ $spotHistoryCount + $reviewHistoryCount }}</span>
             </button>
         </nav>
     </aside>
@@ -970,11 +979,15 @@
                 @if($activeTab === 'reviews')
                     Antrean Review
                 @elseif($activeTab === 'audit')
-                    Riwayat Audit
+                    Riwayat Spot &amp; Review
                 @else
                     Lokasi Feeding Spot
                 @endif
             </h1>
+            <form method="POST" action="/admin/feeding/logout">
+                @csrf
+                <button type="submit" class="btn btn-neutral btn-sm">Keluar ({{ auth()->user()->name }})</button>
+            </form>
         </header>
 
         <main class="page-content">
@@ -983,10 +996,10 @@
                     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                         <span>{{ request()->query('notice') }}</span>
                         @if(request()->filled('regenerated_spot'))
-                            <a href="/api/v1/feeding/admin-preview/spots/{{ request()->query('regenerated_spot') }}/qr-sheet" target="_blank" class="btn btn-neutral btn-sm">
+                            <a href="/admin/feeding/spots/{{ request()->query('regenerated_spot') }}/qr-sheet" target="_blank" class="btn btn-neutral btn-sm">
                                 Lihat &amp; Cetak QR Baru
                             </a>
-                            <a href="/api/v1/feeding/admin-preview/spots/{{ request()->query('regenerated_spot') }}/qr-download?format=png" class="btn btn-primary btn-sm">
+                            <a href="/admin/feeding/spots/{{ request()->query('regenerated_spot') }}/qr-download?format=png" class="btn btn-primary btn-sm">
                                 Unduh QR Baru (PNG)
                             </a>
                         @endif
@@ -1008,21 +1021,22 @@
             @endif
 
             <!-- ================= TAB 1: LOKASI FEEDING SPOT ================= -->
+            @if($canManageSpots)
             <section id="tabSection-spots" class="tab-section {{ $activeTab === 'spots' ? 'active' : '' }}">
                 <div class="stats-grid">
-                    <a href="/api/v1/feeding/admin-preview?tab=spots" class="stat-item {{ empty($filters['status']) ? 'active' : '' }}">
+                    <a href="/admin/feeding?tab=spots" class="stat-item {{ empty($filters['status']) ? 'active' : '' }}">
                         <span class="stat-label">Total Spot</span>
                         <span class="stat-value">{{ $allSpotsCount }}</span>
                     </a>
-                    <a href="/api/v1/feeding/admin-preview?tab=spots&status=ACTIVE" class="stat-item {{ ($filters['status'] ?? '') === 'ACTIVE' ? 'active' : '' }}">
+                    <a href="/admin/feeding?tab=spots&status=ACTIVE" class="stat-item {{ ($filters['status'] ?? '') === 'ACTIVE' ? 'active' : '' }}">
                         <span class="stat-label">Aktif</span>
                         <span class="stat-value">{{ $activeCount }}</span>
                     </a>
-                    <a href="/api/v1/feeding/admin-preview?tab=spots&status=TEMPORARILY_UNAVAILABLE" class="stat-item {{ ($filters['status'] ?? '') === 'TEMPORARILY_UNAVAILABLE' ? 'active' : '' }}">
+                    <a href="/admin/feeding?tab=spots&status=TEMPORARILY_UNAVAILABLE" class="stat-item {{ ($filters['status'] ?? '') === 'TEMPORARILY_UNAVAILABLE' ? 'active' : '' }}">
                         <span class="stat-label">Sementara Tutup</span>
                         <span class="stat-value">{{ $tempCount }}</span>
                     </a>
-                    <a href="/api/v1/feeding/admin-preview?tab=spots&status=INACTIVE" class="stat-item {{ ($filters['status'] ?? '') === 'INACTIVE' ? 'active' : '' }}">
+                    <a href="/admin/feeding?tab=spots&status=INACTIVE" class="stat-item {{ ($filters['status'] ?? '') === 'INACTIVE' ? 'active' : '' }}">
                         <span class="stat-label">Nonaktif</span>
                         <span class="stat-value">{{ $inactiveCount }}</span>
                     </a>
@@ -1030,7 +1044,7 @@
 
                 <div class="panel">
                     <div class="toolbar">
-                        <form method="GET" action="/api/v1/feeding/admin-preview" class="toolbar-filters">
+                        <form method="GET" action="/admin/feeding" class="toolbar-filters">
                             <input type="hidden" name="tab" value="spots">
                             <input
                                 type="text"
@@ -1047,12 +1061,12 @@
                             </select>
                             <button type="submit" class="btn btn-neutral">Cari</button>
                             @if(!empty($filters['search']) || !empty($filters['status']))
-                                <a href="/api/v1/feeding/admin-preview?tab=spots" class="btn btn-neutral">Reset</a>
+                                <a href="/admin/feeding?tab=spots" class="btn btn-neutral">Reset</a>
                             @endif
                         </form>
 
                         <div class="row-actions">
-                            <a href="/api/v1/feeding/admin-preview/qr-sheet" target="_blank" class="btn btn-neutral">
+                            <a href="/admin/feeding/qr-sheet" target="_blank" class="btn btn-neutral">
                                 Cetak Semua QR
                             </a>
                             <button type="button" class="btn btn-primary" onclick="openCreateSpotModal()">
@@ -1100,7 +1114,7 @@
                                         </td>
                                         <td>
                                             <!-- STANDARD DROPDOWN FOR CAT INFORMATION (POINT 4) -->
-                                            <form method="POST" action="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/cats" style="margin: 0;">
+                                            <form method="POST" action="/admin/feeding/spots/{{ $spot['id'] }}/cats" style="margin: 0;">
                                                 @csrf
                                                 <select
                                                     name="cat_id"
@@ -1131,20 +1145,20 @@
                                             <div class="row-actions">
                                                 <button type="button" class="btn btn-neutral btn-sm" onclick='openDetailSpotModal(@json($spot))'>Detail</button>
                                                 <button type="button" class="btn btn-edit btn-sm" onclick='openEditSpotModal(@json($spot))'>Edit</button>
-                                                <a href="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/qr-sheet" target="_blank" class="btn btn-neutral btn-sm">Cetak QR</a>
-                                                <form method="POST" action="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/qr" onsubmit="return confirm('Apakah Anda yakin ingin mengganti QR Code spot ini? QR Code sebelumnya akan dinonaktifkan dan tidak dapat digunakan lagi.');" style="display:inline;">
+                                                <a href="/admin/feeding/spots/{{ $spot['id'] }}/qr-sheet" target="_blank" class="btn btn-neutral btn-sm">Cetak QR</a>
+                                                <form method="POST" action="/admin/feeding/spots/{{ $spot['id'] }}/qr" onsubmit="return confirm('Apakah Anda yakin ingin mengganti QR Code spot ini? QR Code sebelumnya akan dinonaktifkan dan tidak dapat digunakan lagi.');" style="display:inline;">
                                                     @csrf
                                                     <button type="submit" class="btn btn-neutral btn-sm">Ganti QR</button>
                                                 </form>
                                                 @if($spot['status'] !== 'INACTIVE')
-                                                    <form method="POST" action="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/update" onsubmit="return confirm('Nonaktifkan spot {{ $spot['code'] }}?');" style="display:inline;">
+                                                    <form method="POST" action="/admin/feeding/spots/{{ $spot['id'] }}/update" onsubmit="return confirm('Nonaktifkan spot {{ $spot['code'] }}?');" style="display:inline;">
                                                         @csrf
                                                         <input type="hidden" name="status" value="INACTIVE">
                                                         <input type="hidden" name="status_reason" value="Dinonaktifkan oleh Admin">
                                                         <button type="submit" class="btn btn-danger btn-sm">Nonaktifkan</button>
                                                     </form>
                                                 @else
-                                                    <form method="POST" action="/api/v1/feeding/admin-preview/spots/{{ $spot['id'] }}/update" style="display:inline;">
+                                                    <form method="POST" action="/admin/feeding/spots/{{ $spot['id'] }}/update" style="display:inline;">
                                                         @csrf
                                                         <input type="hidden" name="status" value="ACTIVE">
                                                         <button type="submit" class="btn btn-success btn-sm">Aktifkan</button>
@@ -1184,8 +1198,10 @@
                     </div>
                 </div>
             </section>
+            @endif
 
             <!-- ================= TAB 2: ANTREAN REVIEW ================= -->
+            @if($canReview)
             <section id="tabSection-reviews" class="tab-section {{ $activeTab === 'reviews' ? 'active' : '' }}">
                 <div class="panel">
                     <div class="table-scroll">
@@ -1219,7 +1235,7 @@
                                             {{ $item->finalized_at?->format('d M Y, H:i') ?? '-' }}
                                         </td>
                                         <td>
-                                            <a href="/api/v1/feeding/admin-preview/reviews/{{ $item->id }}" class="btn btn-primary btn-sm">
+                                            <a href="/admin/feeding/reviews/{{ $item->id }}" class="btn btn-primary btn-sm">
                                                 Periksa Detail
                                             </a>
                                         </td>
@@ -1236,125 +1252,69 @@
                     </div>
                 </div>
             </section>
+            @endif
 
-            <!-- ================= TAB 3: RIWAYAT AUDIT ================= -->
+            <!-- ================= TAB 3: RIWAYAT SPOT & REVIEW ================= -->
             <section id="tabSection-audit" class="tab-section {{ $activeTab === 'audit' ? 'active' : '' }}">
-                @if($reviewedList->count() > 0)
-                    <div class="panel" style="margin-bottom: 20px;">
-                        <div class="toolbar">
-                            <strong style="font-size: 14px;">Riwayat Keputusan Review</strong>
-                        </div>
-                        <div class="table-scroll">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Waktu</th>
-                                        <th>Referensi</th>
-                                        <th>Relawan &amp; Spot</th>
-                                        <th>Keputusan</th>
-                                        <th>Alasan</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($reviewedList as $revItem)
-                                        @php
-                                            $latestRev = $revItem->latestReview ?? $revItem->reviews->sortByDesc('created_at')->first();
-                                            $revReason = $latestRev?->reason ?? ($revItem->reward_snapshot['review_reason'] ?? '-');
-                                        @endphp
-                                        <tr>
-                                            <td style="color: var(--text-secondary); white-space: nowrap;">
-                                                {{ $latestRev?->created_at?->format('d M Y, H:i') ?? $revItem->updated_at?->format('d M Y, H:i') }}
-                                            </td>
-                                            <td><span class="spot-code">{{ $revItem->feeding_record_ref }}</span></td>
-                                            <td>
-                                                <div style="font-weight: 600;">{{ $revItem->user?->name ?? 'Relawan' }}</div>
-                                                <div style="font-size: 12px; color: var(--text-muted);">{{ $revItem->spot?->name ?? '-' }}</div>
-                                            </td>
-                                            <td>
-                                                @if($revItem->status === 'REJECTED')
-                                                    <span class="status-label status-rejected">Ditolak (REJECTED)</span>
-                                                @else
-                                                    <span class="status-label status-active">Disetujui (VERIFIED)</span>
-                                                @endif
-                                            </td>
-                                            <td>{{ $revReason }}</td>
-                                            <td>
-                                                <a href="/api/v1/feeding/admin-preview/reviews/{{ $revItem->id }}" class="btn btn-neutral btn-sm">Detail</a>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                @endif
-
+                @if($canManageSpots)
                 <div class="panel">
-                    <div class="toolbar">
-                        <strong style="font-size: 14px;">Log Aktivitas Audit</strong>
-                    </div>
+                    <div class="toolbar"><strong style="font-size: 14px;">Riwayat Lokasi Spot</strong></div>
                     <div class="table-scroll">
                         <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Waktu</th>
-                                    <th>Aktor</th>
-                                    <th>Aktivitas</th>
-                                    <th>Keterangan</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>Waktu</th><th>Aktor</th><th>Lokasi</th><th>Perubahan</th><th>Alasan</th></tr></thead>
                             <tbody>
-                                @forelse($auditLogs as $log)
+                                @forelse($spotHistory as $history)
                                     @php
-                                        $old = $log['changes']['old'] ?? null;
-                                        $new = $log['changes']['new'] ?? null;
-                                        $subjectType = $log['subject_type'] ?? 'feeding_spot';
-                                        $actionName = $log['action'] ?? '';
+                                        $old = $history->changes['old'] ?? [];
+                                        $new = $history->changes['new'] ?? [];
+                                        $changed = $history->changes['changed_fields'] ?? [];
                                     @endphp
                                     <tr>
-                                        <td style="color: var(--text-secondary); white-space: nowrap;">{{ $log['created_at'] }}</td>
-                                        <td style="font-weight: 600;">{{ $log['actor_name'] }}</td>
+                                        <td style="white-space: nowrap;">{{ $history->created_at?->format('d M Y, H:i') }}</td>
+                                        <td>{{ $history->actor?->name ?? 'Sistem / Admin' }}</td>
+                                        <td><strong>{{ $history->spot?->code ?? ($new['code'] ?? $old['code'] ?? '-') }}</strong><br><span style="color: var(--text-secondary);">{{ $history->spot?->name ?? ($new['name'] ?? $old['name'] ?? 'Spot dihapus') }}</span></td>
                                         <td>
-                                            @if($actionName === 'FEEDING_REVIEW_REJECTED')
-                                                <span class="status-label status-rejected">{{ $actionLabels[$actionName] ?? $actionName }}</span>
-                                                <span style="display:none;">FEEDING_REVIEW_REJECTED DITOLAK (REJECTED)</span>
-                                            @elseif($actionName === 'FEEDING_REVIEW_APPROVED')
-                                                <span class="status-label status-active">{{ $actionLabels[$actionName] ?? $actionName }}</span>
-                                            @else
-                                                <span class="status-label status-inactive">{{ $actionLabels[$actionName] ?? $actionName }}</span>
-                                            @endif
+                                            <span class="status-label status-inactive">{{ $actionLabels[$history->action] ?? $history->action }}</span>
+                                            @foreach($changed as $field)
+                                                @php $fieldLabels = ['name' => 'Nama', 'status' => 'Status', 'latitude' => 'Latitude', 'longitude' => 'Longitude', 'description' => 'Deskripsi', 'status_reason' => 'Alasan']; @endphp
+                                                @if(isset($fieldLabels[$field]))<br><strong>{{ $fieldLabels[$field] }}:</strong> {{ $old[$field] ?? '—' }} &rarr; {{ $new[$field] ?? '—' }}@endif
+                                            @endforeach
                                         </td>
-                                        <td style="color: var(--text-secondary);">
-                                            @if($subjectType === 'feeding_activity')
-                                                <strong>{{ $new['feeding_record_ref'] ?? '' }}</strong>
-                                                @if(!empty($new['review_reason']))
-                                                    — {{ $new['review_reason'] }}
-                                                @endif
-                                            @else
-                                                <strong>{{ $new['code'] ?? ($old['code'] ?? '') }}</strong>
-                                                @if(isset($old['status'], $new['status']) && $old['status'] !== $new['status'])
-                                                    — Status: {{ $old['status'] }} &rarr; {{ $new['status'] }}
-                                                @elseif(!empty($new['name']))
-                                                    — {{ $new['name'] }}
-                                                @endif
-                                                @if(!empty($new['status_reason']))
-                                                    ({{ $new['status_reason'] }})
-                                                @endif
-                                            @endif
-                                        </td>
+                                        <td>{{ $history->reason ?: '-' }}</td>
                                     </tr>
                                 @empty
-                                    <tr>
-                                        <td colspan="4" style="text-align: center; padding: 36px; color: var(--text-muted);">
-                                            Belum ada catatan audit.
-                                        </td>
-                                    </tr>
+                                    <tr><td colspan="5" style="text-align: center; padding: 36px; color: var(--text-muted);">Belum ada riwayat perubahan lokasi.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endif
+
+                @if($canReview)
+                <div class="panel" style="margin-top: 20px;">
+                    <div class="toolbar"><strong style="font-size: 14px;">Riwayat Keputusan Review</strong></div>
+                    <div class="table-scroll">
+                        <table class="data-table">
+                            <thead><tr><th>Waktu</th><th>Referensi</th><th>Relawan &amp; Spot</th><th>Keputusan</th><th>Reviewer</th><th>Alasan</th></tr></thead>
+                            <tbody>
+                                @forelse($reviewHistory as $review)
+                                    <tr>
+                                        <td style="white-space: nowrap;">{{ $review->created_at?->format('d M Y, H:i') }}</td>
+                                        <td><span class="spot-code">{{ $review->activity?->feeding_record_ref ?? '-' }}</span></td>
+                                        <td><strong>{{ $review->activity?->user?->name ?? 'Relawan' }}</strong><br><span style="color: var(--text-secondary);">{{ $review->activity?->spot?->name ?? '-' }}</span></td>
+                                        <td>@if($review->decision === 'REJECTED')<span class="status-label status-rejected">Ditolak</span>@else<span class="status-label status-active">Disetujui</span>@endif</td>
+                                        <td>{{ $review->reviewer?->name ?? '-' }}</td>
+                                        <td>{{ $review->reason ?: '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" style="text-align: center; padding: 36px; color: var(--text-muted);">Belum ada keputusan review.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @endif
             </section>
         </main>
     </div>
@@ -1372,7 +1332,7 @@
                 </button>
             </div>
 
-            <form method="POST" action="/api/v1/feeding/admin-preview/spots" id="spotForm" enctype="multipart/form-data" class="modal-form-flex" onsubmit="return handleSpotFormSubmit(event);">
+            <form method="POST" action="/admin/feeding/spots" id="spotForm" enctype="multipart/form-data" class="modal-form-flex" onsubmit="return handleSpotFormSubmit(event);">
                 @csrf
                 <input type="hidden" id="inputLat" name="latitude" value="-6.9731000" required>
                 <input type="hidden" id="inputLng" name="longitude" value="107.6300000" required>
@@ -1661,7 +1621,7 @@
         const TAB_TITLES = {
             spots: 'Lokasi Feeding Spot',
             reviews: 'Antrean Review',
-            audit: 'Riwayat Audit'
+            audit: 'Riwayat Spot & Review'
         };
 
         function switchTab(tabName) {
@@ -1999,7 +1959,7 @@
             isCreateMode = true;
             isNameAutoSuggested = true;
             document.getElementById('spotModalTitle').textContent = 'Tambah Feeding Spot';
-            document.getElementById('spotForm').action = '/api/v1/feeding/admin-preview/spots';
+            document.getElementById('spotForm').action = '/admin/feeding/spots';
             document.getElementById('spotSubmitBtnText').textContent = 'Tambah Feeding Spot';
             document.getElementById('spotSubmitBtn').disabled = false;
             document.getElementById('modalValidationBanner').style.display = 'none';
@@ -2027,7 +1987,7 @@
             isCreateMode = false;
             isNameAutoSuggested = false;
             document.getElementById('spotModalTitle').textContent = `Edit Spot — ${spot.code}`;
-            document.getElementById('spotForm').action = `/api/v1/feeding/admin-preview/spots/${spot.id}/update`;
+            document.getElementById('spotForm').action = `/admin/feeding/spots/${spot.id}/update`;
             document.getElementById('spotSubmitBtnText').textContent = 'Simpan Perubahan';
             document.getElementById('spotSubmitBtn').disabled = false;
             document.getElementById('modalValidationBanner').style.display = 'none';
@@ -2070,9 +2030,9 @@
 
         function openDetailSpotModal(spot) {
             document.getElementById('detailModalTitle').textContent = `${spot.name} (${spot.code})`;
-            document.getElementById('detailDownloadQrBtn').href = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr-download?format=png`;
-            document.getElementById('detailPrintQrBtn').href = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr-sheet`;
-            document.getElementById('detailRegenQrForm').action = `/api/v1/feeding/admin-preview/spots/${spot.id}/qr`;
+            document.getElementById('detailDownloadQrBtn').href = `/admin/feeding/spots/${spot.id}/qr-download?format=png`;
+            document.getElementById('detailPrintQrBtn').href = `/admin/feeding/spots/${spot.id}/qr-sheet`;
+            document.getElementById('detailRegenQrForm').action = `/admin/feeding/spots/${spot.id}/qr`;
 
             const photoContainer = document.getElementById('detailSpotPhotoContainer');
             const photoImg = document.getElementById('detailSpotPhotoImg');
