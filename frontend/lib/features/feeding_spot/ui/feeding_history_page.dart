@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/meow_style.dart';
 import '../../../core/utils/date_labels.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../data/feeding_session.dart';
 import '../logic/feeding_spot_provider.dart';
@@ -17,6 +18,15 @@ class FeedingHistoryPage extends StatefulWidget {
 
 class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
   FeedingStatus? _filter;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<FeedingSpotProvider>().fetchMyActivities();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FeedingSpotProvider>();
@@ -120,11 +130,12 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
             ),
           ),
           const SizedBox(height: 20),
-          if (!provider.isDemo)
-            const FeedingMessage(
-              'Riwayat kegiatan akan tersedia setelah layanan sesi, verifikasi, dan reward terhubung.',
-            ),
-          if (provider.isDemo && items.isEmpty)
+          if (provider.isLoadingHistory && items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: LoadingIndicator(),
+            )
+          else if (items.isEmpty)
             const FeedingMessage(
               'Belum ada kegiatan dalam kategori ini. Kegiatan baru akan muncul setelah bukti dikirim.',
             ),
@@ -206,8 +217,8 @@ class _FeedingHistoryPageState extends State<FeedingHistoryPage> {
                             const SizedBox(height: 5),
                             Text(
                               item.creditedPoints > 0
-                                  ? '+${item.creditedPoints} poin contoh'
-                                  : 'Poin belum dikreditkan',
+                                  ? '${item.rewardStatusLabel} · +${item.creditedPoints} poin'
+                                  : item.rewardStatusLabel,
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: MeowStyle.orangeDark,

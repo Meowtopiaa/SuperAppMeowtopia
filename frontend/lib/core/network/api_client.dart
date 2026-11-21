@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import '../constants/app_constants.dart';
@@ -13,9 +14,12 @@ class ApiClient {
   final Uuid _uuid = const Uuid();
 
   ApiClient._internal() {
+    const apiBaseUrl = AppConstants.apiBaseUrl;
     dio = Dio(
       BaseOptions(
-        baseUrl: AppConstants.apiBaseUrl,
+        baseUrl: kIsWeb && apiBaseUrl.contains('10.0.2.2')
+            ? apiBaseUrl.replaceFirst('10.0.2.2', 'localhost')
+            : apiBaseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
         headers: {
@@ -72,19 +76,23 @@ class ApiClient {
   }
 
   // HTTP Helper Methods
-  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> get(String path,
+      {Map<String, dynamic>? queryParameters}) async {
     return dio.get(path, queryParameters: queryParameters);
   }
 
-  Future<Response> post(String path, {dynamic data, Map<String, dynamic>? headers}) async {
+  Future<Response> post(String path,
+      {dynamic data, Map<String, dynamic>? headers}) async {
     return dio.post(path, data: data, options: Options(headers: headers));
   }
 
-  Future<Response> put(String path, {dynamic data, Map<String, dynamic>? headers}) async {
+  Future<Response> put(String path,
+      {dynamic data, Map<String, dynamic>? headers}) async {
     return dio.put(path, data: data, options: Options(headers: headers));
   }
 
-  Future<Response> patch(String path, {dynamic data, Map<String, dynamic>? headers}) async {
+  Future<Response> patch(String path,
+      {dynamic data, Map<String, dynamic>? headers}) async {
     return dio.patch(path, data: data, options: Options(headers: headers));
   }
 

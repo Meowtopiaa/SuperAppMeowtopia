@@ -3,19 +3,23 @@
 namespace App\Modules\Core\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AuthOtpMail;
 use App\Models\User;
 use App\Modules\Core\Requests\LoginRequest;
 use App\Modules\Core\Requests\RegisterRequest;
+use App\Modules\Core\Services\GoogleIdTokenVerifier;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class AuthController extends Controller
 {
     /**
-     * User registration with automated campus user_type mapping & OTP generation.
+     * User registration with configured domain mapping and email OTP verification.
      * Role from request is strictly ignored (Fixes FIX-01 & CORE-01).
      */
     public function register(RegisterRequest $request)
@@ -23,55 +27,52 @@ class AuthController extends Controller
         $validated = $request->validated();
         $email = strtolower(trim($validated['email']));
 
-        // 1. Determine user_type from email domain
-        $parts = explode('@', $email);
-        $domain = end($parts);
-        $userType = 'MAHASISWA';
-        if (str_contains($domain, 'student')) {
-            $userType = 'MAHASISWA';
-        } elseif (str_contains($domain, 'telkomuniversity')) {
-            $userType = 'DOSEN';
+        try {
+            [$user, $token] = DB::transaction(function () use ($validated, $email) {
+                $user = new User([
+                    'name' => $validated['name'],
+                    'email' => $email,
+                    'password' => Hash::make($validated['password']),
+                    'identity_number' => $validated['identity_number'] ?? null,
+                    'phone' => $validated['phone'] ?? null,
+                    'is_active' => true,
+                ]);
+
+                // Explicitly set user_type (protected from mass-assignment)
+                $user->user_type = $this->userTypeForEmail($email);
+                $user->save();
+
+                // Assign basic 'user' role
+                $user->assignRole('user');
+
+                // Initialize Point Balance Cache
+                DB::table('point_balances')->updateOrInsert(
+                    ['user_id' => $user->id],
+                    ['total_points' => 0, 'updated_at' => now()]
+                );
+
+                // 3. Generate 6-digit OTP (CORE-02)
+                $otp = sprintf('%06d', random_int(100000, 999999));
+                DB::table('email_otps')->insert([
+                    'id' => (string) Str::ulid(),
+                    'user_id' => $user->id,
+                    'code_hash' => hash('sha256', $otp),
+                    'expires_at' => now()->addMinutes(15),
+                    'attempts' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $token = $user->createToken('auth_token')->plainTextToken;
+                Mail::to($user->email)->send(new AuthOtpMail($otp, $user->name));
+
+                return [$user, $token];
+            });
+        } catch (TransportExceptionInterface $exception) {
+            report($exception);
+
+            return ApiResponse::error('Email OTP belum dapat dikirim. Coba lagi beberapa saat.', 503, 'SERVICE_UNAVAILABLE');
         }
-
-        // 2. Create User with ULID and baseline role
-        $userId = (string) Str::ulid();
-        $user = User::create([
-            'id' => $userId,
-            'name' => $validated['name'],
-            'email' => $email,
-            'password' => Hash::make($validated['password']),
-            'identity_number' => $validated['identity_number'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'is_active' => true,
-        ]);
-
-        // Explicitly set user_type (protected from mass-assignment)
-        $user->user_type = $userType;
-        $user->save();
-
-        // Assign basic 'user' role
-        $user->assignRole('user');
-
-        // Initialize Point Balance Cache
-        DB::table('point_balances')->updateOrInsert(
-            ['user_id' => $user->id],
-            ['total_points' => 0, 'updated_at' => now()]
-        );
-
-        // 3. Generate 6-digit OTP (CORE-02)
-        $otp = sprintf('%06d', mt_rand(100000, 999999));
-        DB::table('email_otps')->insert([
-            'id' => (string) Str::ulid(),
-            'user_id' => $user->id,
-            'code_hash' => hash('sha256', $otp),
-            'expires_at' => now()->addMinutes(15),
-            'attempts' => 0,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Issue temporary token for verification flow
-        $token = $user->createToken('auth_token')->plainTextToken;
 
         $data = [
             'user' => [
@@ -84,15 +85,166 @@ class AuthController extends Controller
             'token' => $token,
         ];
 
-        // In dev or testing, expose OTP in response for testing convenience
-        if (app()->environment('local', 'testing')) {
-            $data['dev_otp'] = $otp;
-        }
-
         return ApiResponse::created(
             $data,
             'Registrasi berhasil. Kode OTP verifikasi telah dikirim ke email Anda.'
         );
+    }
+
+    /** Request an email OTP for an existing account without revealing whether it exists. */
+    public function requestEmailOtp(Request $request)
+    {
+        $validated = $request->validate(['email' => ['required', 'email', 'max:255']]);
+        $email = strtolower(trim($validated['email']));
+        $user = User::where('email', $email)->first();
+
+        if (!$user || !$user->is_active) {
+            return ApiResponse::success(['sent' => true], 'Jika akun terdaftar, kode masuk akan dikirim ke email tersebut.');
+        }
+
+        $recentCount = DB::table('email_otps')
+            ->where('user_id', $user->id)
+            ->where('created_at', '>', now()->subHour())
+            ->count();
+        if ($recentCount >= 3) {
+            return ApiResponse::error('Batas permintaan OTP tercapai. Coba lagi dalam 1 jam.', 429, 'RATE_LIMITED');
+        }
+
+        $otp = sprintf('%06d', random_int(100000, 999999));
+        $otpId = (string) Str::ulid();
+        DB::table('email_otps')->insert([
+            'id' => $otpId,
+            'user_id' => $user->id,
+            'code_hash' => hash('sha256', $otp),
+            'expires_at' => now()->addMinutes(15),
+            'attempts' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            Mail::to($user->email)->send(new AuthOtpMail($otp, $user->name));
+        } catch (\Throwable $exception) {
+            DB::table('email_otps')->where('id', $otpId)->delete();
+            report($exception);
+
+            return ApiResponse::error('Email OTP belum dapat dikirim. Coba lagi beberapa saat.', 503, 'SERVICE_UNAVAILABLE');
+        }
+
+        return ApiResponse::success(['sent' => true], 'Jika akun terdaftar, kode masuk akan dikirim ke email tersebut.');
+    }
+
+    /** Complete passwordless sign-in after verifying the email OTP. */
+    public function loginWithEmailOtp(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'otp' => ['required', 'string', 'size:6', 'regex:/^[0-9]{6}$/'],
+        ]);
+        $user = User::where('email', strtolower(trim($validated['email'])))->first();
+        $otpRecord = $user ? DB::table('email_otps')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->orderByDesc('id')
+            ->first() : null;
+
+        if (!$otpRecord || $otpRecord->used_at || $otpRecord->attempts >= 5
+            || now()->gte($otpRecord->expires_at)) {
+            return ApiResponse::error('Kode OTP salah, kedaluwarsa, atau tidak dapat digunakan.', 422, 'VALIDATION_ERROR');
+        }
+        if (!hash_equals($otpRecord->code_hash, hash('sha256', $validated['otp']))) {
+            DB::table('email_otps')->where('id', $otpRecord->id)->whereNull('used_at')->increment('attempts');
+
+            return ApiResponse::error('Kode OTP salah, kedaluwarsa, atau tidak dapat digunakan.', 422, 'VALIDATION_ERROR');
+        }
+        if (!$user->is_active) {
+            return ApiResponse::error('Akun Anda dinonaktifkan. Hubungi administrator.', 403, 'FORBIDDEN');
+        }
+
+        return DB::transaction(function () use ($otpRecord, $user) {
+            $claimed = DB::table('email_otps')->where('id', $otpRecord->id)
+                ->whereNull('used_at')
+                ->where('expires_at', '>', now())
+                ->where('attempts', '<', 5)
+                ->update(['used_at' => now()]);
+            if (!$claimed) {
+                return ApiResponse::error('Kode OTP salah, kedaluwarsa, atau tidak dapat digunakan.', 422, 'VALIDATION_ERROR');
+            }
+
+            $user->email_verified_at ??= now();
+            $user->last_login_at = now();
+            $user->save();
+
+            return ApiResponse::success($this->authenticatedUserData($user), 'Login berhasil.');
+        });
+    }
+
+    /** Exchange a Google ID token for a Meowtopia Sanctum token. */
+    public function loginWithGoogle(Request $request, GoogleIdTokenVerifier $verifier)
+    {
+        $validated = $request->validate(['id_token' => ['required', 'string', 'max:8192']]);
+        try {
+            $claims = $verifier->verify($validated['id_token']);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return ApiResponse::error('Layanan Google belum dapat dijangkau. Coba lagi.', 503, 'SERVICE_UNAVAILABLE');
+        }
+        if (!$claims) {
+            return ApiResponse::error('Token Google tidak valid atau belum dikonfigurasi.', 401, 'FORBIDDEN');
+        }
+
+        return DB::transaction(function () use ($claims) {
+            $email = strtolower(trim($claims['email']));
+            $googleSub = $claims['sub'];
+            $googleOwnsEmail = Str::afterLast($email, '@') === 'gmail.com' || !empty($claims['hd']);
+            $user = User::where('google_sub', $googleSub)->lockForUpdate()->first();
+
+            if (!$user) {
+                if (!$googleOwnsEmail) {
+                    return ApiResponse::error('Gunakan OTP untuk masuk dengan alamat email ini.', 422, 'EMAIL_NOT_VERIFIED');
+                }
+
+                $user = User::where('email', $email)->lockForUpdate()->first();
+                if ($user && $user->google_sub && !hash_equals($user->google_sub, $googleSub)) {
+                    return ApiResponse::error('Email ini sudah terhubung ke akun Google lain.', 409, 'CONFLICT');
+                }
+                if ($user && !$user->is_active) {
+                    return ApiResponse::error('Akun Anda dinonaktifkan. Hubungi administrator.', 403, 'FORBIDDEN');
+                }
+                if (!$user) {
+                    $user = new User([
+                        'name' => $claims['name'] ?? Str::before($email, '@'),
+                        'email' => $email,
+                        'password' => Hash::make(Str::random(64)),
+                        'is_active' => true,
+                    ]);
+                    $user->user_type = $this->userTypeForEmail($email);
+                    $user->google_sub = $googleSub;
+                    $user->email_verified_at = now();
+                    $user->save();
+                    $user->assignRole('user');
+                    DB::table('point_balances')->insertOrIgnore([
+                        'user_id' => $user->id,
+                        'total_points' => 0,
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    $user->google_sub = $googleSub;
+                }
+            }
+
+            if (!$user->is_active) {
+                return ApiResponse::error('Akun Anda dinonaktifkan. Hubungi administrator.', 403, 'FORBIDDEN');
+            }
+            if ($googleOwnsEmail && strcasecmp($user->email, $email) === 0) {
+                $user->email_verified_at ??= now();
+            }
+            $user->last_login_at = now();
+            $user->save();
+
+            return ApiResponse::success($this->authenticatedUserData($user), 'Login Google berhasil.');
+        });
     }
 
     /**
@@ -113,14 +265,18 @@ class AuthController extends Controller
 
         $otpRecord = DB::table('email_otps')
             ->where('user_id', $user->id)
-            ->where('used_at', null)
+            ->whereNull('used_at')
             ->where('expires_at', '>', now())
+            ->where('attempts', '<', 5)
             ->latest('created_at')
             ->first();
 
-        if (!$otpRecord || $otpRecord->code_hash !== $codeHash) {
+        if (!$otpRecord || !hash_equals($otpRecord->code_hash, $codeHash)) {
+            if ($otpRecord) {
+                DB::table('email_otps')->where('id', $otpRecord->id)->increment('attempts');
+            }
             return ApiResponse::error(
-                'Kode OTP salah atau telah kedaluwarsa.',
+                'Kode OTP salah, kedaluwarsa, atau tidak dapat digunakan.',
                 422,
                 'VALIDATION_ERROR'
             );
@@ -165,9 +321,10 @@ class AuthController extends Controller
             );
         }
 
-        $otp = sprintf('%06d', mt_rand(100000, 999999));
+        $otp = sprintf('%06d', random_int(100000, 999999));
+        $otpId = (string) Str::ulid();
         DB::table('email_otps')->insert([
-            'id' => (string) Str::ulid(),
+            'id' => $otpId,
             'user_id' => $user->id,
             'code_hash' => hash('sha256', $otp),
             'expires_at' => now()->addMinutes(15),
@@ -176,12 +333,16 @@ class AuthController extends Controller
             'updated_at' => now(),
         ]);
 
-        $data = ['resent' => true];
-        if (app()->environment('local', 'testing')) {
-            $data['dev_otp'] = $otp;
+        try {
+            Mail::to($user->email)->send(new AuthOtpMail($otp, $user->name));
+        } catch (\Throwable $exception) {
+            DB::table('email_otps')->where('id', $otpId)->delete();
+            report($exception);
+
+            return ApiResponse::error('Email OTP belum dapat dikirim. Coba lagi beberapa saat.', 503, 'SERVICE_UNAVAILABLE');
         }
 
-        return ApiResponse::success($data, 'Kode OTP baru telah dikirimkan ke email Anda.');
+        return ApiResponse::success(['resent' => true], 'Kode OTP baru telah dikirimkan ke email Anda.');
     }
 
     /**
@@ -213,18 +374,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return ApiResponse::success([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'user_type' => $user->user_type,
-                'email_verified' => $user->email_verified_at !== null,
-                'roles' => $user->getRoleNames(),
-                'permissions' => $user->getAllPermissions()->pluck('name'),
-            ],
-            'token' => $token,
-        ], 'Login berhasil.');
+        return ApiResponse::success($this->authenticatedUserData($user, $token), 'Login berhasil.');
     }
 
     /**
@@ -261,5 +411,35 @@ class AuthController extends Controller
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
         ], 'Profil berhasil diambil.');
+    }
+
+    private function userTypeForEmail(string $email): string
+    {
+        $domain = strtolower(substr(strrchr($email, '@'), 1));
+        $mapping = [];
+        foreach (explode(',', (string) env('EMAIL_DOMAIN_TYPES', '')) as $entry) {
+            [$mappedDomain, $type] = array_pad(explode(':', trim($entry), 2), 2, null);
+            if ($mappedDomain && $type) {
+                $mapping[strtolower($mappedDomain)] = strtoupper($type);
+            }
+        }
+
+        return $mapping[$domain] ?? 'UMUM';
+    }
+
+    private function authenticatedUserData(User $user, ?string $token = null): array
+    {
+        return [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'user_type' => $user->user_type,
+                'email_verified' => $user->email_verified_at !== null,
+                'roles' => $user->getRoleNames(),
+                'permissions' => $user->getAllPermissions()->pluck('name'),
+            ],
+            'token' => $token ?? $user->createToken('auth_token')->plainTextToken,
+        ];
     }
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/scanner/qr_parser.dart';
 import '../data/demo_feeding_data.dart';
 import '../data/feeding_session.dart';
 import '../data/feeding_spot_model.dart';
@@ -16,37 +19,44 @@ class FeedingSpotProvider extends ChangeNotifier {
       _spots = demoFeedingSpots(DateTime.now());
       _history.addAll(demoFeedingHistory(_spots, DateTime.now()));
       _loaded = true;
+      _sortSpotsClientSide();
     }
   }
+
   final bool isDemo;
   final FeedingSpotService _service;
   List<FeedingSpotModel> _spots = [];
   final List<FeedingSubmission> _history = [];
-  final Set<int> _favorites = {};
-  final Map<int, DateTime> _lastSubmitted = {};
+  final Set<String> _favorites = {};
+  final Map<String, DateTime> _lastSubmitted = {};
   FeedingSession? session;
   bool _isLoading = false;
+  bool _isLoadingHistory = false;
   bool _loaded = false;
   String? _errorMessage;
+
   List<FeedingSpotModel> get spots => List.unmodifiable(
     _spots.where((s) => s.status.toLowerCase() != 'inactive'),
   );
   List<FeedingSubmission> get history => List.unmodifiable(_history);
   bool get isLoading => _isLoading;
+  bool get isLoadingHistory => _isLoadingHistory;
   String? get errorMessage => _errorMessage;
   int get pendingCount =>
       _history.where((s) => s.status == FeedingStatus.underReview).length;
   int get creditedPoints =>
       _history.fold(0, (sum, s) => sum + s.creditedPoints);
-  bool isFavorite(int id) => _favorites.contains(id);
-  void toggleFavorite(int id) {
+
+  bool isFavorite(String id) => _favorites.contains(id);
+
+  void toggleFavorite(String id) {
     if (!_favorites.add(id)) _favorites.remove(id);
     notifyListeners();
   }
 
-  FeedingSpotModel? spotById(int id) {
+  FeedingSpotModel? spotById(String id) {
     for (final spot in spots) {
-      if (spot.id == id) return spot;
+      if (spot.id == id || spot.code == id) return spot;
     }
     return null;
   }
@@ -64,33 +74,196 @@ class FeedingSpotProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      if (!isDemo) _spots = await _service.getSpots();
+      if (!isDemo) {
+        _spots = await _service.getSpots();
+        await fetchMyActivities();
+      } else {
+        // Coba sinkronisasi data spot aktual dari backend bila server aktif,
+        // dengan fallback otomatis ke data contoh apabila berjalan secara offline.
+        try {
+          final remoteSpots = await _service.getSpots();
+          if (remoteSpots.isNotEmpty) {
+            _spots = remoteSpots;
+          }
+        } catch (_) {
+          if (_spots.isEmpty) {
+            _spots = demoFeedingSpots(DateTime.now());
+          }
+        }
+      }
+      await _sortSpotsClientSide();
       _loaded = true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _extractErrorMessage(e);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  Future<void> fetchMyActivities() async {
+    if (isDemo || _isLoadingHistory) return;
+    _isLoadingHistory = true;
+    notifyListeners();
+    try {
+      final spotsMap = {for (final s in _spots) s.id: s};
+      final items = await _service.getMyActivities(spotsMap);
+      _history
+        ..clear()
+        ..addAll(items);
+    } catch (_) {
+      // Abaikan jika pengguna belum login saat melihat daftar spot publik
+    } finally {
+      _isLoadingHistory = false;
+      notifyListeners();
+    }
+  }
+
+  /// Mengurutkan spot terdekat di sisi klien (HP) tanpa mengirim atau menyimpan
+  /// koordinat GPS pengguna ke server (sesuai Aturan Keras #8 & AFS-02).
+  /// Jika izin lokasi tidak diberikan, otomatis fallback ke urutan alfabetis.
+  Future<void> _sortSpotsClientSide() async {
+    if (_spots.isEmpty) return;
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _sortAlphabetically();
+        return;
+      }
+
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        _sortAlphabetically();
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 4),
+        ),
+      );
+
+      _spots = _spots.map((spot) {
+        final distance = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          spot.latitude,
+          spot.longitude,
+        );
+        return spot.copyWith(distanceMeters: distance);
+      }).toList()
+        ..sort(
+          (a, b) => (a.distanceMeters ?? double.infinity).compareTo(
+            b.distanceMeters ?? double.infinity,
+          ),
+        );
+      notifyListeners();
+    } catch (_) {
+      _sortAlphabetically();
+    }
+  }
+
+  void _sortAlphabetically() {
+    _spots = [..._spots]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    notifyListeners();
+  }
+
   Future<FeedingSession> openSession(
     String rawToken, {
-    int? expectedSpotId,
+    String? expectedSpotId,
   }) async {
     final token = rawToken.trim();
     if (token.isEmpty) throw StateError('Masukkan token QR spot yang valid.');
     await fetchSpots();
+
+    if (!isDemo) {
+      try {
+        final data = await _service.openSession(qrToken: token);
+        final spotJson = data['spot'] as Map<String, dynamic>?;
+        final activityId =
+            (data['id'] ?? data['activity_id'])?.toString() ?? '';
+        final spotId =
+            (data['spot_id'] ?? spotJson?['id'])?.toString() ?? '';
+        if (expectedSpotId != null &&
+            expectedSpotId.isNotEmpty &&
+            spotId != expectedSpotId &&
+            spotJson?['code']?.toString() != expectedSpotId) {
+          throw StateError(
+            'QR ini milik spot lain. Pindai QR di spot yang dipilih.',
+          );
+        }
+
+        await _service.confirmIntent(activityId);
+
+        final matchedSpot =
+            spotById(spotId) ??
+            (spotJson != null
+                ? FeedingSpotModel.fromJson(spotJson)
+                : await _service.getSpotDetail(spotId));
+
+        final now = DateTime.now();
+        final startedAt = data['scanned_at'] != null
+            ? DateTime.tryParse(data['scanned_at'].toString()) ?? now
+            : now;
+
+        final intentDeadlineAt = data['intent_deadline_at'] != null
+            ? DateTime.tryParse(data['intent_deadline_at'].toString())
+            : startedAt.add(const Duration(minutes: 15));
+        final finalizeDeadlineAt = data['finalize_deadline_at'] != null
+            ? DateTime.tryParse(data['finalize_deadline_at'].toString())
+            : null;
+
+        session = FeedingSession(
+          id: activityId,
+          feedingRecordRef: data['feeding_record_ref']?.toString(),
+          spot: matchedSpot,
+          startedAt: startedAt,
+          expiresAt: finalizeDeadlineAt ?? intentDeadlineAt ?? now.add(const Duration(minutes: 15)),
+          intentDeadlineAt: intentDeadlineAt,
+          finalizeDeadlineAt: finalizeDeadlineAt,
+        );
+        notifyListeners();
+        return session!;
+      } catch (e) {
+        throw StateError(_extractErrorMessage(e));
+      }
+    }
+
+    final parsed = parseQr(token);
+    if (parsed.kind == QrKind.cat || token.toUpperCase().startsWith('CAT')) {
+      throw StateError(
+        'QR_WRONG_TYPE: Kode QR yang dipindai adalah QR kalung kucing, bukan QR feeding spot. Pindai QR spot resmi (MTP1.S.*).',
+      );
+    }
+    if (token.startsWith('MTP1.') && parsed.kind == QrKind.unknown) {
+      throw StateError(
+        'QR_INVALID: Format QR tidak dikenali. Gunakan QR resmi titik pakan (MTP1.S.*) atau kode manual spot.',
+      );
+    }
+
     FeedingSpotModel? match;
     for (final spot in spots) {
-      if (spot.qrToken == token) match = spot;
+      if (spot.qrToken == token ||
+          spot.qrToken == 'MTP1.S.${parsed.value}' ||
+          'SPOT:${spot.code}' == token.toUpperCase() ||
+          'MTP1.S.${spot.code}' == token.toUpperCase() ||
+          spot.code.toUpperCase() == token.toUpperCase() ||
+          spot.code.toUpperCase() == parsed.value.toUpperCase()) {
+        match = spot;
+      }
     }
     if (match == null) {
       throw StateError(
-        'QR tidak dikenali sebagai QR spot. Gunakan QR resmi di lokasi.',
+        'QR_INVALID: Kode QR atau kode manual spot tidak terdaftar. Gunakan QR resmi di lokasi atau periksa kembali kode manual spot.',
       );
     }
-    if (expectedSpotId != null && match.id != expectedSpotId) {
+    if (expectedSpotId != null &&
+        expectedSpotId.isNotEmpty &&
+        match.id != expectedSpotId &&
+        match.code != expectedSpotId) {
       throw StateError(
         'QR ini milik spot lain. Pindai QR di spot yang dipilih.',
       );
@@ -107,15 +280,10 @@ class FeedingSpotProvider extends ChangeNotifier {
         'Kegiatan di spot ini sudah diajukan. Tunggu 6 jam untuk kegiatan berikutnya.',
       );
     }
-    // The legacy endpoint auto-credits points; never use it for this evidence flow.
-    if (!isDemo) {
-      throw StateError(
-        'Layanan sesi dan verifikasi bukti belum tersedia. Coba lagi setelah integrasi backend siap.',
-      );
-    }
     final now = DateTime.now();
     session = FeedingSession(
-      id: 'LOKAL-${now.microsecondsSinceEpoch}',
+      id: '01JAFS00000000000000999999',
+      feedingRecordRef: 'FD-${now.millisecondsSinceEpoch}',
       spot: match,
       startedAt: now,
       expiresAt: now.add(const Duration(minutes: 15)),
@@ -176,21 +344,91 @@ class FeedingSpotProvider extends ChangeNotifier {
         'Sesi harus aktif dan minimal satu foto wajib tersedia.',
       );
     }
-    if (!isDemo) throw StateError('Layanan pengiriman bukti belum tersedia.');
+
+    if (!isDemo) {
+      try {
+        final mediaIds = <String>[];
+        for (var i = 0; i < current.evidence.length; i++) {
+          final evidence = current.evidence[i];
+          final mediaId =
+              evidence.mediaId ??
+              await _service.uploadEvidence(
+                evidence.bytes,
+                filename: 'feeding-${current.id}-${i + 1}.jpg',
+              );
+          mediaIds.add(mediaId);
+        }
+
+        final data = await _service.finalizeSession(
+          activityId: current.id,
+          mediaIds: mediaIds,
+          foodType: current.foodType,
+          foodAmount: current.quantity,
+          notes: current.notes.trim(),
+          catId: current.catId,
+          catCode: current.catCode,
+        );
+
+        final submission = FeedingSubmission.fromJson(
+          data,
+          fallbackSpot: current.spot,
+          localEvidence: List.unmodifiable(current.evidence),
+        );
+        _history.insert(0, submission);
+        _lastSubmitted[current.spot.id] = DateTime.now();
+        notifyListeners();
+        return submission;
+      } catch (e) {
+        throw StateError(_extractErrorMessage(e));
+      }
+    }
+
     final now = DateTime.now();
     final item = FeedingSubmission(
       id: current.id,
+      feedingRecordRef: current.feedingRecordRef,
       spot: current.spot,
       createdAt: now,
       status: FeedingStatus.underReview,
+      rewardStatus: 'PENDING',
       foodType: current.foodType,
       quantity: current.quantity,
       evidence: List.unmodifiable(current.evidence),
       notes: current.notes.trim(),
+      catId: current.catId,
+      potentialPoints: 10,
     );
     _history.insert(0, item);
     _lastSubmitted[current.spot.id] = now;
     notifyListeners();
     return item;
+  }
+
+  String _extractErrorMessage(Object error) {
+    if (error is ApiException) {
+      switch (error.code) {
+        case 'COOLDOWN_ACTIVE':
+          return 'Spot ini baru saja diberi makan dalam 6 jam terakhir. Silakan pilih spot lain yang membutuhkan pakan.';
+        case 'SESSION_EXPIRED':
+          return 'Sesi pemberian makan telah kedaluwarsa. Silakan pindai ulang QR di spot.';
+        case 'QR_WRONG_TYPE':
+          return 'QR_WRONG_TYPE: Kode QR yang dipindai adalah QR kalung kucing, bukan QR titik pakan. Pastikan Anda memindai kode QR resmi titik pakan (MTP1.S.*).';
+        case 'QR_REVOKED':
+          return 'QR_REVOKED: Kode QR spot ini sudah dicabut atau diganti oleh admin. Silakan pindai stiker QR terbaru di lokasi atau masukkan kode manual spot.';
+        case 'QR_INVALID':
+          return 'QR_INVALID: Kode QR atau kode manual spot tidak valid. Pastikan Anda memindai QR resmi Meowtopia atau periksa kode manual spot.';
+        case 'SPOT_UNAVAILABLE':
+        case 'SPOT_NOT_FOUND':
+          return 'SPOT_UNAVAILABLE: Spot pakan ini sedang dalam perawatan atau sementara tidak tersedia.';
+        case 'DAILY_CAP_REACHED':
+          return 'Batas reward harian Anda telah tercapai. Anda tetap dapat memberi makan, namun poin tidak bertambah hari ini.';
+        case 'IDEMPOTENCY_CONFLICT':
+          return 'Permintaan sedang diproses atau sudah tercatat sebelumnya. Muat ulang halaman.';
+        default:
+          return error.message;
+      }
+    }
+    final raw = error.toString();
+    return raw.replaceFirst('Bad state: ', '').replaceFirst('Exception: ', '');
   }
 }

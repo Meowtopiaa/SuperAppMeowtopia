@@ -3,13 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/scanner/qr_parser.dart';
 import '../../../core/theme/meow_style.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../logic/feeding_spot_provider.dart';
 
 class ScanSpotPage extends StatefulWidget {
   const ScanSpotPage({super.key, this.expectedSpotId});
-  final int? expectedSpotId;
+  final String? expectedSpotId;
   @override
   State<ScanSpotPage> createState() => _ScanSpotPageState();
 }
@@ -44,15 +45,23 @@ class _ScanSpotPageState extends State<ScanSpotPage>
     super.dispose();
   }
 
-  Future<void> _openToken(String token) async {
-    if (_busy) return;
+  Future<void> _openToken(String rawToken) async {
+    final trimmed = rawToken.trim();
+    if (_busy || trimmed.isEmpty) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
+      final parsed = parseQr(trimmed);
+      final normalizedToken = switch (parsed.kind) {
+        QrKind.spot => 'MTP1.S.${parsed.value}',
+        QrKind.cat => 'MTP1.C.${parsed.value}',
+        QrKind.unknown => trimmed,
+      };
+
       await context.read<FeedingSpotProvider>().openSession(
-        token,
+        normalizedToken,
         expectedSpotId: widget.expectedSpotId,
       );
       if (_cameraEnabled) await _controller.stop();
@@ -72,21 +81,22 @@ class _ScanSpotPageState extends State<ScanSpotPage>
     final token = await showDialog<String>(
       context: context,
       builder: (dialog) => AlertDialog(
-        title: const Text('Masukkan token QR spot'),
+        title: const Text('Input Kode Manual Spot'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Gunakan token lengkap pada QR resmi. Nomor spot saja tidak dapat membuka sesi.',
+              'Masukkan kode manual spot (contoh: SPOT-TULT-01) yang tertera pada stiker lokasi atau token QR resmi (MTP1.S.*) apabila QR rusak atau tidak terbaca kamera.',
               style: TextStyle(fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: input,
               autofocus: true,
+              textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
-                labelText: 'Token QR spot',
-                hintText: 'SPOT:…',
+                labelText: 'Kode manual spot / Token QR',
+                hintText: 'Contoh: SPOT-TULT-01',
               ),
               onSubmitted: (value) => Navigator.pop(dialog, value),
             ),
@@ -99,7 +109,7 @@ class _ScanSpotPageState extends State<ScanSpotPage>
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialog, input.text),
-            child: const Text('Periksa QR'),
+            child: const Text('Gunakan Kode'),
           ),
         ],
       ),
@@ -136,17 +146,38 @@ class _ScanSpotPageState extends State<ScanSpotPage>
                                 if (value != null) _openToken(value);
                               }
                             },
-                            errorBuilder: (context, error) => Container(
+                            errorBuilder: (context, error, child) => Container(
                               color: MeowStyle.slate,
                               alignment: Alignment.center,
                               padding: const EdgeInsets.all(24),
-                              child: const Text(
-                                'Kamera tidak tersedia atau izinnya ditolak. Periksa izin kamera, lalu coba lagi atau masukkan token QR.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  height: 1.6,
-                                ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.no_photography_outlined,
+                                    color: MeowStyle.peach,
+                                    size: 40,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Kamera tidak tersedia atau izin kamera ditolak. Berikan izin kamera di pengaturan perangkat, atau gunakan input kode manual spot di bawah.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      height: 1.6,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: MeowStyle.orange,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: _busy ? null : _manualInput,
+                                    icon: const Icon(Icons.pin_outlined, size: 18),
+                                    label: const Text('Input Kode Manual Spot'),
+                                  ),
+                                ],
                               ),
                             ),
                           )
@@ -344,7 +375,7 @@ class _ScanSpotPageState extends State<ScanSpotPage>
                                   size: 20,
                                 ),
                                 label: const Text(
-                                  'Input token manual',
+                                  'Input kode manual spot',
                                   style: TextStyle(fontSize: 12),
                                 ),
                               ),
@@ -388,7 +419,7 @@ class _ScanSpotPageState extends State<ScanSpotPage>
               secondary: true,
               busy: _busy,
               onPressed: () =>
-                  _openToken(selected?.qrToken ?? 'SPOT:FS-TULT-01'),
+                  _openToken(selected?.qrToken ?? 'MTP1.S.SPOT-TULT-01'),
             ),
             const SizedBox(height: 10),
             const Text(

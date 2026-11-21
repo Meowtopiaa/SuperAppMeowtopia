@@ -12,10 +12,22 @@ import '../../features/home/home_routes.dart';
 import '../../features/incident_report/incident_report_routes.dart';
 import '../../features/profile/profile_routes.dart';
 import '../../features/shell/main_navigation_shell.dart';
+import '../widgets/page_transition_overlay.dart';
 
 class AppRouter {
+  static final ValueNotifier<int> transitionNotifier = ValueNotifier<int>(0);
+
+  static void notifyPageTransition() {
+    transitionNotifier.value++;
+  }
+
+  static List<NavigatorObserver> _buildObservers() => [
+    PageTransitionTracker(onTransition: notifyPageTransition),
+  ];
+
   static GoRouter createRouter({String initialLocation = '/home'}) => GoRouter(
     initialLocation: initialLocation,
+    observers: _buildObservers(),
     errorBuilder: (context, state) => Scaffold(
       body: Center(
         child: FilledButton(
@@ -33,15 +45,39 @@ class AppRouter {
             MainNavigationShell(navigationShell: navigationShell),
         branches: [
           // The first five branches are the app-wide navigation destinations.
-          StatefulShellBranch(routes: homeRoutes),
-          StatefulShellBranch(routes: exploreRoutes),
-          StatefulShellBranch(routes: catIdentificationRoutes),
-          StatefulShellBranch(routes: activityRoutes),
-          StatefulShellBranch(routes: profileRoutes),
-          StatefulShellBranch(routes: feedingSpotRoutes),
-          StatefulShellBranch(routes: catHunterRoutes),
-          StatefulShellBranch(routes: catAdoptionRoutes),
-          StatefulShellBranch(routes: incidentReportRoutes),
+          StatefulShellBranch(routes: homeRoutes, observers: _buildObservers()),
+          StatefulShellBranch(
+            routes: exploreRoutes,
+            observers: _buildObservers(),
+          ),
+          StatefulShellBranch(
+            routes: catIdentificationRoutes,
+            observers: _buildObservers(),
+          ),
+          StatefulShellBranch(
+            routes: activityRoutes,
+            observers: _buildObservers(),
+          ),
+          StatefulShellBranch(
+            routes: profileRoutes,
+            observers: _buildObservers(),
+          ),
+          StatefulShellBranch(
+            routes: feedingSpotRoutes,
+            observers: _buildObservers(),
+          ),
+          StatefulShellBranch(
+            routes: catHunterRoutes,
+            observers: _buildObservers(),
+          ),
+          StatefulShellBranch(
+            routes: catAdoptionRoutes,
+            observers: _buildObservers(),
+          ),
+          StatefulShellBranch(
+            routes: incidentReportRoutes,
+            observers: _buildObservers(),
+          ),
         ],
       ),
     ],

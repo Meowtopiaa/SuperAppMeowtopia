@@ -133,10 +133,15 @@ class _RecordFeedingPageState extends State<RecordFeedingPage> {
         ),
       );
     }
-    final left = session.expiresAt.difference(DateTime.now());
-    final seconds = left.inSeconds.clamp(0, 900);
-    final countdown =
-        '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+    final intentLeft = session.remainingIntentTime;
+    final finalizeLeft = session.remainingFinalizeTime;
+    final intentSec = intentLeft.inSeconds;
+    final finalizeSec = finalizeLeft.inSeconds;
+    final intentCountdown =
+        '${(intentSec ~/ 60).toString().padLeft(2, '0')}:${(intentSec % 60).toString().padLeft(2, '0')}';
+    final finalizeCountdown =
+        '${(finalizeSec ~/ 60).toString().padLeft(2, '0')}:${(finalizeSec % 60).toString().padLeft(2, '0')}';
+
     return MeowPage(
       title: 'Refill Check In',
       bottom: MeowButton(
@@ -182,15 +187,33 @@ class _RecordFeedingPageState extends State<RecordFeedingPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                MeowPill(
-                  countdown,
-                  color: MeowStyle.peach,
-                  foreground: MeowStyle.orangeDark,
-                  icon: Icons.timer_outlined,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    MeowPill(
+                      finalizeCountdown,
+                      color: MeowStyle.peach,
+                      foreground: MeowStyle.orangeDark,
+                      icon: Icons.timer_outlined,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Intent: $intentCountdown',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: MeowStyle.brown,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            FeedingError(_error!),
+          ],
           if (session.isExpired) ...[
             const SizedBox(height: 12),
             const FeedingError(
@@ -647,6 +670,93 @@ class _RecordFeedingPageState extends State<RecordFeedingPage> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
+                const Text(
+                  'Kucing yang Diberi Makan (Opsional - AFS-10)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: MeowStyle.brown,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (session.catCode != null && session.catCode!.isNotEmpty)
+                  Row(
+                    children: [
+                      MeowPill(
+                        'Kucing: ${session.catCode}',
+                        color: MeowStyle.mint,
+                        foreground: MeowStyle.green,
+                        icon: Icons.pets_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Hapus asosiasi kucing',
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: () => setState(() {
+                          session.catCode = null;
+                          session.catId = null;
+                        }),
+                      ),
+                    ],
+                  )
+                else
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                    label: const Text('Pindai QR / Kode Kalung Kucing (AFS-10)'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: MeowStyle.orangeDark,
+                      side: const BorderSide(color: MeowStyle.peach),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final code = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) {
+                          final ctrl = TextEditingController();
+                          return AlertDialog(
+                            title: const Text('Identitas Kucing (Opsional)'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'Masukkan kode alfanumerik kalung atau token QR kucing yang ada di spot:',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: ctrl,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Contoh: CAT001 atau MTP1.C.token',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  textCapitalization: TextCapitalization.characters,
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Batal'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                                child: const Text('Simpan'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (code != null && code.isNotEmpty) {
+                        setState(() {
+                          session.catCode = code;
+                          session.catId = code;
+                        });
+                      }
+                    },
+                  ),
               ],
             ),
           ),

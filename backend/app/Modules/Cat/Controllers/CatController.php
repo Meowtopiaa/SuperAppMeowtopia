@@ -123,14 +123,20 @@ class CatController extends Controller
             'reason' => null,
         ];
 
-        // 4. Feeding Action (Available)
-        $actions[] = [
-            'id' => 'feeding.start',
-            'module' => 'FeedingSpot',
-            'label' => 'Beri Makan di Spot',
-            'enabled' => $cat->presence_status === 'ON_CAMPUS',
-            'reason' => null,
-        ];
+        // 4. Feeding Action (Delegated to FeedingActionProvider per PRD 4.3 & MEOW-23)
+        if (class_exists(\App\Modules\FeedingSpot\Services\FeedingActionProvider::class)) {
+            $feedingProvider = app(\App\Modules\FeedingSpot\Services\FeedingActionProvider::class);
+            $feedingActions = $feedingProvider->actionsFor($cat, $user);
+            $actions = array_merge($actions, $feedingActions);
+        } else {
+            $actions[] = [
+                'id' => 'feeding.start',
+                'module' => 'FeedingSpot',
+                'label' => 'Beri Makan di Spot',
+                'enabled' => $cat->presence_status === 'ON_CAMPUS',
+                'reason' => null,
+            ];
+        }
 
         return ApiResponse::success($actions, 'Daftar aksi hub profil kucing berhasil diambil.');
     }

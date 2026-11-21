@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/meow_style.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../logic/identification_provider.dart';
 
@@ -158,7 +159,7 @@ class _ScanQrPageState extends State<ScanQrPage> with WidgetsBindingObserver {
                               if (token != null) _identify(token);
                             }
                           },
-                          errorBuilder: (context, error) => const Center(
+                          errorBuilder: (context, error, child) => const Center(
                             child: Padding(
                               padding: EdgeInsets.all(24),
                               child: Text(
@@ -215,10 +216,10 @@ class _ScanQrPageState extends State<ScanQrPage> with WidgetsBindingObserver {
                   const Positioned.fill(
                     child: ColoredBox(
                       color: Colors.black54,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: MeowStyle.orange,
-                        ),
+                      child: LoadingIndicator(
+                        onDark: true,
+                        compact: true,
+                        size: 132,
                       ),
                     ),
                   ),
