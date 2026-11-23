@@ -1,0 +1,14 @@
+unique_code,name,gender,color_pattern,age_group,is_sterilized,description,territory_code,verification_status
+CAT-TULT-01,Oyen TULT,MALE,Orange Tabby,ADULT,true,Kucing jantan bulu oranye bergaris; sering beristirahat di dekat lobi barat TULT.,TULT,VERIFIED
+CAT-TULT-02,Miko,FEMALE,Calico,ADULT,true,Kucing tiga warna ramah dengan tanda putih di hidung; biasa di taman TULT.,TULT,VERIFIED
+CAT-TULT-03,Kuro,MALE,Black Solid,ADULT,,Kucing hitam polos dengan ujung telinga kiri terpotong tipis (ear-tip).,TULT,VERIFIED
+CAT-GKU-01,Luna,FEMALE,Tuxedo,ADULT,true,Kucing hitam putih seperti tuksedo; tenang dan sering terlihat di gazebo GKU.,GKU,VERIFIED
+CAT-GKU-02,Simba,MALE,Orange White Bicolor,KITTEN,false,Anak kucing oranye putih aktif; biasanya bersama induknya di koridor GKU.,GKU,VERIFIED
+CAT-GKU-03,Abu,UNKNOWN,Grey Tabby,ADULT,,Kucing abu-abu belang; agak pemalu terhadap keramaian.,GKU,UNVERIFIED
+CAT-FIT-01,Oreo,MALE,Black White Bicolor,ADULT,true,Kucing hitam putih bertubuh sedang; sering berada di area kantin FIT.,FIT,VERIFIED
+CAT-FIT-02,Bella,FEMALE,Tortoiseshell,SENIOR,true,Kucing tortoiseshell senior dengan bulu cokelat hitam berbintik.,FIT,VERIFIED
+CAT-ASRPA-01,Tiger,MALE,Brown Tabby,ADULT,true,Kucing belang cokelat tua berpostur besar di sekitar parkiran Asrama Putra.,ASRAMA_PA,VERIFIED
+CAT-ASRPA-02,Boni,MALE,White Ginger Spot,ADULT,,Kucing putih dengan bercak oranye di kepala dan ekor.,ASRAMA_PA,VERIFIED
+CAT-ASRPI-01,Comel,FEMALE,Calico Dilute,ADULT,true,Kucing calico warna pastel lembut; sangat akrab dengan penghuni Asrama Putri.,ASRAMA_PI,VERIFIED
+CAT-ASRPI-02,Putih,FEMALE,White Solid,UNKNOWN,,Kucing putih polos bermata kuning; status steril belum terkonfirmasi.,ASRAMA_PI,UNVERIFIED
+

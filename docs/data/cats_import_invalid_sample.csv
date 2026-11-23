@@ -1,0 +1,6 @@
+unique_code,name,gender,color_pattern,age_group,is_sterilized,description,territory_code,verification_status
+CAT-ERR-01,,MALE,Orange,ADULT,true,Gagal: kolom name kosong,TULT,VERIFIED
+CAT-ERR-02,Moci,INVALID_GENDER,Calico,ADULT,false,Gagal: gender tidak valid,TULT,VERIFIED
+CAT-ERR-03,Ciko,MALE,Tabby,ADULT,true,Gagal: territory_code tidak terdaftar,ZONA_FIKTIF,VERIFIED
+CAT-OK-01,Pusi Valid,FEMALE,White,ADULT,,Baris valid di antara baris error,TULT,VERIFIED
+CAT-OK-01,Pusi Duplikat,FEMALE,White,ADULT,,Gagal: unique_code duplikat dengan baris sebelumnya,TULT,VERIFIED

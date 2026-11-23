@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meowtopia — Lembar Cetak QR Kalung Kucing (MTP1.C)</title>
+  <style>
+    :root {
+      --ink: #1e2430;
+      --muted: #5c6575;
+      --accent: #e86f2c;
+      --accent-soft: #fff3eb;
+      --border: #d8dee9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: #f4f6f9;
+    }
+
+    .sheet-header {
+      max-width: 210mm;
+      margin: 0 auto 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+    }
+
+    .sheet-header h1 { margin: 0 0 4px; font-size: 18px; }
+    .sheet-header p { margin: 0; font-size: 12px; color: var(--muted); }
+
+    .print-btn {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .a4-page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 12mm;
+      background: #ffffff;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .page-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-bottom: 10mm;
+    }
+
+    .tag-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6mm;
+    }
+
+    .collar-tag {
+      border: 1.5px dashed #94a3b8;
+      border-radius: 10px;
+      padding: 4.5mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      background: #ffffff;
+      page-break-inside: avoid;
+    }
+
+    .tag-brand {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 3mm;
+    }
+
+    .tag-territory {
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 8px;
+    }
+
+    .qr-box {
+      width: 34mm;
+      height: 34mm;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2.5mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      margin-bottom: 2.5mm;
+    }
+
+    .qr-box svg { width: 100%; height: 100%; display: block; }
+    .cat-name { font-size: 12px; font-weight: 700; margin: 0 0 2px; }
+
+    .backup-code {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 3px 10px;
+      margin: 2mm 0 1.5mm;
+    }
+
+    .payload-preview {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 7px;
+      color: var(--muted);
+      word-break: break-all;
+      line-height: 1.3;
+    }
+
+    .safety-note { margin-top: 2mm; font-size: 7.5px; color: var(--muted); }
+
+    .sheet-footer {
+      margin-top: 8mm;
+      padding-top: 4mm;
+      border-top: 1px solid var(--border);
+      font-size: 9px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      .sheet-header { display: none; }
+      .a4-page { box-shadow: none; width: auto; min-height: auto; padding: 8mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet-header">
+    <div>
+      <h1>Lembar Cetak QR Kalung Kucing — Meowtopia</h1>
+      <p>Format baku PRD v1.1: <code>MTP1.C.&lt;token&gt;</code> + kode cadangan <code>unique_code</code> (tanpa URL/domain). Gunakan pada kalung <em>breakaway</em>.</p>
+    </div>
+    <button class="print-btn" onclick="window.print()">Cetak / Simpan PDF (A4)</button>
+  </div>
+
+  <main class="a4-page">
+    <div class="page-meta">
+      <span><strong>MEOWTOPIA SUPERAPP</strong> — Rekans Caps Data Curation</span>
+      <span>Endpoint sumber: <code>GET /api/v1/admin/cats/qr-sheet</code></span>
+    </div>
+
+    <section class="tag-grid" id="tag-grid"></section>
+
+    <div class="sheet-footer">
+      <span>Catatan: QR hanya dibaca oleh scanner internal aplikasi Meowtopia. Jangan cetak data privat pada kalung.</span>
+      <span>PRD v1.1 • CAT-03 / CAT-05</span>
+    </div>
+  </main>
+
+  <script>
+    const sampleItems = [
+      { name: 'Oyen TULT', unique_code: 'CAT-TULT-01', territory: 'TULT', qr_payload: 'MTP1.C.a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6' },
+      { name: 'Miko', unique_code: 'CAT-TULT-02', territory: 'TULT', qr_payload: 'MTP1.C.q7R8s9T0u1V2w3X4y5Z6a7B8c9D0e1F2' },
+      { name: 'Kuro', unique_code: 'CAT-TULT-03', territory: 'TULT', qr_payload: 'MTP1.C.g3H4i5J6k7L8m9N0o1P2q3R4s5T6u7V8' },
+      { name: 'Luna', unique_code: 'CAT-GKU-01', territory: 'GKU', qr_payload: 'MTP1.C.w9X0y1Z2a3B4c5D6e7F8g9H0i1J2k3L4' },
+      { name: 'Simba', unique_code: 'CAT-GKU-02', territory: 'GKU', qr_payload: 'MTP1.C.m5N6o7P8q9R0s1T2u3V4w5X6y7Z8a9B0' },
+      { name: 'Oreo', unique_code: 'CAT-FIT-01', territory: 'FIT', qr_payload: 'MTP1.C.c1D2e3F4g5H6i7J8k9L0m1N2o3P4q5R6' },
+      { name: 'Bella', unique_code: 'CAT-FIT-02', territory: 'FIT', qr_payload: 'MTP1.C.s7T8u9V0w1X2y3Z4a5B6c7D8e9F0g1H2' },
+      { name: 'Tiger', unique_code: 'CAT-ASRPA-01', territory: 'ASRAMA_PA', qr_payload: 'MTP1.C.i3J4k5L6m7N8o9P0q1R2s3T4u5V6w7X8' },
+      { name: 'Comel', unique_code: 'CAT-ASRPI-01', territory: 'ASRAMA_PI', qr_payload: 'MTP1.C.y9Z0a1B2c3D4e5F6g7H8i9J0k1L2m3N4' },
+    ];
+
+    function buildQrMockSvg(seedText) {
+      const size = 21;
+      let hash = 2166136261;
+      for (let i = 0; i < seedText.length; i++) {
+        hash ^= seedText.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      const isFinder = (r, c) =>
+        (r < 7 && c < 7) || (r < 7 && c >= size - 7) || (r >= size - 7 && c < 7);
+      const rects = [];
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          let filled = false;
+          if (isFinder(r, c)) {
+            const lr = r >= size - 7 ? r - (size - 7) : r;
+            const lc = c >= size - 7 ? c - (size - 7) : c;
+            filled = lr === 0 || lr === 6 || lc === 0 || lc === 6 || (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4);
+          } else {
+            const bit = Math.abs(Math.imul(hash ^ (r * 31 + c * 17), 2654435761)) % 10;
+            filled = bit < 5;
+          }
+          if (filled) rects.push(`<rect x="${c}" y="${r}" width="1" height="1" fill="#111827"/>`);
+        }
+      }
+      return `<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${seedText}">${rects.join('')}</svg>`;
+    }
+
+    const grid = document.getElementById('tag-grid');
+    grid.innerHTML = sampleItems.map((item) => `
+      <article class="collar-tag">
+        <div class="tag-brand">
+          <span>MEOWTOPIA</span>
+          <span class="tag-territory">${item.territory}</span>
+        </div>
+        <div class="qr-box">${buildQrMockSvg(item.qr_payload)}</div>
+        <h2 class="cat-name">${item.name}</h2>
+        <div class="backup-code" title="Kode cadangan input manual">${item.unique_code}</div>
+        <div class="payload-preview">${item.qr_payload}</div>
+        <div class="safety-note">Pindai lewat aplikasi Meowtopia • Jangan kejar kucing</div>
+      </article>
+    `).join('');
+  </script>
+</body>
+</html>

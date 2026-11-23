@@ -42,6 +42,16 @@ class Cat extends Model
         'last_seen_at' => 'datetime',
     ];
 
+    public function photos(): HasMany
+    {
+        return $this->hasMany(CatPhoto::class, 'cat_id')->orderBy('sort_order');
+    }
+
+    public function sightings(): HasMany
+    {
+        return $this->hasMany(CatSighting::class, 'cat_id');
+    }
+
     public function qrTokens(): HasMany
     {
         return $this->hasMany(CatQrToken::class, 'cat_id');

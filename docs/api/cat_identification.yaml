@@ -1,0 +1,266 @@
+openapi: 3.0.3
+info:
+  title: Meowtopia API - Modul CatIdentification & Kurasi (Rekans Caps)
+  version: 1.1.0
+  description: |
+    Kontrak API untuk identifikasi kucing berbasis pertanyaan (Akinator - P0),
+    identifikasi foto melalui ml-service FastAPI (P1 dengan flag ML_ENABLED),
+    pelaporan dugaan kucing tak teridentifikasi (unidentified_sightings - P0),
+    serta manajemen pertanyaan & antrean kurasi oleh data_curator.
+    Mengacu pada PRD Final Meowtopia SuperApp v1.1 (Bagian 6.2, 7.2, 8.3, FIX-08).
+    Catatan: Identifikasi tidak memberikan poin dan tidak menampilkan persentase confidence dummy.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        maxLength: 128
+      description: Kunci unik untuk mencegah duplikasi pengiriman ulang.
+
+  schemas:
+    IdentificationQuestion:
+      type: object
+      properties:
+        id: { type: string, example: 01JBC9Z8W2V3M4N5P6Q7R8S9Q1 }
+        code: { type: string, example: COAT_ORANGE }
+        question_text: { type: string, example: Apakah bulu kucing dominan berwarna oranye / jahe? }
+        sort_order: { type: integer, example: 1 }
+        is_active: { type: boolean, example: true }
+
+    CandidateCatSummary:
+      type: object
+      description: Ringkasan kandidat kucing (publik, tanpa koordinat mentah dan tanpa persentase confidence dummy).
+      properties:
+        id: { type: string }
+        unique_code: { type: string, example: CAT001 }
+        name: { type: string, example: Oyen }
+        gender: { type: string, enum: [MALE, FEMALE, UNKNOWN] }
+        color_pattern: { type: string, nullable: true }
+        age_group: { type: string, enum: [KITTEN, ADULT, SENIOR, UNKNOWN] }
+        primary_photo_media_id: { type: string, nullable: true }
+        presence_status: { type: string, enum: [ON_CAMPUS, ADOPTED, MISSING, DECEASED] }
+
+    AkinatorStepResponse:
+      type: object
+      properties:
+        attempt_id: { type: string }
+        result: { type: string, enum: [IN_PROGRESS, MATCHED, INCONCLUSIVE] }
+        next_question:
+          allOf:
+            - $ref: '#/components/schemas/IdentificationQuestion'
+          nullable: true
+        remaining_count: { type: integer, example: 3 }
+        answered_count: { type: integer }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/CandidateCatSummary' }
+
+    PhotoIdentifyResponse:
+      type: object
+      properties:
+        attempt_id: { type: string }
+        ml_enabled: { type: boolean }
+        model_version: { type: string, nullable: true }
+        result: { type: string, enum: [MATCHED, INCONCLUSIVE, NOT_CAT, ML_DISABLED] }
+        predicted_category: { type: string, nullable: true }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/CandidateCatSummary' }
+        fallback_recommended: { type: string, nullable: true, enum: [RETRY_PHOTO, AKINATOR, REPORT_UNIDENTIFIED] }
+
+    UnidentifiedSighting:
+      type: object
+      properties:
+        id: { type: string }
+        reporter_id: { type: string }
+        media_id: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        source: { type: string, enum: [IDENTIFY_FAILED, AKINATOR_FAILED, INCIDENT_NEW_CAT] }
+        incident_report_id: { type: string, nullable: true }
+        status: { type: string, enum: [OPEN, MATCHED, CAT_CREATED, REJECTED] }
+        matched_cat_id: { type: string, nullable: true }
+        handled_by: { type: string, nullable: true }
+        handled_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+paths:
+  /cats/identify/akinator/start:
+    post:
+      summary: Mulai sesi identifikasi berbasis pertanyaan (Akinator - P0)
+      tags: [Cat Identification]
+      responses:
+        '201':
+          description: Sesi Akinator dimulai dan mengembalikan pertanyaan pertama
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/AkinatorStepResponse' }
+
+  /cats/identify/akinator/answer:
+    post:
+      summary: Kirim jawaban pertanyaan Akinator (YES / NO / UNKNOWN) dan saring kandidat
+      tags: [Cat Identification]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [attempt_id, question_id, answer]
+              properties:
+                attempt_id: { type: string }
+                question_id: { type: string }
+                answer: { type: string, enum: [YES, NO, UNKNOWN] }
+      responses:
+        '200': { description: Pertanyaan berikutnya atau daftar kandidat / INCONCLUSIVE }
+        '404': { description: Sesi attempt tidak ditemukan }
+        '422': { description: Validasi jawaban gagal }
+
+  /cats/identify/photo:
+    post:
+      summary: Identifikasi kucing via foto melalui ml-service FastAPI (P1, bergantung flag ML_ENABLED)
+      tags: [Cat Identification]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [media_id]
+              properties:
+                media_id: { type: string, description: ULID hasil unggahan dari POST /media }
+      responses:
+        '200': { description: Hasil penyaringan kandidat atau fallback saat ML_ENABLED=false / NOT_CAT }
+
+  /cats/unidentified:
+    post:
+      summary: Catat dugaan kucing baru / tidak teridentifikasi ke antrean kurasi (P0)
+      tags: [Cat Identification]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source]
+              properties:
+                media_id: { type: string, nullable: true }
+                location_lat: { type: number, nullable: true }
+                location_lng: { type: number, nullable: true }
+                notes: { type: string, maxLength: 1000, nullable: true }
+                source: { type: string, enum: [IDENTIFY_FAILED, AKINATOR_FAILED, INCIDENT_NEW_CAT] }
+                incident_report_id: { type: string, nullable: true }
+      responses:
+        '201': { description: Laporan masuk antrean kurasi (status OPEN) }
+
+  /admin/unidentified:
+    get:
+      summary: Daftar antrean kucing tak teridentifikasi untuk data_curator (izin cat.curate)
+      tags: [Cat Curation Admin]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, MATCHED, CAT_CREATED, REJECTED] }
+        - name: source
+          in: query
+          schema: { type: string, enum: [IDENTIFY_FAILED, AKINATOR_FAILED, INCIDENT_NEW_CAT] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+      responses:
+        '200': { description: Daftar antrean kurasi berpaginasi }
+        '403': { description: Tidak memiliki izin cat.curate }
+
+  /admin/unidentified/{id}/resolve:
+    post:
+      summary: Selesaikan item antrean kurasi (MATCHED, CAT_CREATED, atau REJECTED; izin cat.curate)
+      tags: [Cat Curation Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [MATCHED, CAT_CREATED, REJECTED] }
+                matched_cat_id: { type: string, nullable: true }
+                new_cat: { type: object, nullable: true }
+                reason: { type: string, nullable: true }
+      responses:
+        '200': { description: Item kurasi selesai dan diaudit }
+        '403': { description: Tidak memiliki izin cat.curate }
+        '409': { description: Item sudah pernah diselesaikan }
+
+  /admin/identification-questions:
+    get:
+      summary: Daftar semua pertanyaan Akinator (izin cat.curate)
+      tags: [Cat Curation Admin]
+      responses:
+        '200': { description: Daftar pertanyaan }
+    post:
+      summary: Tambah pertanyaan Akinator baru (izin cat.curate)
+      tags: [Cat Curation Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, question_text]
+              properties:
+                code: { type: string }
+                question_text: { type: string }
+                sort_order: { type: integer, default: 0 }
+                is_active: { type: boolean, default: true }
+      responses:
+        '201': { description: Pertanyaan dibuat }
+
+  /admin/identification-questions/{id}:
+    patch:
+      summary: Ubah pertanyaan Akinator (izin cat.curate)
+      tags: [Cat Curation Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Pertanyaan diperbarui }
+    delete:
+      summary: Nonaktifkan atau hapus pertanyaan Akinator (izin cat.curate)
+      tags: [Cat Curation Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Pertanyaan dihapus }

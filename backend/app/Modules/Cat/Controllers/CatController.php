@@ -4,7 +4,8 @@ namespace App\Modules\Cat\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Cat\Models\Cat;
-use App\Modules\Cat\Models\CatQrToken;
+use App\Modules\Cat\Requests\RecordSightingRequest;
+use App\Modules\Cat\Resources\CatPublicResource;
 use App\Modules\Cat\Services\QrCodeService;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
@@ -18,64 +19,88 @@ class CatController extends Controller
     ) {}
 
     /**
-     * List all campus cats (Public resource without precise coordinates).
+     * List all campus cats (Public resource without precise coordinates or QR tokens).
      * GET /api/v1/cats
      */
     public function index(Request $request)
     {
-        $query = Cat::query();
+        $query = Cat::query()->with('photos');
 
-        // Filter presence (default only ON_CAMPUS for general public)
-        if ($request->has('presence_status')) {
+        if ($request->filled('presence_status')) {
             $query->where('presence_status', $request->query('presence_status'));
         }
 
-        if ($request->has('adoption_status')) {
+        if ($request->filled('adoption_status')) {
             $query->where('adoption_status', $request->query('adoption_status'));
         }
 
-        if ($request->has('search')) {
+        if ($request->filled('health_status')) {
+            $query->where('health_status', $request->query('health_status'));
+        }
+
+        if ($request->filled('territory_id')) {
+            $query->where('territory_id', $request->query('territory_id'));
+        }
+
+        if ($request->filled('search')) {
             $search = $request->query('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('unique_code', 'like', "%{$search}%")
-                  ->orWhere('color_pattern', 'like', "%{$search}%");
+                    ->orWhere('unique_code', 'like', "%{$search}%")
+                    ->orWhere('color_pattern', 'like', "%{$search}%");
             });
         }
 
-        $cats = $query->paginate($request->query('per_page', 15));
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
+        $paginator = $query->orderBy('name')->paginate($perPage);
 
-        return ApiResponse::paginated($cats, 'Daftar kucing berhasil diambil.');
+        $items = CatPublicResource::collection($paginator->getCollection())->resolve($request);
+
+        return ApiResponse::success($items, 'Daftar kucing berhasil diambil.', 200, [
+            'current_page' => $paginator->currentPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'last_page' => $paginator->lastPage(),
+            'has_more' => $paginator->hasMorePages(),
+        ]);
     }
 
     /**
      * Show single cat profile (Public resource without private data).
      * GET /api/v1/cats/{id}
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        $cat = Cat::find($id);
+        $cat = Cat::with('photos')->find($id);
 
         if (!$cat) {
             return ApiResponse::error('Kucing tidak ditemukan.', 404, 'NOT_FOUND');
         }
 
-        return ApiResponse::success($cat, 'Detail profil kucing berhasil diambil.');
+        return ApiResponse::success(
+            (new CatPublicResource($cat))->resolve($request),
+            'Detail profil kucing berhasil diambil.'
+        );
     }
 
     /**
-     * Find cat by printed collar unique code (Manual input).
+     * Find cat by printed collar unique code (Manual input, CAT-05).
      * GET /api/v1/cats/by-code/{unique_code}
      */
-    public function findByCode(string $uniqueCode)
+    public function findByCode(Request $request, string $uniqueCode)
     {
-        $cat = Cat::where('unique_code', trim($uniqueCode))->first();
+        $cat = Cat::with('photos')
+            ->where('unique_code', strtoupper(trim($uniqueCode)))
+            ->first();
 
         if (!$cat) {
             return ApiResponse::error('Kucing dengan kode tersebut tidak ditemukan.', 404, 'NOT_FOUND');
         }
 
-        return ApiResponse::success($cat, 'Kucing berhasil ditemukan.');
+        return ApiResponse::success(
+            (new CatPublicResource($cat))->resolve($request),
+            'Kucing berhasil ditemukan.'
+        );
     }
 
     /**
@@ -93,9 +118,8 @@ class CatController extends Controller
         $user = $request->user();
         $actions = [];
 
-        // 1. Encounter Action (Cat Hunter)
         $canEncounter = ($cat->presence_status === 'ON_CAMPUS') &&
-                         !in_array($cat->health_status, ['SICK', 'INJURED'], true);
+            !in_array($cat->health_status, ['SICK', 'INJURED'], true);
         $actions[] = [
             'id' => 'game.encounter',
             'module' => 'CatHunter',
@@ -104,7 +128,6 @@ class CatController extends Controller
             'reason' => $canEncounter ? null : 'Kucing sedang tidak berada di kampus atau sedang dalam perawatan sakit/terluka.',
         ];
 
-        // 2. Adoption Action (Cat Adoption)
         $canAdopt = ($cat->adoption_status === 'READY') && ($user?->user_type === 'MAHASISWA');
         $actions[] = [
             'id' => 'adoption.apply',
@@ -114,7 +137,6 @@ class CatController extends Controller
             'reason' => $canAdopt ? null : ($user?->user_type !== 'MAHASISWA' ? 'Hanya mahasiswa terverifikasi yang dapat mengajukan adopsi.' : 'Kucing ini belum berstatus siap adopsi.'),
         ];
 
-        // 3. Incident Report Action (Always available)
         $actions[] = [
             'id' => 'incident.report',
             'module' => 'IncidentReport',
@@ -123,13 +145,12 @@ class CatController extends Controller
             'reason' => null,
         ];
 
-        // 4. Feeding Action (Available)
         $actions[] = [
             'id' => 'feeding.start',
             'module' => 'FeedingSpot',
             'label' => 'Beri Makan di Spot',
             'enabled' => $cat->presence_status === 'ON_CAMPUS',
-            'reason' => null,
+            'reason' => $cat->presence_status === 'ON_CAMPUS' ? null : 'Kucing sedang tidak berada di kampus.',
         ];
 
         return ApiResponse::success($actions, 'Daftar aksi hub profil kucing berhasil diambil.');
@@ -138,20 +159,23 @@ class CatController extends Controller
     /**
      * Record sighting for this cat (PRD 4.4).
      * POST /api/v1/cats/{id}/sightings (Idempotency Key required)
+     * Deduplication: one sighting per (user, cat, source) within 30 minutes.
      */
-    public function recordSighting(Request $request, string $id)
+    public function recordSighting(RecordSightingRequest $request, string $id)
     {
         $cat = Cat::find($id);
         if (!$cat) {
             return ApiResponse::error('Kucing tidak ditemukan.', 404, 'NOT_FOUND');
         }
 
+        $validated = $request->validated();
         $user = $request->user();
+        $source = $validated['source'] ?? 'manual_sighting';
 
-        // 30-minute deduplication check
         $recentSighting = DB::table('cat_sightings')
             ->where('cat_id', $cat->id)
             ->where('user_id', $user->id)
+            ->where('source', $source)
             ->where('occurred_at', '>=', now()->subMinutes(30))
             ->first();
 
@@ -163,19 +187,30 @@ class CatController extends Controller
         }
 
         $sightingId = (string) Str::ulid();
-        DB::table('cat_sightings')->insert([
-            'id' => $sightingId,
-            'cat_id' => $cat->id,
-            'user_id' => $user->id,
-            'source' => $request->input('source', 'manual_sighting'),
-            'request_id' => $request->header('Idempotency-Key'),
-            'location_lat' => $request->input('location_lat'),
-            'location_lng' => $request->input('location_lng'),
-            'accuracy_m' => $request->input('accuracy_m'),
-            'occurred_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $now = now();
+
+        DB::transaction(function () use ($sightingId, $cat, $user, $source, $validated, $request, $now) {
+            DB::table('cat_sightings')->insert([
+                'id' => $sightingId,
+                'cat_id' => $cat->id,
+                'user_id' => $user->id,
+                'source' => $source,
+                'request_id' => $request->header('Idempotency-Key'),
+                'location_lat' => $validated['location_lat'] ?? null,
+                'location_lng' => $validated['location_lng'] ?? null,
+                'accuracy_m' => $validated['accuracy_m'] ?? null,
+                'metadata' => isset($validated['metadata']) ? json_encode($validated['metadata']) : null,
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $cat->last_seen_at = $now;
+            if ($cat->first_seen_at === null) {
+                $cat->first_seen_at = $now;
+            }
+            $cat->save();
+        });
 
         return ApiResponse::created([
             'sighting_id' => $sightingId,
