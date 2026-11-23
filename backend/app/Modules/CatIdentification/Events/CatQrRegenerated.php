@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Cat\Events;
+namespace App\Modules\CatIdentification\Events;
 
 use App\Modules\Cat\Models\Cat;
 use App\Modules\Cat\Models\CatQrToken;
@@ -18,4 +18,3 @@ class CatQrRegenerated
         public readonly ?string $reason = null,
     ) {}
 }
-

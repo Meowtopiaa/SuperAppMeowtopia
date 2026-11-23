@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Cat\Services;
+namespace App\Modules\CatIdentification\Services;
 
 use App\Models\User;
 use App\Modules\Cat\Models\Cat;
@@ -11,10 +11,6 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class CatMergeService
 {
-    /**
-     * Merge a duplicate cat profile into a primary cat profile (PRD 4.2, CAT-01).
-     * Reassigns history to primaryCat, revokes duplicate's QR tokens, soft-deletes duplicate, and records audit log.
-     */
     public function merge(Cat $primaryCat, Cat $duplicateCat, User $actor, string $reason): array
     {
         if ($primaryCat->id === $duplicateCat->id) {

@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\Cat\Requests;
+namespace App\Modules\CatIdentification\Requests;
 
-use App\Modules\Cat\Policies\CatPolicy;
+use App\Modules\CatIdentification\Policies\CatPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -37,11 +37,9 @@ class UpdateCatRequest extends FormRequest
             'primary_photo_media_id' => ['nullable', 'string', 'size:26', 'exists:media_files,id'],
             'verification_status' => ['sometimes', 'in:UNVERIFIED,VERIFIED'],
 
-            // presence_status may only be changed by data_curator (cat.curate) with reason via CatStatusService
             'presence_status' => ['sometimes', 'in:ON_CAMPUS,MISSING,DECEASED'],
             'status_reason' => ['required_with:presence_status', 'string', 'max:500'],
 
-            // health_status (IncidentReport) & adoption_status (CatAdoption) cannot be mutated by Cat module
             'health_status' => ['prohibited'],
             'adoption_status' => ['prohibited'],
         ];

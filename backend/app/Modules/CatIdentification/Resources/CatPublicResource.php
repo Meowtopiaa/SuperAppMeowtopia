@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Modules\Cat\Resources;
+namespace App\Modules\CatIdentification\Resources;
 
+use App\Modules\CatIdentification\Models\CatPhoto;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,6 +19,18 @@ class CatPublicResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $photos = CatPhoto::where('cat_id', $this->id)
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn ($photo) => [
+                'id' => $photo->id,
+                'media_id' => $photo->media_id,
+                'angle' => $photo->angle,
+                'sort_order' => $photo->sort_order,
+            ])
+            ->values()
+            ->all();
+
         return [
             'id' => $this->id,
             'unique_code' => $this->unique_code,
@@ -36,17 +49,9 @@ class CatPublicResource extends JsonResource
             'verification_status' => $this->verification_status,
             'first_seen_at' => $this->first_seen_at?->toIso8601String(),
             'last_seen_at' => $this->last_seen_at?->toIso8601String(),
-            'photos' => $this->whenLoaded('photos', function () {
-                return $this->photos->map(fn ($photo) => [
-                    'id' => $photo->id,
-                    'media_id' => $photo->media_id,
-                    'angle' => $photo->angle,
-                    'sort_order' => $photo->sort_order,
-                ])->values()->all();
-            }),
+            'photos' => $photos,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }
 }
-

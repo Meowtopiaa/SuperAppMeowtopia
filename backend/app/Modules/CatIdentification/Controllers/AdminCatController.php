@@ -1,21 +1,21 @@
 <?php
 
-namespace App\Modules\Cat\Controllers;
+namespace App\Modules\CatIdentification\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Cat\Models\Cat;
-use App\Modules\Cat\Models\CatPhoto;
-use App\Modules\Cat\Policies\CatPolicy;
-use App\Modules\Cat\Requests\ImportCatsRequest;
-use App\Modules\Cat\Requests\MergeCatRequest;
-use App\Modules\Cat\Requests\RegenerateQrRequest;
-use App\Modules\Cat\Requests\StoreCatRequest;
-use App\Modules\Cat\Requests\UpdateCatRequest;
-use App\Modules\Cat\Requests\UpdateCatTraitsRequest;
-use App\Modules\Cat\Resources\CatAdminResource;
-use App\Modules\Cat\Services\CatImportService;
-use App\Modules\Cat\Services\CatMergeService;
-use App\Modules\Cat\Services\QrCodeService;
+use App\Modules\CatIdentification\Models\CatPhoto;
+use App\Modules\CatIdentification\Policies\CatPolicy;
+use App\Modules\CatIdentification\Requests\ImportCatsRequest;
+use App\Modules\CatIdentification\Requests\MergeCatRequest;
+use App\Modules\CatIdentification\Requests\RegenerateQrRequest;
+use App\Modules\CatIdentification\Requests\StoreCatRequest;
+use App\Modules\CatIdentification\Requests\UpdateCatRequest;
+use App\Modules\CatIdentification\Requests\UpdateCatTraitsRequest;
+use App\Modules\CatIdentification\Resources\CatAdminResource;
+use App\Modules\CatIdentification\Services\CatImportService;
+use App\Modules\CatIdentification\Services\CatMergeService;
+use App\Modules\CatIdentification\Services\CatQrService;
 use App\Modules\Core\Services\CatStatusService;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
@@ -26,17 +26,13 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 class AdminCatController extends Controller
 {
     public function __construct(
-        protected QrCodeService $qrCodeService,
+        protected CatQrService $catQrService,
         protected CatStatusService $catStatusService,
         protected CatMergeService $catMergeService,
         protected CatImportService $catImportService,
         protected CatPolicy $catPolicy
     ) {}
 
-    /**
-     * Create a new cat profile with an initial active QR token (CAT-01, CAT-02, FIX-03, FIX-05).
-     * POST /api/v1/admin/cats
-     */
     public function store(StoreCatRequest $request)
     {
         $validated = $request->validated();
@@ -45,7 +41,7 @@ class AdminCatController extends Controller
         $cat = DB::transaction(function () use ($validated, $actor) {
             $uniqueCode = !empty($validated['unique_code'])
                 ? strtoupper($validated['unique_code'])
-                : $this->qrCodeService->generateUniqueCode();
+                : $this->catQrService->generateUniqueCode();
 
             $cat = Cat::create([
                 'unique_code' => $uniqueCode,
@@ -75,7 +71,7 @@ class AdminCatController extends Controller
                 }
             }
 
-            $this->qrCodeService->issueInitialToken($cat, $actor);
+            $this->catQrService->issueInitialToken($cat, $actor);
 
             DB::table('audit_logs')->insert([
                 'id' => (string) Str::ulid(),
@@ -92,7 +88,7 @@ class AdminCatController extends Controller
             return $cat;
         });
 
-        $cat->load(['photos', 'activeQrToken']);
+        $cat->load('activeQrToken');
 
         return ApiResponse::created(
             (new CatAdminResource($cat))->resolve($request),
@@ -100,11 +96,6 @@ class AdminCatController extends Controller
         );
     }
 
-    /**
-     * Update cat master profile (FIX-03).
-     * presence_status changes require cat.curate and go through CatStatusService.
-     * PATCH /api/v1/admin/cats/{id}
-     */
     public function update(UpdateCatRequest $request, string $id)
     {
         $cat = Cat::find($id);
@@ -180,7 +171,7 @@ class AdminCatController extends Controller
             return ApiResponse::error($e->getMessage(), 409, 'CONFLICT');
         }
 
-        $cat->refresh()->load(['photos', 'activeQrToken']);
+        $cat->refresh()->load('activeQrToken');
 
         return ApiResponse::success(
             (new CatAdminResource($cat))->resolve($request),
@@ -188,10 +179,6 @@ class AdminCatController extends Controller
         );
     }
 
-    /**
-     * Import cats from CSV upload (CAT-06).
-     * POST /api/v1/admin/cats/import
-     */
     public function import(ImportCatsRequest $request)
     {
         $file = $request->file('file');
@@ -200,10 +187,6 @@ class AdminCatController extends Controller
         return ApiResponse::success($summary, 'Proses impor CSV kucing selesai.');
     }
 
-    /**
-     * Revoke active QR token and generate a new one (CAT-03, IT-02).
-     * POST /api/v1/admin/cats/{id}/qr/regenerate
-     */
     public function regenerateQr(RegenerateQrRequest $request, string $id)
     {
         $cat = Cat::find($id);
@@ -211,7 +194,7 @@ class AdminCatController extends Controller
             return ApiResponse::error('Kucing tidak ditemukan.', 404, 'NOT_FOUND');
         }
 
-        $newToken = $this->qrCodeService->regenerateToken(
+        $newToken = $this->catQrService->regenerateToken(
             $cat,
             $request->user(),
             $request->validated()['reason']
@@ -222,15 +205,11 @@ class AdminCatController extends Controller
             'unique_code' => $cat->unique_code,
             'token_id' => $newToken->id,
             'status' => $newToken->status,
-            'qr_payload' => $this->qrCodeService->formatQrPayload($newToken->token),
+            'qr_payload' => $this->catQrService->formatQrPayload($newToken->token),
             'issued_at' => $newToken->issued_at?->toIso8601String(),
         ], 'Token QR kucing berhasil diperbarui. Token lama telah dicabut.');
     }
 
-    /**
-     * Printable QR sheet data for active cats (CAT-03, PRD 4.2).
-     * GET /api/v1/admin/cats/qr-sheet
-     */
     public function qrSheet(Request $request)
     {
         if (!$this->catPolicy->viewQrSheet($request->user())) {
@@ -260,7 +239,7 @@ class AdminCatController extends Controller
                 'unique_code' => $cat->unique_code,
                 'territory_id' => $cat->territory_id,
                 'has_active_qr' => $token !== null,
-                'qr_payload' => $token ? $this->qrCodeService->formatQrPayload($token->token) : null,
+                'qr_payload' => $token ? $this->catQrService->formatQrPayload($token->token) : null,
                 'issued_at' => $token?->issued_at?->toIso8601String(),
             ];
         })->values()->all();
@@ -272,10 +251,6 @@ class AdminCatController extends Controller
         ], 'Data lembar cetak QR berhasil diambil.');
     }
 
-    /**
-     * Upsert verified physical trait answers for Akinator identification (PRD 7.2, 8.3).
-     * PUT /api/v1/admin/cats/{id}/traits
-     */
     public function updateTraits(UpdateCatTraitsRequest $request, string $id)
     {
         $cat = Cat::find($id);
@@ -312,10 +287,6 @@ class AdminCatController extends Controller
         ], 'Atribut ciri fisik kucing berhasil diperbarui.');
     }
 
-    /**
-     * Merge duplicate cat profile into this primary cat profile (CAT-01, PRD 4.2).
-     * POST /api/v1/admin/cats/{id}/merge
-     */
     public function merge(MergeCatRequest $request, string $id)
     {
         $primaryCat = Cat::find($id);

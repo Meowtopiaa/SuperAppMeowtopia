@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Cat\Requests;
+namespace App\Modules\CatIdentification\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -22,4 +22,3 @@ class RecordSightingRequest extends FormRequest
         ];
     }
 }
-

@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Modules\Cat\Models;
+namespace App\Modules\CatIdentification\Models;
 
 use App\Models\User;
+use App\Modules\Cat\Models\Cat;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ class CatSighting extends Model
 {
     use HasFactory, HasUlids;
 
+    protected $table = 'cat_sightings';
     protected $keyType = 'string';
     public $incrementing = false;
 
@@ -46,4 +48,3 @@ class CatSighting extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 }
-

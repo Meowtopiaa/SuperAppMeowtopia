@@ -1,22 +1,21 @@
 <?php
 
-namespace App\Modules\Cat\Requests;
+namespace App\Modules\CatIdentification\Requests;
 
-use App\Modules\Cat\Policies\CatPolicy;
+use App\Modules\CatIdentification\Policies\CatPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
-class MergeCatRequest extends FormRequest
+class RegenerateQrRequest extends FormRequest
 {
     public function authorize(): bool
     {
         $user = $this->user();
-        return $user !== null && app(CatPolicy::class)->merge($user);
+        return $user !== null && app(CatPolicy::class)->regenerateQr($user);
     }
 
     public function rules(): array
     {
         return [
-            'duplicate_cat_id' => ['required', 'string', 'size:26', 'exists:cats,id'],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
         ];
     }

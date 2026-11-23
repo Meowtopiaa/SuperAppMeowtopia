@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Cat\Services;
+namespace App\Modules\CatIdentification\Services;
 
 use App\Models\User;
 use App\Modules\Cat\Models\Cat;
@@ -11,12 +11,9 @@ use InvalidArgumentException;
 class CatImportService
 {
     public function __construct(
-        protected QrCodeService $qrCodeService
+        protected CatQrService $catQrService
     ) {}
 
-    /**
-     * Import initial cat master data from a CSV file exported from Google Sheets (CAT-06).
-     */
     public function importFromPath(string $filePath, ?User $actor = null): array
     {
         if (!is_readable($filePath)) {
@@ -68,7 +65,7 @@ class CatImportService
 
             $uniqueCode = !empty($data['unique_code'])
                 ? strtoupper($data['unique_code'])
-                : $this->qrCodeService->generateUniqueCode();
+                : $this->catQrService->generateUniqueCode();
 
             $gender = !empty($data['gender']) ? strtoupper($data['gender']) : 'UNKNOWN';
             $ageGroup = !empty($data['age_group']) ? strtoupper($data['age_group']) : 'UNKNOWN';
@@ -139,7 +136,7 @@ class CatImportService
                     'verification_status' => $valid['verification_status'],
                 ]);
 
-                $this->qrCodeService->issueInitialToken($cat, $actor);
+                $this->catQrService->issueInitialToken($cat, $actor);
             });
 
             $imported++;

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Modules\Cat\Services\CatImportService;
+use App\Modules\CatIdentification\Services\CatImportService;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 

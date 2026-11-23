@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\Feature\Cat;
+namespace Tests\Feature\CatIdentification;
 
 use App\Models\User;
 use App\Modules\Cat\Models\Cat;
-use App\Modules\Cat\Services\QrCodeService;
+use App\Modules\CatIdentification\Services\CatQrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -54,7 +54,7 @@ class CatPublicTest extends TestCase
             'verification_status' => 'VERIFIED',
         ], $overrides));
 
-        app(QrCodeService::class)->issueInitialToken($cat);
+        app(CatQrService::class)->issueInitialToken($cat);
 
         return $cat;
     }

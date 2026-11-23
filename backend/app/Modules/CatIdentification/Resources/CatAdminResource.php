@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\Cat\Resources;
+namespace App\Modules\CatIdentification\Resources;
 
-use App\Modules\Cat\Services\QrCodeService;
+use App\Modules\CatIdentification\Services\CatQrService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,7 +19,7 @@ class CatAdminResource extends JsonResource
     public function toArray(Request $request): array
     {
         $base = (new CatPublicResource($this->resource))->toArray($request);
-        $qrService = app(QrCodeService::class);
+        $qrService = app(CatQrService::class);
 
         $activeToken = $this->relationLoaded('activeQrToken')
             ? $this->activeQrToken
@@ -36,4 +36,3 @@ class CatAdminResource extends JsonResource
         ]);
     }
 }
-

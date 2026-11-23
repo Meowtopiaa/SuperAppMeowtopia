@@ -1,13 +1,13 @@
 <?php
 
-namespace Tests\Feature\Cat;
+namespace Tests\Feature\CatIdentification;
 
 use App\Models\User;
-use App\Modules\Cat\Events\CatQrRegenerated;
 use App\Modules\Cat\Models\Cat;
 use App\Modules\Cat\Models\CatQrToken;
-use App\Modules\Cat\Services\QrCodeService;
+use App\Modules\CatIdentification\Events\CatQrRegenerated;
 use App\Modules\CatIdentification\Models\IdentificationQuestion;
+use App\Modules\CatIdentification\Services\CatQrService;
 use App\Modules\Core\Services\ScanResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -82,7 +82,7 @@ class CatAdminTest extends TestCase
             'verification_status' => 'VERIFIED',
         ]);
 
-        app(QrCodeService::class)->issueInitialToken($cat);
+        app(CatQrService::class)->issueInitialToken($cat);
 
         return $cat;
     }
@@ -314,7 +314,6 @@ class CatAdminTest extends TestCase
         $this->assertNotFalse($sampleCsv);
         $this->assertNotFalse($invalidCsv);
 
-        // All 12 rows in valid sample CSV must import cleanly
         $this->artisan('cats:import', ['file' => $sampleCsv])
             ->expectsOutputToContain('12 kucing diimpor, 0 dilewati')
             ->assertSuccessful();
@@ -322,7 +321,6 @@ class CatAdminTest extends TestCase
         $this->assertEquals(12, Cat::count());
         $this->assertEquals(12, CatQrToken::where('status', 'ACTIVE')->count());
 
-        // Invalid sample CSV: 1 valid row imported, 4 invalid rows skipped
         $this->artisan('cats:import', ['file' => $invalidCsv])
             ->expectsOutputToContain('1 kucing diimpor, 4 dilewati')
             ->assertSuccessful();

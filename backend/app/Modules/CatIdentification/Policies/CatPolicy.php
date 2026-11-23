@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Modules\Cat\Policies;
+namespace App\Modules\CatIdentification\Policies;
 
 use App\Models\User;
 use App\Modules\Cat\Models\Cat;
 
 /**
- * Permission-based Policy for Cat domain (PRD 3.1, 3.2, FIX-03).
+ * Permission-based Policy for Cat & CatIdentification domain (PRD 3.1, 3.2, FIX-03).
  * Checks Spatie permissions only, never role strings.
  */
 class CatPolicy
