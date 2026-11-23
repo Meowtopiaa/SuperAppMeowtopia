@@ -46,6 +46,7 @@ class CatPublicResource extends JsonResource
             'presence_status' => $this->presence_status,
             'health_status' => $this->health_status,
             'adoption_status' => $this->adoption_status,
+            'status_badges' => $this->statusBadges(),
             'verification_status' => $this->verification_status,
             'first_seen_at' => $this->first_seen_at?->toIso8601String(),
             'last_seen_at' => $this->last_seen_at?->toIso8601String(),
