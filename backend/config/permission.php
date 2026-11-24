@@ -16,8 +16,8 @@ return [
     ],
 
     'column_names' => [
-        'role_pivot_key' => null,
-        'permission_pivot_key' => null,
+        'role_pivot_key' => 'role_id',
+        'permission_pivot_key' => 'permission_id',
         'model_morph_key' => 'model_id',
         'team_foreign_key' => 'team_id',
     ],

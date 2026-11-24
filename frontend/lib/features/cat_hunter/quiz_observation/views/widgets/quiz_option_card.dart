@@ -42,7 +42,7 @@ class QuizOptionCard extends StatelessWidget {
                 color: isSelected ? Colors.white : AppColors.surfaceSubtle,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary.withOpacity(0.3) : AppColors.borderSubtle,
+                  color: isSelected ? AppColors.primary.withValues(alpha: 0.3) : AppColors.borderSubtle,
                 ),
               ),
               alignment: Alignment.center,
@@ -71,7 +71,7 @@ class QuizOptionCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
-                      color: isSelected ? AppColors.primaryPeachDark.withOpacity(0.8) : AppColors.textSecondary,
+                      color: isSelected ? AppColors.primaryPeachDark.withValues(alpha: 0.8) : AppColors.textSecondary,
                     ),
                   ),
                 ],

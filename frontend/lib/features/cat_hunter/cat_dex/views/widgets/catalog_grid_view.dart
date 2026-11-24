@@ -200,7 +200,7 @@ class _CatalogGridViewState extends State<CatalogGridView> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.primaryPeach,
-                      border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: Image.asset(
@@ -296,7 +296,7 @@ class _CatalogGridViewState extends State<CatalogGridView> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black.withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
                       ),
                       child: const Text(

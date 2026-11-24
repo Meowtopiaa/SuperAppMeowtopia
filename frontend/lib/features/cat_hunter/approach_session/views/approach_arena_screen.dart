@@ -152,7 +152,7 @@ class _ApproachArenaScreenState extends State<ApproachArenaScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.65),
+      barrierColor: Colors.black.withValues(alpha: 0.65),
       builder: (_) => ResultModalDialog(
         cat: widget.cat,
         observation: widget.observationSubmission,
@@ -268,9 +268,9 @@ class _ApproachArenaScreenState extends State<ApproachArenaScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: _moodColor.withOpacity(0.15),
+                            color: _moodColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-                            border: Border.all(color: _moodColor.withOpacity(0.5)),
+                            border: Border.all(color: _moodColor.withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -374,7 +374,7 @@ class _ApproachArenaScreenState extends State<ApproachArenaScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: _isTimingModeActive
-                              ? AppColors.primary.withOpacity(0.12)
+                              ? AppColors.primary.withValues(alpha: 0.12)
                               : AppColors.primaryPeach,
                           border: Border.all(
                             color: _isTimingModeActive
@@ -384,7 +384,7 @@ class _ApproachArenaScreenState extends State<ApproachArenaScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(_isTimingModeActive ? 0.35 : 0.1),
+                              color: AppColors.primary.withValues(alpha: _isTimingModeActive ? 0.35 : 0.1),
                               blurRadius: 24,
                               spreadRadius: 4,
                             ),

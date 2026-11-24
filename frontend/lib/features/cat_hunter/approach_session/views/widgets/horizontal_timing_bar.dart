@@ -153,7 +153,7 @@ class HorizontalTimingBarState extends State<HorizontalTimingBar>
                               color: AppColors.sweetSpotGreen,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.sweetSpotGreen.withOpacity(0.5),
+                                  color: AppColors.sweetSpotGreen.withValues(alpha: 0.5),
                                   blurRadius: 6,
                                 ),
                               ],

@@ -87,7 +87,7 @@ class _QrScanScreenState extends State<QrScanScreen>
                   color: AppColors.sweetSpotGreenBg,
                   borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
                   border: Border.all(
-                    color: AppColors.sweetSpotGreen.withOpacity(0.3),
+                    color: AppColors.sweetSpotGreen.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -219,7 +219,7 @@ class _QrScanScreenState extends State<QrScanScreen>
                                       color: AppColors.primary,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: AppColors.primary.withOpacity(0.8),
+                                          color: AppColors.primary.withValues(alpha: 0.8),
                                           blurRadius: 8,
                                           spreadRadius: 2,
                                         ),
@@ -235,7 +235,7 @@ class _QrScanScreenState extends State<QrScanScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.08),
+                                  color: Colors.white.withValues(alpha: 0.08),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
@@ -264,7 +264,7 @@ class _QrScanScreenState extends State<QrScanScreen>
                             decoration: BoxDecoration(
                               color: _isFlashOn
                                   ? AppColors.primary
-                                  : Colors.black.withOpacity(0.4),
+                                  : Colors.black.withValues(alpha: 0.4),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -287,7 +287,7 @@ class _QrScanScreenState extends State<QrScanScreen>
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
                           ),
                           child: const Text(
@@ -349,7 +349,7 @@ class _QrScanScreenState extends State<QrScanScreen>
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<CatModel>(
-                      value: _selectedCat,
+                      initialValue: _selectedCat,
                       isExpanded: true,
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(

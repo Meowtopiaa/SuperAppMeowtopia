@@ -116,7 +116,7 @@ class _TerritoryMapScreenState extends State<TerritoryMapScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.92),
+                          color: Colors.white.withValues(alpha: 0.92),
                           borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
                           boxShadow: const [
                             BoxShadow(

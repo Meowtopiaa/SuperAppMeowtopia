@@ -34,7 +34,7 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
         bottom: 10,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.92),
+        color: AppColors.surface.withValues(alpha: 0.92),
         border: const Border(
           bottom: BorderSide(color: AppColors.borderSubtle, width: 1),
         ),

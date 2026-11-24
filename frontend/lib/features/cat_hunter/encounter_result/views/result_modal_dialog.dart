@@ -118,7 +118,7 @@ class ResultModalDialog extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.primaryPeach,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

@@ -156,7 +156,7 @@ class _CafeSanctuaryViewState extends State<CafeSanctuaryView> {
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              Colors.black.withOpacity(0.2),
+                              Colors.black.withValues(alpha: 0.2),
                             ],
                           ),
                         ),
@@ -182,7 +182,7 @@ class _CafeSanctuaryViewState extends State<CafeSanctuaryView> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.92),
+                                  color: Colors.white.withValues(alpha: 0.92),
                                   borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
                                   boxShadow: const [
                                     BoxShadow(
@@ -274,7 +274,7 @@ class _CafeSanctuaryViewState extends State<CafeSanctuaryView> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusCard),
-                border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 1.5),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
                 boxShadow: AppDimensions.cardShadow,
               ),
               child: Row(
