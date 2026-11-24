@@ -5,13 +5,14 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/meow_style.dart';
 import '../../../core/utils/date_labels.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../logic/feeding_spot_provider.dart';
 import 'feeding_widgets.dart';
 
 class FeedingSpotDetailPage extends StatefulWidget {
   const FeedingSpotDetailPage({super.key, required this.spotId});
-  final int spotId;
+  final String spotId;
   @override
   State<FeedingSpotDetailPage> createState() => _FeedingSpotDetailPageState();
 }
@@ -35,7 +36,7 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingIndicator()
               : FeedingMessage(
                   provider.errorMessage ??
                       'Spot tidak ditemukan atau sudah dinonaktifkan.',
@@ -138,51 +139,29 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                     TextButton.icon(
                       onPressed: () => showDialog<void>(
                         context: context,
-                        builder: (dialog) => Dialog(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Expanded(
-                                      child: Text(
-                                        'Peta spot kampus',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Tutup peta',
-                                      onPressed: () => Navigator.pop(dialog),
-                                      icon: const Icon(Icons.close_rounded),
-                                    ),
-                                  ],
-                                ),
-                                InteractiveViewer(
-                                  minScale: 1,
-                                  maxScale: 3,
-                                  child: CampusSpotMap(
-                                    spots: provider.spots,
-                                    selectedId: spot.id,
-                                    isDemo: provider.isDemo,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Cubit untuk memperbesar skema lokasi.',
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
+                        useSafeArea: false,
+                        builder: (dialog) => Scaffold(
+                          backgroundColor: Colors.black,
+                          appBar: AppBar(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            title: const Text('Peta Spot Telkom University'),
+                            leading: IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => Navigator.pop(dialog),
                             ),
+                          ),
+                          body: CampusSpotMap(
+                            spots: provider.spots,
+                            selectedId: spot.id,
+                            isDemo: provider.isDemo,
+                            isFullScreen: true,
                           ),
                         ),
                       ),
-                      icon: const Icon(Icons.open_in_full_rounded, size: 13),
+                      icon: const Icon(Icons.fullscreen_rounded, size: 16),
                       label: const Text(
-                        'Perbesar',
+                        'Layar Penuh',
                         style: TextStyle(fontSize: 11),
                       ),
                     ),
@@ -243,7 +222,9 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${spot.locationName} · Shelter kampus',
+                  spot.distanceLabel != null
+                      ? '${spot.locationName} · ${spot.distanceLabel} · Shelter kampus'
+                      : '${spot.locationName} · Shelter kampus',
                   style: const TextStyle(
                     fontSize: 14,
                     color: MeowStyle.brown,
@@ -252,9 +233,12 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                 ),
                 if (!spot.isActive) ...[
                   const SizedBox(height: 12),
-                  const MeowPill(
-                    'Pengajuan baru dinonaktifkan sementara',
+                  MeowPill(
+                    spot.statusReason != null && spot.statusReason!.trim().isNotEmpty
+                        ? 'Sementara ditutup: ${spot.statusReason}'
+                        : 'Pengajuan baru dinonaktifkan sementara',
                     color: MeowStyle.peach,
+                    icon: Icons.pause_circle_outline_rounded,
                   ),
                 ],
               ],
@@ -319,10 +303,22 @@ class _FeedingSpotDetailPageState extends State<FeedingSpotDetailPage> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Terakhir tercatat',
-                        style: TextStyle(fontSize: 12, color: MeowStyle.brown),
+                      Text(
+                        spot.lastFedSentence,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: MeowStyle.brown,
+                        ),
                       ),
+                      if (spot.hasPendingReview) ...[
+                        const SizedBox(height: 6),
+                        const MeowPill(
+                          'Ada pengajuan menunggu verifikasi',
+                          color: Color(0xFFFFF4E5),
+                          foreground: Color(0xFFD97706),
+                          icon: Icons.hourglass_top_rounded,
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Text(
                         spot.aggregateUpdatedAt == null

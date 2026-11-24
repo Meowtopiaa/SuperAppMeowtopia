@@ -56,4 +56,10 @@ class Cat extends Model
     {
         return $this->hasMany(CatStatusLog::class, 'cat_id');
     }
+
+    public function feedingSpots(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\App\Modules\FeedingSpot\Models\FeedingSpot::class, 'feeding_spot_cats', 'cat_id', 'spot_id')
+            ->withTimestamps();
+    }
 }

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/meow_style.dart';
+import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/meow_widgets.dart';
 import '../logic/feeding_spot_provider.dart';
 import 'feeding_widgets.dart';
@@ -183,11 +184,47 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(4, 2, 4, 12),
-                      child: SectionTitle(
-                        'Peta spot kampus',
-                        icon: Icons.layers_outlined,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 2, 4, 12),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: SectionTitle(
+                              'Peta spot kampus',
+                              icon: Icons.layers_outlined,
+                            ),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => showDialog<void>(
+                              context: context,
+                              useSafeArea: false,
+                              builder: (dialog) => Scaffold(
+                                backgroundColor: Colors.black,
+                                appBar: AppBar(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: Colors.white,
+                                  title: const Text('Peta Spot Telkom University'),
+                                  leading: IconButton(
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () => Navigator.pop(dialog),
+                                  ),
+                                ),
+                                body: CampusSpotMap(
+                                  spots: provider.spots,
+                                  isDemo: provider.isDemo,
+                                  isFullScreen: true,
+                                ),
+                              ),
+                            ),
+                            icon: const Icon(Icons.fullscreen_rounded, size: 16),
+                            label: const Text('Layar Penuh', style: TextStyle(fontSize: 11)),
+                          ),
+                        ],
                       ),
                     ),
                     CampusSpotMap(
@@ -212,8 +249,8 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
             const SizedBox(height: 14),
             if (provider.isLoading)
               const Padding(
-                padding: EdgeInsets.all(28),
-                child: Center(child: CircularProgressIndicator()),
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: LoadingIndicator(),
               ),
             if (provider.errorMessage != null)
               FeedingMessage(
@@ -282,12 +319,32 @@ class _FeedingSpotListPageState extends State<FeedingSpotListPage> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      spot.locationName,
+                      spot.distanceLabel != null
+                          ? '${spot.locationName} · ${spot.distanceLabel}'
+                          : spot.locationName,
                       style: const TextStyle(
                         fontSize: 12,
                         color: MeowStyle.brown,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      spot.lastFedSentence,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: MeowStyle.orangeDark,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (spot.hasPendingReview) ...[
+                      const SizedBox(height: 6),
+                      const MeowPill(
+                        'Ada pengajuan menunggu verifikasi',
+                        color: Color(0xFFFFF4E5),
+                        foreground: Color(0xFFD97706),
+                        icon: Icons.hourglass_top_rounded,
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     Row(
                       children: [

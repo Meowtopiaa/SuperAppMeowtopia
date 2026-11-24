@@ -166,7 +166,7 @@ class FeedingSubmissionPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'ID ${item.id}',
+                  'Ref ${item.feedingRecordRef ?? item.id} · ID ${item.id}',
                   style: const TextStyle(fontSize: 10, color: MeowStyle.brown),
                 ),
                 const Divider(height: 28, color: MeowStyle.lilac),
@@ -249,6 +249,33 @@ class FeedingSubmissionPage extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (item.rewardCapped) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      border: Border.all(color: const Color(0xFFFFEDD5)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, color: Color(0xFFC2410C), size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Aktivitas terverifikasi penuh, namun kuota reward pakan harian Anda sudah tercapai (reward capped). Poin tidak ditambahkan lagi hari ini.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF9A3412),
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -276,8 +303,8 @@ class FeedingSubmissionPage extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         item.creditedPoints > 0
-                            ? '+${item.creditedPoints} poin ${provider.isDemo ? 'contoh' : 'dikreditkan'}'
-                            : 'Belum ada poin dikreditkan',
+                            ? '${item.rewardStatusLabel} · +${item.creditedPoints} poin ${provider.isDemo ? 'contoh' : 'dikreditkan'}'
+                            : item.rewardStatusLabel,
                         style: const TextStyle(
                           fontSize: 13,
                           color: MeowStyle.green,

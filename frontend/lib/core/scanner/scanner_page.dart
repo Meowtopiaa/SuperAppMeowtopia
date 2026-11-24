@@ -164,7 +164,10 @@ class _ScannerPageState extends State<ScannerPage> {
             Container(
               color: Colors.black54,
               child: const Center(
-                child: LoadingIndicator(message: 'Memverifikasi kode...'),
+                child: LoadingIndicator(
+                  message: 'Memverifikasi kode...',
+                  onDark: true,
+                ),
               ),
             ),
           if (_errorMessage != null)
